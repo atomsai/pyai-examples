@@ -89,7 +89,8 @@
     ws.binaryType = "arraybuffer";
     ws.onopen = function () {
       // Stateless on PyAI: the whole agent behavior travels in this one frame.
-      try { ws.send(JSON.stringify(configure)); } catch (e) {}
+      // Control frames are 0x03-prefixed (see OMNI_PROTOCOL_V2.md §2/§3).
+      try { ws.send(frame03(configure)); } catch (e) {}
       startCapture();
     };
     ws.onmessage = onMessage;
@@ -120,12 +121,36 @@
     setState("live", "Listening — tap to end");
   }
 
+  // Build a 0x03-prefixed control frame (the engine's client→server framing).
+  function frame03(obj) {
+    var json = new TextEncoder().encode(JSON.stringify(obj));
+    var out = new Uint8Array(json.length + 1);
+    out[0] = 0x03;
+    out.set(json, 1);
+    return out.buffer;
+  }
+
+  // Demux by the first byte: 0x01 audio · 0x02 transcript · 0x03 control/event.
+  // (Treating every binary frame as audio — the classic bug — plays control
+  // frames as a glitch and silently drops every event.)
   function onMessage(ev) {
-    if (typeof ev.data !== "string") return playAgentAudio(ev.data);
-    var evt;
-    try { evt = JSON.parse(ev.data); } catch (e) { return; }
-    // Omni server frames are keyed on `event`; read it first, fall back to `type`.
-    var kind = evt.event || evt.type;
+    if (typeof ev.data === "string") { // legacy text frame — tolerate
+      try { handleEvent(JSON.parse(ev.data)); } catch (e) {}
+      return;
+    }
+    var u8 = new Uint8Array(ev.data);
+    var tag = u8[0];
+    if (tag === 0x01) return playAgentAudio(ev.data.slice(1)); // PCM16
+    if (tag === 0x02) return; // transcript JSON — this minimal widget doesn't render it
+    if (tag === 0x03) {
+      try { handleEvent(JSON.parse(new TextDecoder().decode(u8.subarray(1)))); } catch (e) {}
+      return;
+    }
+    playAgentAudio(ev.data); // unexpected/untagged: best-effort as audio
+  }
+
+  function handleEvent(evt) {
+    var kind = evt.event || evt.type; // server frames keyed on `event`
     if (kind === "barge_in" || kind === "flush") stopPlayback();
     else if (kind === "session_end") stop("Talk to us");
     else if (kind === "error") setState("error", "Error");

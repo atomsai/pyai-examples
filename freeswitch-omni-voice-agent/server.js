@@ -53,6 +53,9 @@ const esl = {
   },
 };
 
+// Engine control frames are 0x03-prefixed JSON (OMNI_PROTOCOL_V2.md §2/§3).
+const b03 = (obj) => Buffer.concat([Buffer.from([0x03]), Buffer.from(JSON.stringify(obj))]);
+
 function connectOmni() {
   const ws = new WebSocket(`${BASE}/v1/omni?format=pcm16&rate=${RATE}`, [`pyai-key.${KEY}`]);
   ws.binaryType = "nodebuffer";
@@ -69,23 +72,36 @@ wss.on("connection", (fs) => {
 
   omni.on("open", () => {
     // Stateless on PyAI: the agent's whole behavior travels in this frame.
-    omni.send(JSON.stringify({ type: "configure", persona: PERSONA, ...(VOICE ? { voice_id: VOICE } : {}) }));
+    omni.send(b03({ type: "configure", persona: PERSONA, ...(VOICE ? { voice_id: VOICE } : {}) }));
     omniReady = true;
     for (const buf of pending) omni.send(buf);
     pending.length = 0;
   });
 
   omni.on("message", (data, isBinary) => {
+    const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
+    let evt = null;
     if (isBinary) {
-      // Agent speech (PCM16 @ RATE) -> play into the call.
-      if (fs.readyState === fs.OPEN) fs.send(FS_PROTOCOL.playAudio(Buffer.isBuffer(data) ? data : Buffer.from(data)));
-      return;
-    }
-    let evt;
-    try {
-      evt = JSON.parse(data.toString());
-    } catch {
-      return;
+      // Engine binary frames are type-tagged: 0x01 audio · 0x02 transcript ·
+      // 0x03 control JSON. Demux on the first byte (treating all binary as audio
+      // plays control frames as a glitch and drops every event).
+      const tag = buf[0];
+      if (tag === 0x01) {
+        if (fs.readyState === fs.OPEN) fs.send(FS_PROTOCOL.playAudio(buf.subarray(1))); // PCM16 into the call
+        return;
+      }
+      if (tag !== 0x03) return; // 0x02 transcript (log/forward as you like) / untagged
+      try {
+        evt = JSON.parse(buf.subarray(1).toString());
+      } catch {
+        return;
+      }
+    } else {
+      try {
+        evt = JSON.parse(buf.toString()); // legacy text control frame, tolerated
+      } catch {
+        return;
+      }
     }
     // Read `event` first, then `type` (switching on `type` alone silently misses
     // every Omni server frame — the #1 integration bug).
@@ -116,7 +132,7 @@ wss.on("connection", (fs) => {
     if (ctrl.uuid && !channelUuid) channelUuid = ctrl.uuid; // captured from start metadata
     // If you forward FreeSWITCH DTMF events as control frames, pass them to Omni:
     if (ctrl.type === "dtmf" && ctrl.digit && omni.readyState === omni.OPEN) {
-      omni.send(JSON.stringify({ type: "dtmf", digit: String(ctrl.digit) }));
+      omni.send(b03({ type: "dtmf", digit: String(ctrl.digit) }));
     }
   });
 

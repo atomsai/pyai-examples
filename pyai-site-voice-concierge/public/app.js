@@ -110,7 +110,8 @@ async function connectDirect() {
   ws.binaryType = "arraybuffer";
   ws.onopen = () => {
     // Stateless on PyAI: the agent's whole behavior travels in this one frame.
-    try { ws.send(JSON.stringify(pendingConfigure)); } catch {}
+    // Control frames are 0x03-prefixed (OMNI_PROTOCOL_V2.md §2/§3).
+    try { ws.send(frame03(pendingConfigure)); } catch {}
     setStatus("Connecting to the agent…");
     startCapture();
   };
@@ -153,19 +154,60 @@ function startCapture() {
   setStatus("Listening — go ahead and ask.", "live");
 }
 
+// Build a 0x03-prefixed control frame (the engine's client→server framing).
+function frame03(obj) {
+  const json = new TextEncoder().encode(JSON.stringify(obj));
+  const out = new Uint8Array(json.length + 1);
+  out[0] = 0x03;
+  out.set(json, 1);
+  return out.buffer;
+}
+
 function onMessage(ev) {
   if (typeof ev.data !== "string") {
-    playAgentAudio(ev.data); // ArrayBuffer of PCM16 LE
+    // DIRECT mode: the engine sends type-tagged binary frames — demux on the
+    // first byte (0x01 audio · 0x02 transcript · 0x03 control). BROKER mode: our
+    // own server relays raw PCM audio (and carries events as text frames).
+    if (connectMode === "direct") return onBinaryFrame(ev.data);
+    playAgentAudio(ev.data);
     return;
   }
-  let evt;
-  try { evt = JSON.parse(ev.data); } catch { return; }
+  try {
+    handleEvent(JSON.parse(ev.data));
+  } catch {
+    /* ignore malformed */
+  }
+}
+
+// First-byte demux for the engine's binary frames (direct mode). Treating every
+// binary frame as audio plays control/transcript frames as a glitch and drops
+// every event — the #1 Omni integration bug.
+function onBinaryFrame(arrayBuffer) {
+  const u8 = new Uint8Array(arrayBuffer);
+  switch (u8[0]) {
+    case 0x01:
+      return playAgentAudio(arrayBuffer.slice(1)); // PCM16 LE
+    case 0x02:
+      try { renderTranscript(JSON.parse(new TextDecoder().decode(u8.subarray(1)))); } catch {}
+      return;
+    case 0x03:
+      try { handleEvent(JSON.parse(new TextDecoder().decode(u8.subarray(1)))); } catch {}
+      return;
+    default:
+      return playAgentAudio(arrayBuffer); // untagged fallback
+  }
+}
+
+function handleEvent(evt) {
   // Omni server frames are keyed on `event`; the broker also synthesizes a few
   // `type`-keyed control frames (`ready`/`session_end`/`error`). Read `event`
   // first, then fall back to `type` so both modes work. (Switching on `type`
   // alone is the #1 Omni bug — it silently misses every server frame.)
   const kind = evt.event || evt.type;
   switch (kind) {
+    case "config_ack":     // direct mode: ack for our configure
+      setStatus("Listening — go ahead and ask.", "live");
+      break;
     case "ready":            // broker mode: synthesized by our server
     case "session_started":  // direct mode: Omni's own opening event
       setStatus("Listening — go ahead and ask.", "live");

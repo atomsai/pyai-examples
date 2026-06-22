@@ -2,4 +2,4 @@
 
 These examples are published from the PyAI monorepo by
 `.github/workflows/publish-examples.yml`. Edit them there; changes are
-synced on merge to main. Source commit: `5edc450c0aaef84f04ba39d6deab8bcd966df2b9`.
+synced on merge to main. Source commit: `68ac88a0037cab7480d080d9196846b6e6ded880`.

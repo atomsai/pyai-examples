@@ -27,8 +27,14 @@ both ways, transcripts, barge-in, and DTMF.
 
 ## What it implements (per `OMNI_PROTOCOL_V2.md`)
 
-- **Handshake:** `hello` → `session_started`, then a `configured` ack after your
-  `configure` frame (server frames keyed on `event`).
+- **Binary, type-tagged frames** (the engine's real framing): every server →
+  client frame carries a first-byte tag — **`0x01` audio · `0x02` transcript ·
+  `0x03` control/event JSON**. **Demux on the first byte.** Client control frames
+  (`configure`, `dtmf`) are `0x03`-prefixed too. A client that treats all binary
+  as audio plays the control/transcript frames as a glitch and misses every
+  event — the same way it fails against prod.
+- **Handshake:** `hello` → `session_started` (0x03), then a `config_ack` (0x03)
+  after your `configure` frame (server frames keyed on `event`).
 - **Audio:** send binary PCM16 at the `?rate=` you connect with; after a short
   silence the mock "replies" with a tone (streamed in 150 ms chunks).
 - **Barge-in:** send audio while the mock is talking and it emits `flush` and
