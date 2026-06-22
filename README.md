@@ -23,6 +23,7 @@ npm create pyai-app@latest openai-drop-in my-app --key pyai_test_…
 | [`browser-hear-live-captions`](./browser-hear-live-captions) | Stream mic audio from the browser to **Hear** and render live partial/final captions. | Static HTML/JS |
 | [`voice-cloning`](./voice-cloning) | Clone a voice end to end: enroll a reference clip → poll until ready → speak in the cloned voice → use it in **Omni**. Includes the "why was my clip rejected" table. | Node, REST |
 | [`recap-call-intelligence`](./recap-call-intelligence) | Mine your calls: batch-transcribe (diarized) with **Hear** jobs, then compute **talk-ratio + keywords + summary** — the Gong-style "conversation intelligence" recipe. | Node, REST |
+| [`omni-mock`](./omni-mock) | An **offline Omni server** (wire protocol v2) to build + test your realtime client with **no key** — handshake, PCM16 both ways, barge-in, DTMF, and a built-in check for the event-vs-`type` footgun. | Node, `ws` |
 
 ## Getting a key
 
@@ -57,3 +58,4 @@ never parse, split, or decode them.
 - **Captions / transcription UI** → `browser-hear-live-captions`.
 - **Your own voice in the agent** → `voice-cloning`.
 - **Analytics on recorded calls** → `recap-call-intelligence`.
+- **Build an Omni client before you have a key** → `omni-mock` (offline protocol server).

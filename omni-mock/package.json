@@ -1,0 +1,17 @@
+{
+  "name": "pyai-example-omni-mock",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Offline PyAI Omni server (wire protocol v2) to build and test your realtime client before you have a key — with a built-in conformance check for the event-vs-type footgun.",
+  "scripts": {
+    "start": "node --env-file=.env server.js",
+    "start:noenv": "node server.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
