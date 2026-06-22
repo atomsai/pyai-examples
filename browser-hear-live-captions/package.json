@@ -1,0 +1,13 @@
+{
+  "name": "pyai-example-browser-hear-live-captions",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser demo: stream mic audio to PyAI Hear and render live captions.",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

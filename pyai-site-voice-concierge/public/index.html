@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Talk to PyAI</title>
+    <style>
+      :root { color-scheme: dark; --accent: #5b8cff; --ok: #6ee7a8; --err: #ff8585; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+        font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        background: radial-gradient(1200px 600px at 50% -10%, #1b2540, #0b0f1a); color: #e8ecf5;
+      }
+      .card {
+        width: min(560px, 92vw); background: #131a2b; border: 1px solid #243049; border-radius: 18px;
+        padding: 32px; box-shadow: 0 24px 70px rgba(0,0,0,.5); text-align: center;
+      }
+      h1 { margin: 0 0 4px; font-size: 24px; }
+      p.sub { margin: 0 0 26px; color: #95a0bd; font-size: 14px; }
+      .orb {
+        width: 132px; height: 132px; margin: 0 auto 22px; border-radius: 50%;
+        background: radial-gradient(circle at 50% 35%, #6f9bff, #2c52c9);
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 0 0 0 rgba(91,140,255,.5); transition: transform .12s ease;
+      }
+      .orb svg { width: 52px; height: 52px; fill: #fff; opacity: .95; }
+      .orb.live { animation: pulse 1.6s infinite; }
+      .orb.speaking { animation: pulse .7s infinite; }
+      @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(91,140,255,.45); }
+        70% { box-shadow: 0 0 0 22px rgba(91,140,255,0); }
+        100% { box-shadow: 0 0 0 0 rgba(91,140,255,0); }
+      }
+      button {
+        padding: 13px 26px; border-radius: 999px; border: 0; font-weight: 700; font-size: 15px; cursor: pointer;
+        background: var(--accent); color: #07112e;
+      }
+      button:disabled { opacity: .5; cursor: not-allowed; }
+      button.stop { background: #ff6b6b; color: #2a0808; }
+      .status { font-size: 13px; color: #95a0bd; margin: 16px 2px 0; min-height: 18px; }
+      .status.live { color: var(--ok); }
+      .status.err { color: var(--err); }
+      .transcript {
+        margin-top: 22px; text-align: left; max-height: 220px; overflow-y: auto;
+        background: #0e1424; border: 1px solid #233149; border-radius: 12px; padding: 14px 16px;
+        font-size: 14px; display: none;
+      }
+      .transcript.show { display: block; }
+      .turn { margin: 0 0 10px; }
+      .turn .who { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #6c7796; }
+      .turn.user .who { color: #8fb0ff; }
+      .turn.assistant .who { color: var(--ok); }
+      .hint { margin-top: 18px; font-size: 12px; color: #6c7796; }
+      a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Talk to PyAI</h1>
+      <p class="sub">Ask anything about PyAI — products, models, pricing — out loud.</p>
+
+      <div id="orb" class="orb">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Z" />
+          <path d="M19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V21a1 1 0 1 0 2 0v-3.08A7 7 0 0 0 19 11Z" />
+        </svg>
+      </div>
+
+      <button id="toggle">Start talking</button>
+      <div id="status" class="status">Click to start, then allow your microphone.</div>
+
+      <div id="transcript" class="transcript"></div>
+
+      <p class="hint">
+        Your voice streams to this site's backend, which bridges it to a
+        <strong>PyAI&nbsp;Omni</strong> agent. No API key is ever sent to your browser.
+      </p>
+    </div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

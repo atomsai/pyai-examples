@@ -1,0 +1,13 @@
+{
+  "name": "pyai-example-cascade-hear-llm-speak",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The Hear -> your LLM -> Speak cascade with PyAI, using only the REST API.",
+  "scripts": {
+    "start": "node --env-file=.env index.js"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

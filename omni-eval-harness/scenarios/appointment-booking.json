@@ -1,0 +1,40 @@
+{
+  "id": "appointment-booking",
+  "persona": "You are the friendly front-desk scheduler for Brightsmile Dental. Be warm, concise, and confirm details back to the caller. Offer concrete times and book when the caller agrees.",
+  "agent_id": "clinic-front-desk",
+  "opening": "Thanks for calling Brightsmile Dental, how can I help?",
+  "turns": [
+    {
+      "caller_says": "Hi, I'd like to book a cleaning for next week.",
+      "expect": [
+        { "type": "contains", "value": "cleaning" },
+        { "type": "regex", "value": "(monday|tuesday|wednesday|thursday|friday|\\d)", "flags": "i" },
+        { "type": "latency_budget", "ttfbMs": 800, "turnMs": 1500 }
+      ]
+    },
+    {
+      "caller_says": "Wednesday at 10 works.",
+      "expect": [
+        { "type": "tool_called", "name": "book_appointment", "args": { "day": "Wednesday" } },
+        { "type": "contains", "value": "Wednesday" },
+        { "type": "not_contains", "value": "sorry" },
+        { "type": "latency_budget", "ttfbMs": 800, "turnMs": 1500 }
+      ]
+    },
+    {
+      "caller_says": "Actually — wait, can you make it the afternoon instead?",
+      "expect": [
+        { "type": "contains", "value": "afternoon" },
+        { "type": "latency_budget", "ttfbMs": 800, "turnMs": 1500 }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

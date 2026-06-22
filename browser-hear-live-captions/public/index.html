@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PyAI Hear — live captions</title>
+    <style>
+      :root { color-scheme: light dark; --accent: #5b8cff; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+        font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: radial-gradient(1200px 600px at 50% -10%, #1b2540, #0b0f1a); color: #e8ecf5;
+      }
+      .card {
+        width: min(720px, 92vw); background: #131a2b; border: 1px solid #243049; border-radius: 16px;
+        padding: 28px; box-shadow: 0 20px 60px rgba(0,0,0,.45);
+      }
+      h1 { margin: 0 0 4px; font-size: 22px; }
+      p.sub { margin: 0 0 20px; color: #95a0bd; font-size: 14px; }
+      .row { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+      input {
+        flex: 1; min-width: 220px; padding: 11px 13px; border-radius: 10px; border: 1px solid #2c3a59;
+        background: #0e1424; color: #e8ecf5; font-size: 14px;
+      }
+      button {
+        padding: 11px 18px; border-radius: 10px; border: 0; font-weight: 600; font-size: 14px; cursor: pointer;
+        background: var(--accent); color: #07112e;
+      }
+      button:disabled { opacity: .5; cursor: not-allowed; }
+      button.stop { background: #ff6b6b; color: #2a0808; }
+      .status { font-size: 13px; color: #95a0bd; margin: 6px 2px 16px; min-height: 18px; }
+      .status.live { color: #6ee7a8; }
+      .status.err { color: #ff8585; }
+      .captions {
+        min-height: 160px; max-height: 320px; overflow-y: auto; padding: 16px; border-radius: 12px;
+        background: #0e1424; border: 1px solid #233149; font-size: 18px;
+      }
+      .final { color: #e8ecf5; }
+      .partial { color: #8fa0c8; font-style: italic; }
+      .hint { margin-top: 14px; font-size: 12px; color: #6c7796; }
+      a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Live captions</h1>
+      <p class="sub">Streams your microphone to <strong>PyAI Hear</strong> and renders partial &amp; final transcripts in real time.</p>
+
+      <div class="row">
+        <input id="key" type="password" placeholder="PyAI key (use a pyai_test_… sandbox key here)" autocomplete="off" />
+      </div>
+      <div class="row">
+        <input id="base" type="text" value="wss://api.pyai.com" />
+        <button id="toggle">Start listening</button>
+      </div>
+
+      <div id="status" class="status">Idle. Paste a sandbox key and click Start.</div>
+      <div id="captions" class="captions"><span class="partial">…</span></div>
+
+      <p class="hint">
+        The key travels as the WebSocket subprotocol <code>pyai-key.&lt;key&gt;</code>, the browser-safe
+        auth PyAI expects. <strong>Only use a <code>pyai_test_</code> sandbox key in the browser</strong> — never
+        ship a live key to a web page.
+      </p>
+    </div>
+
+    <script type="module">
+      const $ = (id) => document.getElementById(id);
+      const keyEl = $("key"), baseEl = $("base"), toggle = $("toggle");
+      const statusEl = $("status"), captionsEl = $("captions");
+
+      let ws, audioCtx, source, processor, stream, running = false;
+      let finals = [];
+
+      function setStatus(text, kind = "") { statusEl.textContent = text; statusEl.className = "status " + kind; }
+
+      function render(partial = "") {
+        captionsEl.innerHTML =
+          finals.map((t) => `<span class="final">${escapeHtml(t)}</span>`).join(" ") +
+          (partial ? ` <span class="partial">${escapeHtml(partial)}</span>` : "");
+        captionsEl.scrollTop = captionsEl.scrollHeight;
+      }
+      function escapeHtml(s) { return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+
+      async function start() {
+        const key = keyEl.value.trim();
+        if (!key) return setStatus("Enter a PyAI sandbox key first.", "err");
+
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+        } catch (e) {
+          return setStatus("Microphone permission denied.", "err");
+        }
+
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const sampleRate = Math.round(audioCtx.sampleRate); // Hear accepts 8000–48000
+
+        const url = `${baseEl.value.replace(/\/$/, "")}/v1/audio/transcriptions/stream` +
+          `?model=pyai-hear&sample_rate=${sampleRate}&encoding=pcm16&interim_results=true`;
+        ws = new WebSocket(url, [`pyai-key.${key}`]);
+        ws.binaryType = "arraybuffer";
+
+        ws.onopen = () => {
+          setStatus(`Listening at ${sampleRate} Hz… speak now.`, "live");
+          source = audioCtx.createMediaStreamSource(stream);
+          processor = audioCtx.createScriptProcessor(4096, 1, 1);
+          processor.onaudioprocess = (ev) => {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            const input = ev.inputBuffer.getChannelData(0);
+            const pcm = new Int16Array(input.length);
+            for (let i = 0; i < input.length; i++) {
+              const s = Math.max(-1, Math.min(1, input[i]));
+              pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+            }
+            ws.send(pcm.buffer);
+          };
+          source.connect(processor);
+          processor.connect(audioCtx.destination);
+        };
+
+        ws.onmessage = (ev) => {
+          let msg; try { msg = JSON.parse(ev.data); } catch { return; }
+          const text = (msg.text ?? "").trim();
+          if (msg.type === "final") { if (text) finals.push(text); render(); }
+          else if (msg.type === "partial" || msg.type === "speech_final") { render(text); }
+          else if (msg.type === "error") { setStatus(`Error: ${msg.message ?? msg.code ?? "unknown"}`, "err"); }
+        };
+        ws.onerror = () => setStatus("WebSocket error (check the key, scope, and base URL).", "err");
+        ws.onclose = (e) => { if (running) stop(`Closed (code ${e.code}).`); };
+
+        running = true;
+        toggle.textContent = "Stop";
+        toggle.classList.add("stop");
+      }
+
+      function stop(reason = "Stopped.") {
+        running = false;
+        try { processor && processor.disconnect(); } catch {}
+        try { source && source.disconnect(); } catch {}
+        try { stream && stream.getTracks().forEach((t) => t.stop()); } catch {}
+        try { audioCtx && audioCtx.close(); } catch {}
+        try { ws && ws.readyState <= 1 && ws.close(); } catch {}
+        toggle.textContent = "Start listening";
+        toggle.classList.remove("stop");
+        setStatus(reason);
+      }
+
+      toggle.onclick = () => (running ? stop() : start());
+    </script>
+  </body>
+</html>

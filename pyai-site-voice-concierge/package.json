@@ -1,0 +1,20 @@
+{
+  "name": "pyai-example-site-voice-concierge",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The 'Talk to PyAI' voice concierge for pyai.com: a browser widget bridged to a PyAI Omni agent through a server-side token broker, grounded on a customer-hosted kb_endpoint.",
+  "scripts": {
+    "start": "node --env-file=.env server.js",
+    "start:noenv": "node server.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@fastify/static": "^8.0.3",
+    "@fastify/websocket": "^11.0.1",
+    "fastify": "^5.8.5",
+    "ws": "^8.18.0"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "pyai-example-openai-drop-in",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Migrate from OpenAI to PyAI by changing the base URL: the official openai SDK, pointed at PyAI, for Speak (TTS) + Hear (STT).",
+  "scripts": {
+    "start": "node --env-file=.env index.mjs",
+    "smoke": "node index.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "openai": "^4.0.0"
+  }
+}

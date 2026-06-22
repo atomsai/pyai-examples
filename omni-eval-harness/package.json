@@ -1,0 +1,21 @@
+{
+  "name": "pyai-example-omni-eval-harness",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Simulation + eval harness: run scripted voice scenarios against a PyAI Omni agent (and the Hear stream) with no real phone call, then score them. Offline fixture mode by default (CI-safe, no network); dormant live mode against api.pyai.com.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/run.js",
+    "offline": "node src/run.js",
+    "live": "node --env-file=.env src/run.js --live",
+    "test": "node --test 'test/**/*.test.js'"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@pyai/twilio": "^0.2.0",
+    "@pyai/sdk": "^0.2.0"
+  }
+}

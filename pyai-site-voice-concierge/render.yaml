@@ -1,0 +1,28 @@
+# One-click deploy of the "Talk to PyAI" voice concierge to Render.
+#
+# Render reads this Blueprint, provisions a public Node web service, and prompts
+# only for PYAI_API_KEY. Everything else is wired automatically:
+#   • KB_TOKEN is generated (a random secret) so /kb is authenticated.
+#   • KB_PUBLIC_URL is derived at runtime from RENDER_EXTERNAL_URL (server.js),
+#     so per-turn grounding works with NO ngrok and NO manual URL.
+# Result: deploy → open the URL → click "Talk to PyAI" → it answers, grounded.
+#
+# Deploying from the monorepo instead of the standalone example? Set this
+# service's "Root Directory" to examples/pyai-site-voice-concierge.
+services:
+  - type: web
+    name: pyai-voice-concierge
+    runtime: node
+    plan: free # demo tier sleeps when idle; use "starter" for always-on
+    buildCommand: npm install
+    startCommand: npm run start:noenv
+    healthCheckPath: /health
+    envVars:
+      - key: PYAI_API_KEY # the only thing you must paste (server-side only)
+        sync: false
+      - key: KB_TOKEN # auto-generated secret; authenticates the engine's /kb calls
+        generateValue: true
+      - key: CONNECT_MODE # browser mints a short-lived token, connects to PyAI directly
+        value: direct
+      - key: ALLOWED_ORIGINS # lock the minted token to your origin in production
+        sync: false

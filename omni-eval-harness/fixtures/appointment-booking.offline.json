@@ -1,0 +1,47 @@
+{
+  "fixture": "appointment-booking.offline",
+  "scenario": "appointment-booking",
+  "agent_id": "clinic-front-desk",
+  "mode": "live-voice",
+  "recorded_at": "2026-06-16T12:00:00Z",
+  "note": "A recorded synthetic-caller session: caller text, the Hear-stream hypothesis of the synthesized caller audio (for WER), the Omni agent transcript, TTFB + turn latency, a tool call, and a barge-in. Hand-authored to PASS and to exercise every scorer; replace by recording a real --live run.",
+  "turns": [
+    {
+      "caller_says": "Hi, I'd like to book a cleaning for next week.",
+      "caller_audio_ms": 2280,
+      "asr_hypothesis": "Hi I'd like to book a cleaning for next week",
+      "agent_text": "I can help with that. We have a cleaning open Tuesday at 2 PM or Wednesday at 10 AM. Which works for you?",
+      "agent_audio_ms": 4100,
+      "ttfb_ms": 320,
+      "turn_ms": 690,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "Wednesday at 10 works.",
+      "caller_audio_ms": 1240,
+      "asr_hypothesis": "Wednesday at ten works",
+      "agent_text": "Great — you're booked for a cleaning on Wednesday at 10 AM. Anything else?",
+      "agent_audio_ms": 3050,
+      "ttfb_ms": 300,
+      "turn_ms": 720,
+      "tool_calls": [
+        { "name": "book_appointment", "args": { "day": "Wednesday", "time": "10:00", "service": "cleaning" } }
+      ],
+      "barge_in": null
+    },
+    {
+      "caller_says": "Actually — wait, can you make it the afternoon instead?",
+      "caller_audio_ms": 2520,
+      "asr_hypothesis": "Actually wait can you make it the afternoon instead",
+      "agent_text": "No problem — I moved your cleaning to Wednesday afternoon at 2 PM. You're all set.",
+      "agent_audio_ms": 3380,
+      "ttfb_ms": 280,
+      "turn_ms": 640,
+      "tool_calls": [
+        { "name": "book_appointment", "args": { "day": "Wednesday", "time": "14:00", "service": "cleaning" } }
+      ],
+      "barge_in": { "attempted": true, "recovered": true }
+    }
+  ]
+}

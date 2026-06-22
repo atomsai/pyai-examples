@@ -1,0 +1,13 @@
+{
+  "name": "pyai-example-voice-cloning",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Voice cloning end-to-end with PyAI: enroll a reference clip, poll until ready, speak in the cloned voice, use it in Omni. REST only.",
+  "scripts": {
+    "start": "node --env-file=.env index.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

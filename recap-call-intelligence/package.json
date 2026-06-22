@@ -1,0 +1,13 @@
+{
+  "name": "pyai-example-recap-call-intelligence",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Conversation intelligence with PyAI Hear batch jobs: diarized transcript → talk-ratio + keywords + summary. REST only.",
+  "scripts": {
+    "start": "node --env-file=.env index.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

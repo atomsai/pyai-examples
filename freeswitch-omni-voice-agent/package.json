@@ -1,0 +1,17 @@
+{
+  "name": "pyai-example-freeswitch-omni-voice-agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bridge a FreeSWITCH (mod_audio_stream) SIP call to a PyAI Omni voice agent at L16/16k — no transcode. Barge-in, DTMF, transfer-to-human.",
+  "scripts": {
+    "start": "node --env-file=.env server.js",
+    "start:noenv": "node server.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

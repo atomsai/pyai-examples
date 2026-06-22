@@ -1,0 +1,18 @@
+{
+  "name": "pyai-example-twilio-omni-voice-agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bridge a Twilio phone number to a PyAI Omni voice agent with @pyai/twilio.",
+  "scripts": {
+    "start": "node --env-file=.env server.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@fastify/websocket": "^11.0.1",
+    "@pyai/twilio": "^0.2.0",
+    "fastify": "^5.8.5"
+  }
+}
