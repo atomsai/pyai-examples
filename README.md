@@ -4,6 +4,13 @@ Runnable, copy-pasteable examples for building on [PyAI](https://pyai.com). Each
 folder is self-contained with its own `package.json`, `.env.example`, and
 `README.md`, and starts with `npm start`.
 
+**Fastest start** — scaffold any example in one command (no clone):
+
+```bash
+npm create pyai-app@latest            # pick an example interactively
+npm create pyai-app@latest openai-drop-in my-app --key pyai_test_…
+```
+
 | Example | What it shows | Stack |
 |---|---|---|
 | [`openai-drop-in`](./openai-drop-in) | Migrate from OpenAI by changing the **base URL**: the official `openai` SDK, pointed at PyAI, for **Speak** (TTS) + **Hear** (STT). Your method calls and preset voice names (`alloy`, `nova`, …) stay the same. | Node, Python |
