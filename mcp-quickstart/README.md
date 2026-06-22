@@ -20,6 +20,13 @@ a free **sandbox key** (no email/card), then synthesizes speech to `hello.mp3`.
 To use your own key instead, copy `.env.example` to `.env`, set `PYAI_API_KEY`,
 and run with `node --env-file=.env index.mjs` (or just `export PYAI_API_KEY=…`).
 
+Prefer Python? The same flow, standard-library only (needs Node on PATH for
+`npx`):
+
+```bash
+python3 client.py
+```
+
 ## Wire it into your agent
 
 ### Cursor
