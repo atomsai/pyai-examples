@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "pyai": {
+      "command": "npx",
+      "args": ["-y", "@pyai/mcp"]
+    }
+  }
+}

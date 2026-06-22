@@ -24,6 +24,7 @@ npm create pyai-app@latest openai-drop-in my-app --key pyai_test_…
 | [`voice-cloning`](./voice-cloning) | Clone a voice end to end: enroll a reference clip → poll until ready → speak in the cloned voice → use it in **Omni**. Includes the "why was my clip rejected" table. | Node, REST |
 | [`recap-call-intelligence`](./recap-call-intelligence) | Mine your calls: batch-transcribe (diarized) with **Hear** jobs, then compute **talk-ratio + keywords + summary** — the Gong-style "conversation intelligence" recipe. | Node, REST |
 | [`omni-mock`](./omni-mock) | An **offline Omni server** (wire protocol v2) to build + test your realtime client with **no key** — handshake, PCM16 both ways, barge-in, DTMF, and a built-in check for the event-vs-`type` footgun. | Node, `ws` |
+| [`mcp-quickstart`](./mcp-quickstart) | Use PyAI from **Cursor / Claude Code / Codex** via the **MCP** server ([`@pyai/mcp`](https://www.npmjs.com/package/@pyai/mcp)): your agent mints a free key and calls PyAI directly. Includes a zero-dep stdio client that mints a sandbox key → synthesizes speech end to end. | Node (no deps) |
 
 ## Getting a key
 
@@ -59,3 +60,4 @@ never parse, split, or decode them.
 - **Your own voice in the agent** → `voice-cloning`.
 - **Analytics on recorded calls** → `recap-call-intelligence`.
 - **Build an Omni client before you have a key** → `omni-mock` (offline protocol server).
+- **Build with PyAI from Cursor / Claude Code / Codex** → `mcp-quickstart` (the MCP server; your agent mints a key and calls PyAI for you).

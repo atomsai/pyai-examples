@@ -1,0 +1,13 @@
+{
+  "name": "pyai-example-mcp-quickstart",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Drive the PyAI MCP server (@pyai/mcp) over stdio: mint a free sandbox key and synthesize speech — no key, no human steps.",
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
