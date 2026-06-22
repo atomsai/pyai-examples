@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PyAI Omni voice widget — demo</title>
+    <style>
+      body { font: 16px/1.6 system-ui, sans-serif; max-width: 640px; margin: 8vh auto; padding: 0 20px; color: #1a1a2e; }
+      h1 { font-size: 1.6rem; }
+      code { background: #f0f0f5; padding: 2px 6px; border-radius: 6px; font-size: 0.9em; }
+      pre { background: #15120f; color: #f7efe2; padding: 16px; border-radius: 12px; overflow: auto; font-size: 0.85rem; }
+      .muted { color: #666; }
+    </style>
+  </head>
+  <body>
+    <h1>Your website, now with a voice</h1>
+    <p>
+      This page is plain HTML. The floating button in the bottom-right corner is the entire integration —
+      added with a single <code>&lt;script&gt;</code> tag. Click it and talk to an
+      <a href="https://docs.pyai.com">Omni</a> voice agent, right in the browser. No phone, no Twilio.
+    </p>
+    <p>To add the same widget to your own site, paste this one line:</p>
+    <pre><code>&lt;script src="https://your-site.example/pyai-widget.js" data-token-url="/token"&gt;&lt;/script&gt;</code></pre>
+    <p class="muted">
+      <code>data-token-url</code> points at your backend, which mints a short-lived session token so your
+      secret key never ships to the browser (see <code>server.js</code>). Your key never touches this page.
+    </p>
+
+    <!-- The whole integration: one tag. -->
+    <script src="/pyai-widget.js" data-token-url="/token" data-label="Talk to us"></script>
+  </body>
+</html>

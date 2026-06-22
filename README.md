@@ -17,6 +17,7 @@ npm create pyai-app@latest openai-drop-in my-app --key pyai_test_…
 | [`twilio-omni-voice-agent`](./twilio-omni-voice-agent) | A phone number that talks to an **Omni** voice agent — one-line bridge with [`@pyai/twilio`](../sdk/twilio). Barge-in, DTMF, and transfer-to-human included. | Node, Fastify |
 | [`freeswitch-omni-voice-agent`](./freeswitch-omni-voice-agent) | SIP-trunk path: bridge a **FreeSWITCH** call (`mod_audio_stream`) to **Omni** at L16/16k — **no transcode, no resampling**. Barge-in, DTMF, transfer via ESL. | Node, `ws` |
 | [`pyai-site-voice-concierge`](./pyai-site-voice-concierge) | A **"Talk to PyAI"** website voice agent: a browser widget brokered to **Omni** server-side (no key in the page), grounded per-turn on your own `kb_endpoint`. **One-click deploy** (Render) with grounding auto-configured — no ngrok. | Node, Fastify, browser |
+| [`omni-browser-widget`](./omni-browser-widget) | The **minimal embeddable**: add a talking **Omni** voice agent to any site with **one `<script>` tag**. Self-contained widget + a ~80-line, **zero-dependency** token-broker so your key never ships to the browser. No phone/Twilio. | Node (no deps), browser |
 | [`cascade-hear-llm-speak`](./cascade-hear-llm-speak) | The build-your-own pipeline: **Hear** (STT) → your LLM → **Speak** (TTS). Runs end to end with just a key. | Node, REST |
 | [`speak-telephony-formats`](./speak-telephony-formats) | **Speak** server-side audio formats (`g711_ulaw`/`g711_alaw`/`pcm`/`mp3`/`opus`) — get Twilio-ready μ-law in one param instead of a hand-rolled resampler + μ-law encoder. | Node, Python, curl |
 | [`browser-hear-live-captions`](./browser-hear-live-captions) | Stream mic audio from the browser to **Hear** and render live partial/final captions. | Static HTML/JS |
@@ -47,8 +48,10 @@ never parse, split, or decode them.
 - **A phone agent, fast** → `twilio-omni-voice-agent` (Omni does listen→think→speak
   for you).
 - **A phone agent on your own SIP trunk** → `freeswitch-omni-voice-agent`.
-- **A voice agent on your website** → `pyai-site-voice-concierge` (browser widget +
-  server-side Omni broker + your own grounding endpoint).
+- **A voice agent on your website** → `pyai-site-voice-concierge` (full standalone
+  app: browser widget + server-side Omni broker + your own grounding endpoint).
+- **Drop a voice widget into an existing site** → `omni-browser-widget` (one
+  `<script>` tag + a tiny token endpoint; no framework, no deps).
 - **Full control of the brain** → `cascade-hear-llm-speak` (bring your own LLM).
 - **Telephony-ready TTS bytes (μ-law, etc.)** → `speak-telephony-formats`.
 - **Captions / transcription UI** → `browser-hear-live-captions`.

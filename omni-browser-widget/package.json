@@ -1,0 +1,12 @@
+{
+  "name": "pyai-example-omni-browser-widget",
+  "private": true,
+  "type": "module",
+  "description": "Drop-in embeddable browser voice widget for PyAI Omni — one <script> tag + a tiny zero-dependency token-broker server.",
+  "scripts": {
+    "start": "node --env-file=.env server.js"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
