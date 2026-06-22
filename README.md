@@ -4,6 +4,16 @@ Runnable, copy-pasteable examples for building on [PyAI](https://pyai.com). Each
 folder is self-contained with its own `package.json`, `.env.example`, and
 `README.md`, and starts with `npm start`.
 
+> **Meet Omni — the all-in-one AI voice agent model.** Omni is a hybrid
+> speech-to-speech model with a fused LLM brain: over a single WebSocket it
+> hears, reasons, **calls your tools**, **grounds answers in your knowledge
+> base**, and speaks back in **emotion-aware voices** — with ~390 ms turn-taking
+> and barge-in. No STT-LLM-TTS pipeline to assemble, nothing to provision first.
+> One `configure` frame sets the whole agent (voice, persona, knowledge, tools);
+> built-in call control (`transfer_to_human`, `send_dtmf`, `play_hold`,
+> `collect`, `end_call`) ships in the engine. The Omni examples below take you
+> from a phone number to a grounded, tool-using agent in minutes.
+
 **Fastest start** — scaffold any example in one command (no clone):
 
 ```bash
@@ -14,7 +24,7 @@ npm create pyai-app@latest openai-drop-in my-app --key pyai_test_…
 | Example | What it shows | Stack |
 |---|---|---|
 | [`openai-drop-in`](./openai-drop-in) | Migrate from OpenAI by changing the **base URL**: the official `openai` SDK, pointed at PyAI, for **Speak** (TTS) + **Hear** (STT). Your method calls and preset voice names (`alloy`, `nova`, …) stay the same. | Node, Python |
-| [`twilio-omni-voice-agent`](./twilio-omni-voice-agent) | A phone number that talks to an **Omni** voice agent — one-line bridge with [`@pyai/twilio`](../sdk/twilio). Barge-in, DTMF, and transfer-to-human included. | Node, Fastify |
+| [`twilio-omni-voice-agent`](./twilio-omni-voice-agent) | A phone number that talks to the all-in-one **Omni** agent model — one-line bridge with [`@pyai/twilio`](../sdk/twilio). The fused brain reasons, calls tools, and grounds on your KB; barge-in, DTMF, and transfer-to-human included. | Node, Fastify |
 | [`freeswitch-omni-voice-agent`](./freeswitch-omni-voice-agent) | SIP-trunk path: bridge a **FreeSWITCH** call (`mod_audio_stream`) to **Omni** at L16/16k — **no transcode, no resampling**. Barge-in, DTMF, transfer via ESL. | Node, `ws` |
 | [`pyai-site-voice-concierge`](./pyai-site-voice-concierge) | A **"Talk to PyAI"** website voice agent: a browser widget brokered to **Omni** server-side (no key in the page), grounded per-turn on your own `kb_endpoint`. **One-click deploy** (Render) with grounding auto-configured — no ngrok. | Node, Fastify, browser |
 | [`omni-browser-widget`](./omni-browser-widget) | The **minimal embeddable**: add a talking **Omni** voice agent to any site with **one `<script>` tag**. Self-contained widget + a ~80-line, **zero-dependency** token-broker so your key never ships to the browser. No phone/Twilio. | Node (no deps), browser |
@@ -47,8 +57,8 @@ never parse, split, or decode them.
 ## Which one do I want?
 
 - **Already on OpenAI for audio** → `openai-drop-in` (keep your code; change the base URL).
-- **A phone agent, fast** → `twilio-omni-voice-agent` (Omni does listen→think→speak
-  for you).
+- **A phone agent, fast** → `twilio-omni-voice-agent` (Omni does
+  hear→think→tool-call→ground→speak for you — the whole agent in one model).
 - **A phone agent on your own SIP trunk** → `freeswitch-omni-voice-agent`.
 - **A voice agent on your website** → `pyai-site-voice-concierge` (full standalone
   app: browser widget + server-side Omni broker + your own grounding endpoint).

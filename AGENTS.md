@@ -83,18 +83,26 @@ PyAI is one platform with composable products. Treat **Hear** and **Speak** as
 primitives/on-ramps; reach for **Omni** when you want a full voice agent; add
 **Trace** and **Recap** to make any voice agent production-grade.
 
-### 1) Omni — AI voice agents (realtime, speech-to-speech)
-The flagship: one speech-to-speech model purpose-built for phone calls, with
-~390 ms median turn-taking. You stream audio in and get audio out — Omni handles
-listen → think → speak, including natural turn-taking and barge-in.
+### 1) Omni — the all-in-one AI voice agent model (realtime, speech-to-speech)
+The flagship, and genuinely all you need to ship a powerful phone agent: one
+**hybrid speech-to-speech model with a fused LLM brain**, purpose-built for phone
+calls, ~390 ms median turn-taking. You stream audio in and get audio out — Omni
+hears, reasons, **calls your tools**, **grounds answers in your knowledge base**,
+and speaks back in **emotion-aware voices**, with natural turn-taking and
+barge-in. No STT-LLM-TTS pipeline to stitch together.
 
 - **Connect:** `wss://api.pyai.com/v1/omni?format=pcm16&rate=24000`
   (OpenAI-realtime-compatible alias: `wss://api.pyai.com/v1/realtime?model=pyai-omni-realtime`)
 - **Scope:** `omni:session`
 - **Zero-state:** there is nothing to create first. The session is authorized by
-  your key's org; you set the agent's voice and behavior with a `configure` frame
-  right after connecting. `session_label` is an optional opaque tag for your own
+  your key's org; you set the **whole agent** with one `configure` frame right
+  after connecting — `voice_id` (stock, cloned, or designed), `persona`,
+  `kb_endpoint`/`kb_token` (per-turn knowledge grounding), and `tools[]`
+  (function calling). `session_label` is an optional opaque tag for your own
   correlation.
+- **Built-in call control (in the engine):** `transfer_to_human`, `send_dtmf`,
+  `play_hold`, `collect`, `end_call`. Extra `configure` knobs: `greeting`,
+  `language`, `model_tier`, `consent_line`.
 - **Use it for:** phone agents (receptionist, booking, qualification, support),
   website "talk to us" widgets, in-app voice assistants.
 - **Start from:** [`twilio-omni-voice-agent`](./twilio-omni-voice-agent),

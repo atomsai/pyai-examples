@@ -82,13 +82,23 @@ Other shapes:
 
 ## 4. Talk to a voice agent — Omni
 
-Omni is realtime speech-to-speech (~390 ms turn-taking). It's **zero-state**:
-connect with your key and send a `configure` frame; there's nothing to create
-first.
+Omni is the **all-in-one voice agent model**: a hybrid speech-to-speech engine
+with a fused LLM brain (~390 ms turn-taking). Over one socket it hears, reasons,
+calls your tools, grounds answers in your knowledge base, and speaks in
+emotion-aware voices. It's **zero-state**: connect with your key and send one
+`configure` frame; there's nothing to create first.
 
 ```
 wss://api.pyai.com/v1/omni?format=pcm16&rate=24000
 # auth on the upgrade with subprotocol:  pyai-key.<your key>
+
+# One configure frame = the whole agent:
+# { "type": "configure",
+#   "voice_id": "stock_ava_en_us",        // stock, cloned, or designed voice
+#   "persona": "You are Acme's support agent.",
+#   "kb_endpoint": "https://you.example.com/kb",   // knowledge grounding
+#   "tools": [ { "name": "lookup_order", "description": "…", "parameters": {…} } ] }
+# Built-ins in the engine: transfer_to_human, send_dtmf, play_hold, collect, end_call.
 ```
 
 Pick the starting point that matches your channel:

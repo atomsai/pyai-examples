@@ -44,12 +44,28 @@ const FS_PROTOCOL = {
 };
 // ──────────────────────────────────────────────────────────────────────────────
 
-// Optional: wire your Event Socket (ESL) client here to transfer/hangup by uuid.
-// e.g. with `esl`/`modesl`: conn.api(`uuid_transfer ${uuid} ${dest}`).
+// Optional: wire your Event Socket (ESL) client here to drive the call by uuid.
+// e.g. with `esl`/`modesl`: conn.api(`uuid_transfer ${uuid} ${dest}`). These are
+// the engine-native call-control verbs (execution: "engine" in GET /v1/tools):
+// the engine emits a 0x03 frame {"event":"<verb>", ...args} and the TRANSPORT
+// (this bridge) performs the media/SIP action. The engine spreads tool args
+// verbatim, so the arg names below match the tool input_schema.
 const esl = {
   transfer: (uuid, dest) => {
     if (!uuid) return;
     console.log(`[esl] would: uuid_transfer ${uuid} ${dest ?? "<dest>"}  (wire an ESL client to do this)`);
+  },
+  sendDtmf: (uuid, digits) => {
+    if (!uuid || !digits) return;
+    console.log(`[esl] would: uuid_send_dtmf ${uuid} ${digits}`);
+  },
+  playHold: (uuid, seconds) => {
+    if (!uuid) return;
+    console.log(`[esl] would: uuid_broadcast ${uuid} <hold-music>  (~${seconds ?? "until next turn"}s)`);
+  },
+  hangup: (uuid, reason) => {
+    if (!uuid) return;
+    console.log(`[esl] would: uuid_kill ${uuid} ${reason ?? "NORMAL_CLEARING"}`);
   },
 };
 
@@ -109,7 +125,19 @@ wss.on("connection", (fs) => {
     if (kind === "flush" || kind === "barge_in") {
       if (fs.readyState === fs.OPEN) fs.send(FS_PROTOCOL.killAudio()); // caller interrupted
     } else if (kind === "transfer_to_human") {
-      esl.transfer(channelUuid, evt.destination || evt.to);
+      esl.transfer(channelUuid, evt.destination || evt.to); // destination folded in from the agent's tool config
+    } else if (kind === "send_dtmf") {
+      esl.sendDtmf(channelUuid, evt.digits);
+    } else if (kind === "play_hold") {
+      esl.playHold(channelUuid, evt.seconds);
+    } else if (kind === "end_call") {
+      esl.hangup(channelUuid, evt.reason);
+    } else if (kind === "collect") {
+      // Fire-and-forget: the value reaches the brain via existing channels —
+      // caller speech (STT transcript) or caller DTMF (the inbound 0x03 {"event":
+      // "dtmf"} frame this bridge already forwards). Nothing to do unless you want
+      // to ensure DTMF capture is on for evt.kind === "dtmf".
+      console.log(`[omni] collect requested: field=${evt.field} kind=${evt.kind ?? "speech"}`);
     }
     // Other frames (session_started / transcript / session_ending …): log/forward as you like.
   });
