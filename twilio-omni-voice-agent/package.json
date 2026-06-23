@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@fastify/websocket": "^11.0.1",
-    "@pyai/twilio": "^0.2.0",
+    "@pyai/twilio": "^0.3.0",
     "fastify": "^5.8.5"
   }
 }
