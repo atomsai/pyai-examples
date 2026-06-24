@@ -13,7 +13,8 @@
 //   - Auth on the upgrade via the subprotocol `pyai-key.<key>` (key is opaque).
 //   - Right after open, send ONE `configure` control frame as JSON TEXT:
 //       { type:"configure", voice_id?, persona?, kb_endpoint?, kb_token? }
-//     Only LIVE fields are sent; roadmap fields (greeting/language/…) are omitted.
+//     This example sends only voice_id/persona/kb_*; roadmap fields
+//     (language/model_tier) are no-ops today and omitted.
 //   - Audio is BINARY PCM16 little-endian in both directions.
 //   - Session events (session_started, transcript, barge_in, …) are TEXT JSON.
 
