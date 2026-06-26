@@ -101,8 +101,8 @@ barge-in. No STT-LLM-TTS pipeline to stitch together.
   (function calling). `session_label` is an optional opaque tag for your own
   correlation.
 - **Built-in call control (in the engine):** `transfer_to_human`, `send_dtmf`,
-  `play_hold`, `collect`, `end_call`. Extra `configure` knobs: `greeting`,
-  `language`, `model_tier`, `consent_line`.
+  `play_hold`, `collect`, `end_call`. More **live** `configure` knobs: `greeting`
+  and `consent_line`. Roadmap knobs: `language`, `model_tier`.
 - **Use it for:** phone agents (receptionist, booking, qualification, support),
   website "talk to us" widgets, in-app voice assistants.
 - **Start from:** [`twilio-omni-voice-agent`](./twilio-omni-voice-agent),

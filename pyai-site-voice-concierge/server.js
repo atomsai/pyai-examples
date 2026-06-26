@@ -30,7 +30,7 @@ import fastifyWebsocket from "@fastify/websocket";
 
 import { OmniSession } from "./src/omni-session.js";
 import { retrieve } from "./src/knowledge.js";
-import { PERSONA } from "./src/persona.js";
+import { PERSONA, GREETING } from "./src/persona.js";
 
 const {
   PYAI_API_KEY,
@@ -123,15 +123,27 @@ app.post("/session", async (request, reply) => {
       return reply.code(502).send({ error: "mint_failed" });
     }
     const session = await res.json();
+    // The Omni engine derives the session's agent from the gateway-stamped
+    // `x-pyai-agent` header, which the gateway sets from the connect URL's
+    // `session_label`. The mint returns a label-less URL, so attach it here:
+    // without a label the engine takes its keystore fallback path (and if that
+    // keystore is unconfigured upstream, the socket closes 4401 immediately).
+    const sep = session.url.includes("?") ? "&" : "?";
+    const omniUrl = `${session.url}${sep}session_label=${encodeURIComponent(PYAI_SESSION_LABEL)}`;
     // Hand the browser everything it needs to connect + configure itself.
     return {
       token: session.token,
-      url: session.url,
+      url: omniUrl,
       expires_at: session.expires_at,
       configure: {
+        // The Omni engine dispatches control frames on `event` (it ignores a
+        // frame whose `event` it doesn't recognize), so a configure MUST carry
+        // `event: "configure"`. `type` is kept for back-compat / other tooling.
+        event: "configure",
         type: "configure",
         ...(PYAI_VOICE ? { voice_id: PYAI_VOICE } : {}),
         persona: PERSONA,
+        greeting: GREETING,
         ...(groundingOn ? { kb_endpoint: kbPublicUrl, kb_token: KB_TOKEN } : {}),
       },
       grounding: groundingOn,
@@ -198,6 +210,7 @@ app.get("/voice", { websocket: true }, (browser, request) => {
     baseURL: PYAI_BASE_URL,
     voice: PYAI_VOICE,
     persona: PERSONA,
+    greeting: GREETING,
     kbEndpoint: groundingOn ? kbPublicUrl : undefined,
     kbToken: groundingOn ? KB_TOKEN : undefined,
     rate: 24000,

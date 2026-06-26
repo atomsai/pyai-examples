@@ -30,6 +30,7 @@ const DEFAULT_BASE = "https://api.pyai.com";
  * @property {number}  [rate]        Sample rate (Hz). Default 24000.
  * @property {string}  [voice]       voice_id for the configure frame.
  * @property {string}  [persona]     System prompt for the brain.
+ * @property {string}  [greeting]    Turn-0 line the agent speaks first.
  * @property {string}  [kbEndpoint]  Customer-hosted grounding URL (this server's /kb).
  * @property {string}  [kbToken]     Bearer the engine presents to kbEndpoint.
  * @property {() => void}                         [onReady]
@@ -76,9 +77,12 @@ export class OmniSession {
     this.open = true;
     // Supply the agent's behavior for THIS session. Stateless on PyAI: nothing
     // is stored, so everything the agent needs is in this one frame.
-    const configure = { type: "configure" };
+    // The engine dispatches control frames on `event` — a configure missing
+    // `event: "configure"` is silently ignored (no persona/greeting/voice).
+    const configure = { event: "configure", type: "configure" };
     if (this.opts.voice) configure.voice_id = this.opts.voice;
     if (this.opts.persona) configure.persona = this.opts.persona;
+    if (this.opts.greeting) configure.greeting = this.opts.greeting;
     if (this.opts.kbEndpoint) configure.kb_endpoint = this.opts.kbEndpoint;
     if (this.opts.kbToken) configure.kb_token = this.opts.kbToken;
     this.#sendText(configure);
