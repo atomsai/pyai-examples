@@ -27,22 +27,28 @@
     "padding:12px 18px;border:none;border-radius:999px;cursor:pointer;font:600 14px/1 system-ui,sans-serif;",
     "color:#fff;background:#5B5BD6;box-shadow:0 8px 24px rgba(0,0,0,.18);transition:transform .15s,background .2s}",
     ".pyai-fab:hover{transform:translateY(-1px)}",
+    ".pyai-fab:focus-visible{outline:3px solid rgba(91,91,214,.45);outline-offset:3px}",
     ".pyai-fab.live{background:#16a34a}.pyai-fab.connecting{background:#d97706}.pyai-fab.error{background:#dc2626}",
     ".pyai-dot{width:10px;height:10px;border-radius:50%;background:#fff;opacity:.9}",
     ".pyai-fab.live .pyai-dot{animation:pyai-pulse 1.2s infinite}",
     "@keyframes pyai-pulse{0%,100%{opacity:1}50%{opacity:.3}}",
+    "@media (prefers-reduced-motion: reduce){.pyai-fab,.pyai-fab:hover{transition:none;transform:none}.pyai-fab.live .pyai-dot{animation:none}}",
   ].join("");
   document.head.appendChild(style);
 
   var fab = document.createElement("button");
+  fab.type = "button";
   fab.className = "pyai-fab";
+  fab.setAttribute("aria-label", LABEL);
   fab.innerHTML = '<span class="pyai-dot"></span><span class="pyai-label"></span>';
   var labelEl = fab.querySelector(".pyai-label");
+  labelEl.setAttribute("aria-live", "polite");
   document.body.appendChild(fab);
 
   function setState(cls, text) {
     fab.className = "pyai-fab" + (cls ? " " + cls : "");
     labelEl.textContent = text;
+    fab.setAttribute("aria-label", text);
   }
   setState("", LABEL);
 
@@ -66,7 +72,7 @@
       });
     } catch (e) {
       fab.disabled = false;
-      return setState("error", "Mic blocked");
+      return setState("error", "Allow microphone access");
     }
 
     audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: RATE });
@@ -81,7 +87,7 @@
     } catch (e) {
       fab.disabled = false;
       teardownAudio();
-      return setState("error", "Unavailable");
+      return setState("error", "Unavailable. Try again later");
     }
 
     var configure = session.configure || { type: "configure" };
