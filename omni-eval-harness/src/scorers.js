@@ -1,9 +1,9 @@
 // Deterministic scoring engine.
 //
 // Two layers, both pure and fully unit-tested (no network, no key):
-//   1. Per-turn assertion scorers  — contains / not_contains / regex /
+//   1. Per-turn assertion scorers, contains / not_contains / regex /
 //      tool_called / latency_budget.
-//   2. Aggregate metric scorers    — WER, TTFB P95, turn-latency P95, barge-in
+//   2. Aggregate metric scorers, WER, TTFB P95, turn-latency P95, barge-in
 //      recovery, Task Success Rate, and the VAQI composite, classified against
 //      the catalog in metrics.js.
 //

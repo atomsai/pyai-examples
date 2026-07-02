@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""OpenAI drop-in — your OpenAI audio code, served by PyAI.
+"""OpenAI drop-in, your OpenAI audio code, served by PyAI.
 
 The ONLY structural change from an OpenAI integration is the client below: set
 `base_url` to PyAI and use your PyAI key. The two `client.audio.*` calls are the
@@ -27,7 +27,7 @@ base = os.environ.get("PYAI_BASE_URL", "https://api.pyai.com").rstrip("/")
 client = OpenAI(api_key=api_key, base_url=f"{base}/v1")
 # ─────────────────────────────────────────────────────────────────────────────
 
-voice = os.environ.get("PYAI_VOICE", "alloy")  # an OpenAI preset name — works unchanged
+voice = os.environ.get("PYAI_VOICE", "alloy")  # an OpenAI preset name, works unchanged
 text = "The fastest migration is the one where you change a single line."
 
 # Speak (TTS): identical to OpenAI's client.audio.speech.create, model renamed.

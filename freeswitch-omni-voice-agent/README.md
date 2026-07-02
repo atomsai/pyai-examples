@@ -6,7 +6,7 @@ their own carrier (vs. the [Twilio example](../twilio-omni-voice-agent) for
 Programmable Voice).
 
 The key win: run FreeSWITCH at **L16 / 16 kHz** and connect Omni at
-**`rate=16000`** and there is **no μ-law, no resampling** anywhere — linear PCM16
+**`rate=16000`** and there is **no μ-law, no resampling** anywhere, linear PCM16
 flows straight through both ways.
 
 ```
@@ -22,17 +22,16 @@ flows straight through both ways.
 ```
 
 > **What's verified vs. what to match.** The **Omni side** here is exact (connect
-> URL, subprotocol auth, `configure` frame, PCM16 framing, `flush`/barge events —
-> see `docs/OMNI_PROTOCOL_V2.md`). The **FreeSWITCH side** uses the
+> URL, subprotocol auth, `configure` frame, PCM16 framing, `flush`/barge events, > see `docs/OMNI_PROTOCOL_V2.md`). The **FreeSWITCH side** uses the
 > [`mod_audio_stream`](https://github.com/amigniter/mod_audio_stream) JSON
 > protocol (`streamAudio` to play, `killAudio` to barge); its exact framing
 > varies by module build, so the FreeSWITCH-facing bits live in one clearly
-> marked adapter (`FS_PROTOCOL` in `server.js`) — match it to your module.
+> marked adapter (`FS_PROTOCOL` in `server.js`), match it to your module.
 
 ## 1. FreeSWITCH side
 
 Load the module and start a stream from the dialplan. Run the channel at 16 kHz
-so the fork is L16/16k (matches Omni's `rate=16000` — zero conversion):
+so the fork is L16/16k (matches Omni's `rate=16000`, zero conversion):
 
 ```xml
 <!-- dialplan/default/omni.xml -->
@@ -73,7 +72,7 @@ barge-in cuts it off.
 |---|---|---|
 | **Barge-in** | `flush` event (caller started talking) | `{"type":"killAudio"}` to stop playback immediately |
 | **Transfer to human** | `transfer_to_human` event | ESL `uuid_transfer <uuid> <dest>` (needs the channel `uuid` from the start metadata) |
-| **DTMF** | — | FreeSWITCH `DTMF` channel events → forward as `{"type":"dtmf","digit":"5"}` to Omni |
+| **DTMF** |, | FreeSWITCH `DTMF` channel events → forward as `{"type":"dtmf","digit":"5"}` to Omni |
 
 Transfer and DTMF use the FreeSWITCH **Event Socket (ESL)**. The bridge captures
 the channel `uuid` from the stream's start metadata (above) so it can issue
@@ -82,12 +81,12 @@ the channel `uuid` from the stream's start metadata (above) so it can issue
 ## Notes
 
 - **Why no transcode:** Omni at `rate=16000` speaks the same L16/16k FreeSWITCH
-  forks. For an 8 kHz G.711 leg use `rate=8000` instead — then the only step is
+  forks. For an 8 kHz G.711 leg use `rate=8000` instead, then the only step is
   μ-law companding, still no resampling.
 - **Auth:** the bridge holds the `pyai_*` key server-side and connects to Omni
   with it (subprotocol `pyai-key.<key>`). The key never touches the carrier or
   the caller.
-- **Stateless Omni:** there's nothing to create first — the agent's behavior
+- **Stateless Omni:** there's nothing to create first, the agent's behavior
   (voice, persona, knowledge) travels in the `configure` frame on connect. See
   `src/persona` inline in `server.js`.
 - This example is **not** in the nightly live-smoke (it needs a FreeSWITCH box);

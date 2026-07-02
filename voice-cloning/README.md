@@ -1,7 +1,7 @@
 # Voice cloning end-to-end: enroll → poll → speak → use in Omni
 
 Clone a real voice from a reference clip and use it everywhere a stock voice
-works — in [Speak](https://pyai.com/models/speak) (`POST /v1/audio/speech`) and
+works, in [Speak](https://pyai.com/models/speak) (`POST /v1/audio/speech`) and
 as the `voice_id` of an [Omni](https://pyai.com/models/omni) agent.
 
 ```
@@ -41,12 +41,12 @@ cleanup:         deleted voice_abc123 (set KEEP_CLONE=1 to keep it)
 
 The engine enforces a **genuine ≥24 kHz full-band** gate and wants enough
 material. A clip that *looks* like 24 kHz but was upsampled from a phone line is
-**rejected** — the gate measures real spectral content, not the file header.
+**rejected**, the gate measures real spectral content, not the file header.
 
 | What you see | Likely cause | Fix |
 |---|---|---|
-| Enroll `status: failed`, or a thin/muffled clone | Clip is band-limited — recorded at 8 kHz (phone/PSTN) or **upsampled** to 24 kHz | Record at **≥24 kHz full-band** with a real mic; don't resample an 8 kHz file up |
-| `status: failed` / poor likeness | Clip too **short** | Give **≥10 s** (6–15 s of clean, continuous speech is the sweet spot) |
+| Enroll `status: failed`, or a thin/muffled clone | Clip is band-limited, recorded at 8 kHz (phone/PSTN) or **upsampled** to 24 kHz | Record at **≥24 kHz full-band** with a real mic; don't resample an 8 kHz file up |
+| `status: failed` / poor likeness | Clip too **short** | Give **≥10 s** (6-15 s of clean, continuous speech is the sweet spot) |
 | Muddy / averaged voice | Background noise, music, or **multiple speakers** | One speaker, quiet room, no music bed |
 | Likeness off for non-English | **EN-only today** | Use English reference + text for now |
 | `403 forbidden` | Key lacks the **`voice:clone`** scope | Add the scope to the key in the console |
@@ -56,7 +56,7 @@ material. A clip that *looks* like 24 kHz but was upsampled from a phone line is
 > minutes). This example deletes the clone it creates; in your own code, list
 > with `GET /v1/voice/clones` and delete with `DELETE /v1/voice/clones/{id}`.
 > Because they hold cost and create durable state, publishable/browser tokens are
-> **never** granted `voice:clone` — mint clones from a server-side key only.
+> **never** granted `voice:clone`, mint clones from a server-side key only.
 
 ## Use the clone in Omni
 
@@ -93,4 +93,4 @@ curl https://api.pyai.com/v1/audio/speech \
   -d '{"input":"Hello in my own voice.","voice":"voice_abc123"}' --output cloned.wav
 ```
 
-Uses only the built-in `fetch`/`FormData` (Node ≥ 22) — see `index.mjs`.
+Uses only the built-in `fetch`/`FormData` (Node ≥ 22), see `index.mjs`.

@@ -8,7 +8,7 @@ OmniAgent.bridge(twilioWS, { apiKey, agentId, voice, persona, knowledge });
 ```
 
 `@pyai/twilio` handles mu-law↔PCM16 transcoding, resampling, the Omni handshake,
-barge-in, and DTMF — so this example is just an HTTP route for TwiML and a
+barge-in, and DTMF, so this example is just an HTTP route for TwiML and a
 WebSocket route for the media stream.
 
 ## Run it
@@ -36,13 +36,13 @@ off; press a key to confirm DTMF flows through.
 
 ## What to try
 
-- **Persona / voice** — edit `persona` and `PYAI_VOICE` in `server.js` / `.env`.
-- **Knowledge** — replace the `knowledge(query)` stub with your vector search;
+- **Persona / voice**, edit `persona` and `PYAI_VOICE` in `server.js` / `.env`.
+- **Knowledge**, replace the `knowledge(query)` stub with your vector search;
   whatever you return is forwarded to the agent each turn.
-- **Transfer to a human** — set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and
+- **Transfer to a human**, set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and
   `HUMAN_NUMBER`; when the agent decides to hand off, the live call is `<Dial>`ed
   to that number.
-- **Lower latency** — pass `omniRate: 8000` to `OmniAgent.bridge(...)` to match
+- **Lower latency**, pass `omniRate: 8000` to `OmniAgent.bridge(...)` to match
   Twilio's rate exactly and skip resampling.
 
 ## Notes

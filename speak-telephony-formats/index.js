@@ -1,13 +1,13 @@
-// Speak telephony formats — "120 lines of DSP" vs "one param".
+// Speak telephony formats, "120 lines of DSP" vs "one param".
 //
 // AFTER (the win): ask Speak for response_format: "g711_ulaw" and the server
-// returns 8 kHz mono μ-law — the exact bytes a Twilio Media Stream wants. No
+// returns 8 kHz mono μ-law, the exact bytes a Twilio Media Stream wants. No
 // client-side resampler, no μ-law encoder.
 //
 // BEFORE (what you used to write): request wav@24k, then resample 24k→8k and
 // μ-law-encode it yourself. This file shows that path too, using the audio
 // helpers from @pyai/twilio (muLawEncode + makeResampler), so you can see
-// exactly how much code the one param replaces — and verify both produce the
+// exactly how much code the one param replaces, and verify both produce the
 // same μ-law length.
 //
 // Run: cp .env.example .env  &&  npm install  &&  npm start
@@ -52,6 +52,6 @@ async function before() {
 const afterLen = await after();
 const beforeLen = await before();
 console.log(
-  `\nSame audio, both ~${Math.round((afterLen / Math.max(beforeLen, 1)) * 100)}% of the hand-rolled length — ` +
+  `\nSame audio, both ~${Math.round((afterLen / Math.max(beforeLen, 1)) * 100)}% of the hand-rolled length, ` +
     `the server-side path drops the client DSP entirely.`,
 );

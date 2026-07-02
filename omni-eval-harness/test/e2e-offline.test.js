@@ -46,7 +46,7 @@ test("offline end-to-end: sample scenario + fixture score a clean PASS", () => {
 
   // Markdown renders and reflects the verdict.
   const md = renderMarkdown(sc);
-  assert.match(md, /# Omni Eval Scorecard — appointment-booking/);
+  assert.match(md, /# Omni Eval Scorecard, appointment-booking/);
   assert.match(md, /\*\*Verdict:\*\* PASS/);
   assert.match(md, /LLM-judge:\*\* STUB/);
 });

@@ -151,7 +151,7 @@ function startCapture() {
   micSource.connect(processor);
   processor.connect(audioCtx.destination); // required for onaudioprocess to fire
   setOrb("live");
-  setStatus("Listening — go ahead and ask.", "live");
+  setStatus("Listening, go ahead and ask.", "live");
 }
 
 // Build a 0x03-prefixed control frame (the engine's client→server framing).
@@ -165,7 +165,7 @@ function frame03(obj) {
 
 function onMessage(ev) {
   if (typeof ev.data !== "string") {
-    // DIRECT mode: the engine sends type-tagged binary frames — demux on the
+    // DIRECT mode: the engine sends type-tagged binary frames, demux on the
     // first byte (0x01 audio · 0x02 transcript · 0x03 control). BROKER mode: our
     // own server relays raw PCM audio (and carries events as text frames).
     if (connectMode === "direct") return onBinaryFrame(ev.data);
@@ -181,7 +181,7 @@ function onMessage(ev) {
 
 // First-byte demux for the engine's binary frames (direct mode). Treating every
 // binary frame as audio plays control/transcript frames as a glitch and drops
-// every event — the #1 Omni integration bug.
+// every event, the #1 Omni integration bug.
 function onBinaryFrame(arrayBuffer) {
   const u8 = new Uint8Array(arrayBuffer);
   switch (u8[0]) {
@@ -202,22 +202,22 @@ function handleEvent(evt) {
   // Omni server frames are keyed on `event`; the broker also synthesizes a few
   // `type`-keyed control frames (`ready`/`session_end`/`error`). Read `event`
   // first, then fall back to `type` so both modes work. (Switching on `type`
-  // alone is the #1 Omni bug — it silently misses every server frame.)
+  // alone is the #1 Omni bug, it silently misses every server frame.)
   const kind = evt.event || evt.type;
   switch (kind) {
     case "config_ack":     // direct mode: ack for our configure
-      setStatus("Listening — go ahead and ask.", "live");
+      setStatus("Listening, go ahead and ask.", "live");
       break;
     case "ready":            // broker mode: synthesized by our server
     case "session_started":  // direct mode: Omni's own opening event
-      setStatus("Listening — go ahead and ask.", "live");
+      setStatus("Listening, go ahead and ask.", "live");
       break;
     case "transcript":
       renderTranscript(evt);
       break;
     case "barge_in":
     case "flush":
-      stopPlayback(); // user interrupted — drop buffered agent audio immediately
+      stopPlayback(); // user interrupted, drop buffered agent audio immediately
       setOrb("live");
       break;
     case "session_end":

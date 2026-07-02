@@ -5,7 +5,7 @@
 // matched rates there is NO resampling and NO μ-law anywhere.
 //
 // The Omni side is exact (docs/OMNI_PROTOCOL_V2.md). The FreeSWITCH side speaks
-// the mod_audio_stream JSON protocol, which varies by module build — it is
+// the mod_audio_stream JSON protocol, which varies by module build, it is
 // isolated in FS_PROTOCOL below so you can match it to yours.
 //
 // Run: cp .env.example .env  &&  npm install  &&  npm start
@@ -25,7 +25,7 @@ if (!KEY) {
   process.exit(1);
 }
 
-// ── FreeSWITCH-facing protocol adapter — MATCH TO YOUR mod_audio_stream BUILD ──
+// ── FreeSWITCH-facing protocol adapter, MATCH TO YOUR mod_audio_stream BUILD ──
 // Reference: https://github.com/amigniter/mod_audio_stream
 const FS_PROTOCOL = {
   // Parse an inbound text frame (connect metadata / events). Return an object.
@@ -120,7 +120,7 @@ wss.on("connection", (fs) => {
       }
     }
     // Read `event` first, then `type` (switching on `type` alone silently misses
-    // every Omni server frame — the #1 integration bug).
+    // every Omni server frame, the #1 integration bug).
     const kind = evt.event || evt.type;
     if (kind === "flush" || kind === "barge_in") {
       if (fs.readyState === fs.OPEN) fs.send(FS_PROTOCOL.killAudio()); // caller interrupted
@@ -133,8 +133,7 @@ wss.on("connection", (fs) => {
     } else if (kind === "end_call") {
       esl.hangup(channelUuid, evt.reason);
     } else if (kind === "collect") {
-      // Fire-and-forget: the value reaches the brain via existing channels —
-      // caller speech (STT transcript) or caller DTMF (the inbound 0x03 {"event":
+      // Fire-and-forget: the value reaches the brain via existing channels, // caller speech (STT transcript) or caller DTMF (the inbound 0x03 {"event":
       // "dtmf"} frame this bridge already forwards). Nothing to do unless you want
       // to ensure DTMF capture is on for evt.kind === "dtmf".
       console.log(`[omni] collect requested: field=${evt.field} kind=${evt.kind ?? "speech"}`);

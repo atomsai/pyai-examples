@@ -1,4 +1,4 @@
-// Recap — mine your calls: batch transcribe (diarized) → talk-ratio + keywords
+// Recap, mine your calls: batch transcribe (diarized) → talk-ratio + keywords
 // + summary. Built on PyAI Hear batch jobs (/v1/transcription/jobs).
 //
 // Runs with ONLY a key: it synthesizes a short two-voice support call so the

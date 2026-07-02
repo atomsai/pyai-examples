@@ -9,34 +9,34 @@ caller, deterministic scorers, timing capture, and a PASS/WARN/FAIL scorecard.
 
 There is no offline `omni-mock`. The harness has two modes:
 
-- **OFFLINE (default)** — replays a recorded session **fixture** and scores it.
+- **OFFLINE (default)**, replays a recorded session **fixture** and scores it.
   No network, no key, CI-safe. This is what `npm test` and `npm run offline` use.
-- **LIVE (`--live`)** — connects to the real surfaces as a synthetic caller:
+- **LIVE (`--live`)**, connects to the real surfaces as a synthetic caller:
   **Speak → PCM → Omni**, plus the **Hear stream** for caller-audio WER, captures
-  the session, and scores it. **Gated** on `PYAI_API_KEY` — with no key it skips
+  the session, and scores it. **Gated** on `PYAI_API_KEY`, with no key it skips
   cleanly and exits 0 (the repo's dormant-gate pattern), so the same command is
   safe to wire into CI.
 
 The scorers, scenario/fixture formats, timing, and scorecard are identical across
-both modes — the only difference is whether the `RunResult` came from a live WS
+both modes, the only difference is whether the `RunResult` came from a live WS
 session or a recorded fixture.
 
 ## Quick start
 
 ```bash
-# OFFLINE — score the sample recorded session (no key, no network):
+# OFFLINE, score the sample recorded session (no key, no network):
 npm run offline
 
 # Unit + offline e2e tests:
 npm test
 
-# LIVE — needs a key; without one it skips and exits 0 (dormant gate):
+# LIVE, needs a key; without one it skips and exits 0 (dormant gate):
 cp .env.example .env   # add a pyai_test_ sandbox key
 npm run live
 ```
 
 Offline mode and the tests need **no `npm install`** (zero third-party imports on
-that path). Live mode needs the workspace SDKs built once — see
+that path). Live mode needs the workspace SDKs built once, see
 [Live mode](#live-mode).
 
 ## File tree
@@ -113,24 +113,24 @@ Anything you omit defaults to the catalog's warn edge.
 
 Two deterministic layers, both pure and fully unit-tested:
 
-1. **Per-turn assertion scorers** — the table above.
+1. **Per-turn assertion scorers**, the table above.
 2. **Aggregate metric scorers**, classified into good / warn / critical bands and
    gated against `thresholds`. The names and bands mirror
    [the evals plan §4](../../docs/PYAI_EVALS_PLATFORM_PLAN_2026-06-16.md) (this
-   harness keeps its scorers self-contained — it does **not** depend on `evals/`):
+   harness keeps its scorers self-contained, it does **not** depend on `evals/`):
 
    | Metric | Good / Warn / Critical |
    |---|---|
-   | WER (ASR) | <5% / 5–10% / >10% |
-   | TTFB P95 (time-to-first-word) | <400ms / 400–800ms / >800ms |
-   | Turn latency P95 | <800ms / 800–1500ms / >1500ms |
-   | Barge-in recovery rate | >90% / 80–90% / <80% |
-   | Task Success Rate | >85% / 75–85% / <75% |
+   | WER (ASR) | <5% / 5-10% / >10% |
+   | TTFB P95 (time-to-first-word) | <400ms / 400-800ms / >800ms |
+   | Turn latency P95 | <800ms / 800-1500ms / >1500ms |
+   | Barge-in recovery rate | >90% / 80-90% / <80% |
+   | Task Success Rate | >85% / 75-85% / <75% |
    | VAQI (composite) | >70 strong (warn <60) |
 
    **WER** is corpus-level (total edits / total reference words) between each
    caller turn and the Hear-stream transcript of its audio. **VAQI** =
-   `interruptions·40% + missed-response·40% + latency·20%` (0–100), exactly the
+   `interruptions·40% + missed-response·40% + latency·20%` (0-100), exactly the
    plan's weighting.
 
 **Overall verdict:** `FAIL` if any hard assertion fails or any metric breaches its
@@ -144,11 +144,11 @@ Each run writes `out/<scenario>.scorecard.md` and `out/<scenario>.scorecard.json
 and prints the markdown. Sample (the offline default run):
 
 ```
-# Omni Eval Scorecard — appointment-booking
+# Omni Eval Scorecard, appointment-booking
 
 - **Verdict:** PASS
 - **Mode:** live-voice (`fixtures/appointment-booking.offline.json`)
-- **LLM-judge:** STUB (heuristic-stub) — deterministic placeholder, NOT a real model
+- **LLM-judge:** STUB (heuristic-stub), deterministic placeholder, NOT a real model
 
 ## Aggregate metrics
 | Dimension | Value | Band | Gate |
@@ -166,7 +166,7 @@ report.)
 
 ## Offline fixtures
 
-A **fixture** is a recorded session — exactly the per-turn signals the live runner
+A **fixture** is a recorded session, exactly the per-turn signals the live runner
 captures, serialized so the scorers can replay them with no network:
 
 ```json
@@ -210,7 +210,7 @@ agent goes quiet for a settle window).
 
 `run.js --live` checks `PYAI_API_KEY`:
 
-- **absent** → prints a skip notice and **exits 0** (dormant gate — CI-safe).
+- **absent** → prints a skip notice and **exits 0** (dormant gate, CI-safe).
 - **present** → dynamically imports `src/live.js` and runs against
   `https://api.pyai.com` (override with `PYAI_BASE_URL`). `agent_id` resolves from
   `--agent-id` → `PYAI_AGENT_ID` → the scenario → `harness-agent`.
@@ -235,7 +235,7 @@ tests are unaffected).
 - Scenario format + validation; assertion scorers (`contains` / `not_contains` /
   `regex` / `tool_called` / `latency_budget`).
 - Aggregate metrics: WER (real edit-distance), TTFB/turn P50+P95, barge-in
-  recovery, Task Success Rate, VAQI — banded and gated.
+  recovery, Task Success Rate, VAQI, banded and gated.
 - Transcript capture, timing capture, tool-call capture, scorecard (md + JSON),
   PASS/WARN/FAIL gating + CI exit code.
 - Live transport reuse (Omni WS + resampler via `@pyai/twilio`; Speak + Hear via
@@ -243,14 +243,14 @@ tests are unaffected).
 
 **Stubbed / pluggable (clearly marked):**
 
-- **LLM-judge** (`src/judge.js`) — a deterministic keyword-coverage heuristic that
+- **LLM-judge** (`src/judge.js`), a deterministic keyword-coverage heuristic that
   **calls no model**; every rationale is prefixed `[STUB]`. Plug a real judge by
   passing `{ judgeFn }` to `evaluate()`; the contract and the §2 judge discipline
   (decompose into binary checks, pin the version, keep a human-calibrated holdout)
   are documented in `src/judge.js`.
 
 **Engine-roadmap-dependent (sent forward-compatibly):** text-mode input and
-mid-call tool calls — the Omni protocol marks both as not-yet-honored, so live
+mid-call tool calls, the Omni protocol marks both as not-yet-honored, so live
 mode sends them and captures whatever the engine returns; the offline fixtures
 exercise the scoring of both today.
 ```

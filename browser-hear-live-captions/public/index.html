@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>PyAI Hear — live captions</title>
+    <title>PyAI Hear, live captions</title>
     <style>
       :root { color-scheme: light dark; --accent: #5b8cff; }
       * { box-sizing: border-box; }
@@ -60,7 +60,7 @@
 
       <p class="hint">
         The key travels as the WebSocket subprotocol <code>pyai-key.&lt;key&gt;</code>, the browser-safe
-        auth PyAI expects. <strong>Only use a <code>pyai_test_</code> sandbox key in the browser</strong> — never
+        auth PyAI expects. <strong>Only use a <code>pyai_test_</code> sandbox key in the browser</strong>, never
         ship a live key to a web page.
       </p>
     </div>
@@ -94,7 +94,7 @@
         }
 
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const sampleRate = Math.round(audioCtx.sampleRate); // Hear accepts 8000–48000
+        const sampleRate = Math.round(audioCtx.sampleRate); // Hear accepts 8000-48000
 
         const url = `${baseEl.value.replace(/\/$/, "")}/v1/audio/transcriptions/stream` +
           `?model=pyai-hear&sample_rate=${sampleRate}&encoding=pcm16&interim_results=true`;

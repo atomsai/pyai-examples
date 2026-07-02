@@ -3,7 +3,7 @@
 // These mirror the names + bands in docs/PYAI_EVALS_PLATFORM_PLAN_2026-06-16.md
 // §4. The catalog is kept self-contained here on purpose: a sibling agent is
 // building an engine-benchmark scorer set under evals/, and this harness must
-// NOT depend on it — but the metric names and thresholds match so scorecards are
+// NOT depend on it, but the metric names and thresholds match so scorecards are
 // comparable across both.
 //
 // Bands (good / warn / critical):

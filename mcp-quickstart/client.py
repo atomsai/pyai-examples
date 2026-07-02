@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""MCP quickstart (Python) — drive the PyAI MCP server (@pyai/mcp) over stdio.
+"""MCP quickstart (Python), drive the PyAI MCP server (@pyai/mcp) over stdio.
 
 Spawns ``npx -y @pyai/mcp``, performs the MCP handshake, lists the tools, mints a
 free sandbox key (no human steps) unless ``PYAI_API_KEY`` is already set, then
-synthesizes speech to ``hello.mp3`` — proving "MCP -> working PyAI call" end to
+synthesizes speech to ``hello.mp3``, proving "MCP -> working PyAI call" end to
 end.
 
 Transport: newline-delimited JSON-RPC 2.0 over stdio (the MCP stdio transport).
-Standard library only — Python 3.8+, plus Node (for ``npx``) on PATH.
+Standard library only, Python 3.8+, plus Node (for ``npx``) on PATH.
 
     python3 client.py
 """
@@ -129,7 +129,7 @@ def main():
             },
         )
         print("synthesize_speech:", tts)
-        print(f"\nDone — play {out_path}")
+        print(f"\nDone, play {out_path}")
     except (RuntimeError, FileNotFoundError) as err:
         print("Error:", err, file=sys.stderr)
         sys.exit(1)

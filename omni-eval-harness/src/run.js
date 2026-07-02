@@ -1,8 +1,8 @@
-// omni-eval-harness — entry point.
+// omni-eval-harness, entry point.
 //
 // Two modes:
 //   OFFLINE (default)  replays a recorded session fixture and scores it. No
-//                      network, no key — safe in CI. This is what `npm test`
+//                      network, no key, safe in CI. This is what `npm test`
 //                      and `npm run offline` use.
 //   LIVE (--live)      connects to the real PyAI surfaces as a synthetic caller
 //                      (Speak -> Omni, plus the Hear stream for caller-audio
@@ -71,10 +71,9 @@ async function main() {
   let run;
   if (opts.live) {
     const apiKey = process.env.PYAI_API_KEY;
-    // Dormant gate: behave exactly like the rest of the repo's live paths —
-    // when the key is absent, skip cleanly and exit 0 so CI stays green.
+    // Dormant gate: behave exactly like the rest of the repo's live paths, // when the key is absent, skip cleanly and exit 0 so CI stays green.
     if (!apiKey) {
-      console.error("[live] PYAI_API_KEY not set — skipping live run (dormant gate). Exit 0.");
+      console.error("[live] PYAI_API_KEY not set, skipping live run (dormant gate). Exit 0.");
       console.error("[live] Set PYAI_API_KEY (a pyai_test_ sandbox key is fine) to run against api.pyai.com.");
       process.exit(0);
     }

@@ -41,4 +41,4 @@ Output:
   [browser captions example](../browser-hear-live-captions)) and Speak's
   streamed response so you start talking back within tens of milliseconds.
 
-Uses only the built-in `fetch` (Node ≥ 22) — see `index.js`.
+Uses only the built-in `fetch` (Node ≥ 22), see `index.js`.

@@ -21,7 +21,7 @@
       "caller_says": "Wednesday at 10 works.",
       "caller_audio_ms": 1240,
       "asr_hypothesis": "Wednesday at ten works",
-      "agent_text": "Great — you're booked for a cleaning on Wednesday at 10 AM. Anything else?",
+      "agent_text": "Great, you're booked for a cleaning on Wednesday at 10 AM. Anything else?",
       "agent_audio_ms": 3050,
       "ttfb_ms": 300,
       "turn_ms": 720,
@@ -31,10 +31,10 @@
       "barge_in": null
     },
     {
-      "caller_says": "Actually — wait, can you make it the afternoon instead?",
+      "caller_says": "Actually, wait, can you make it the afternoon instead?",
       "caller_audio_ms": 2520,
       "asr_hypothesis": "Actually wait can you make it the afternoon instead",
-      "agent_text": "No problem — I moved your cleaning to Wednesday afternoon at 2 PM. You're all set.",
+      "agent_text": "No problem, I moved your cleaning to Wednesday afternoon at 2 PM. You're all set.",
       "agent_audio_ms": 3380,
       "ttfb_ms": 280,
       "turn_ms": 640,

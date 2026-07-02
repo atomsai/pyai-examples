@@ -106,7 +106,7 @@ async function main() {
   console.log(`[3/4] ready:     ${created.id} became ready in ${secs.toFixed(1)}s`);
 
   // 4) Speak a line in the cloned voice.
-  const cloned = await speak("Hello — this line is spoken in the cloned voice.", { voice: created.id });
+  const cloned = await speak("Hello, this line is spoken in the cloned voice.", { voice: created.id });
   await writeFile("cloned.wav", cloned);
   console.log(`[4/4] speak:     wrote cloned.wav in the cloned voice (${cloned.length} bytes)`);
 

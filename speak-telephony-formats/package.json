@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Speak server-side audio formats: g711_ulaw/alaw, pcm, mp3, opus in one param — the before/after vs hand-rolled resampler + μ-law.",
+  "description": "Speak server-side audio formats: g711_ulaw/alaw, pcm, mp3, opus in one param, the before/after vs hand-rolled resampler + μ-law.",
   "scripts": {
     "start": "node --env-file=.env index.js"
   },

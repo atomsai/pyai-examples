@@ -1,4 +1,4 @@
-// LIVE runner — drives a real PyAI Omni session as a synthetic caller and
+// LIVE runner, drives a real PyAI Omni session as a synthetic caller and
 // captures a RunResult the scorers can grade. This path is DORMANT by default
 // (run.js only loads it under `--live` with a key present).
 //
@@ -10,13 +10,13 @@
 //
 // Those packages ship as TypeScript and are consumed from their build output
 // (dist/). If they aren't built yet, we throw a clear, actionable error rather
-// than a cryptic module-not-found — the deterministic offline path never needs
+// than a cryptic module-not-found, the deterministic offline path never needs
 // them, so OFFLINE mode and the test suite are unaffected.
 //
 // What's fully functional here: connect + configure, voice-mode Speak->PCM->Omni
 // playback, agent transcript capture, TTFB + per-turn latency, and Hear-stream
 // WER of the caller audio. What's engine-roadmap-dependent: text-mode input and
-// mid-call tool calls (the protocol marks both as not-yet-honored) — we send
+// mid-call tool calls (the protocol marks both as not-yet-honored), we send
 // them forward-compatibly and capture whatever the engine returns.
 
 const SETTLE_MS = 600; // silence after agent audio that marks the turn complete

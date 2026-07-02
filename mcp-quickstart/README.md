@@ -1,7 +1,7 @@
-# mcp-quickstart — PyAI over Model Context Protocol
+# mcp-quickstart, PyAI over Model Context Protocol
 
 Use the PyAI **MCP server** ([`@pyai/mcp`](https://www.npmjs.com/package/@pyai/mcp))
-from any MCP host — **Cursor, Claude Code, Codex** — so your AI coding agent can
+from any MCP host, **Cursor, Claude Code, Codex**, so your AI coding agent can
 mint a free key and call PyAI (TTS, STT, voices, realtime) **directly instead of
 guessing endpoints**. There is **no human step**: with no key set, the agent
 calls `create_sandbox_key` and the server adopts the minted key for the session.
@@ -59,7 +59,7 @@ JSON-RPC 2.0 over stdio.
 | Tool | Needs a key? | What it does |
 |------|--------------|--------------|
 | `create_sandbox_key` | No | Mint a free `pyai_test_` key (no email/card); adopted for the session |
-| `get_started` | No | Curated quickstart (auth, SDK install, snippets) — no network |
+| `get_started` | No | Curated quickstart (auth, SDK install, snippets), no network |
 | `whoami` | Yes | Inspect the active key (org, env, scopes, credit) |
 | `list_models` / `list_voices` | Yes | Catalog browsing |
 | `synthesize_speech` | Yes | Text-to-speech to a file |

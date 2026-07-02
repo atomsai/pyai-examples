@@ -1,4 +1,4 @@
-// A tiny static file server for the live-captions page — no dependencies.
+// A tiny static file server for the live-captions page, no dependencies.
 // The browser talks to PyAI Hear directly over a WebSocket; this server only
 // serves the HTML/JS, so it never sees your key.
 

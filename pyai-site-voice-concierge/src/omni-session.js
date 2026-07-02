@@ -1,4 +1,4 @@
-// One server-side PyAI Omni realtime session — the upstream half of the BROKER
+// One server-side PyAI Omni realtime session, the upstream half of the BROKER
 // pattern (CONNECT_MODE=broker). This server holds the pyai_live_ key and opens
 // the Omni socket on the visitor's behalf, relaying audio + events.
 //
@@ -57,7 +57,7 @@ export class OmniSession {
       format: "pcm16",
       rate: String(this.rate),
     });
-    // session_label is optional — only attach it if we were given one.
+    // session_label is optional, only attach it if we were given one.
     if (opts.sessionLabel) q.set("session_label", opts.sessionLabel);
     const url = `${base}/v1/omni?${q.toString()}`;
 
@@ -77,7 +77,7 @@ export class OmniSession {
     this.open = true;
     // Supply the agent's behavior for THIS session. Stateless on PyAI: nothing
     // is stored, so everything the agent needs is in this one frame.
-    // The engine dispatches control frames on `event` — a configure missing
+    // The engine dispatches control frames on `event`, a configure missing
     // `event: "configure"` is silently ignored (no persona/greeting/voice).
     const configure = { event: "configure", type: "configure" };
     if (this.opts.voice) configure.voice_id = this.opts.voice;

@@ -1,9 +1,8 @@
 # OpenAI drop-in: keep your code, change the base URL
 
 Already calling OpenAI for text-to-speech or transcription? You don't rewrite
-anything. Point the **official `openai` SDK** at PyAI and your existing calls —
-same methods, same preset voice names (`alloy`, `nova`, …), same response
-shapes — run against PyAI's [Speak](https://pyai.com/models/speak) and
+anything. Point the **official `openai` SDK** at PyAI and your existing calls, same methods, same preset voice names (`alloy`, `nova`, …), same response
+shapes, run against PyAI's [Speak](https://pyai.com/models/speak) and
 [Hear](https://pyai.com/models/hear).
 
 ```diff
@@ -15,7 +14,7 @@ shapes — run against PyAI's [Speak](https://pyai.com/models/speak) and
 ```
 
 That's it. The rest of this example is the *same* `audio.speech.create` and
-`audio.transcriptions.create` calls you already have — just renamed to PyAI's
+`audio.transcriptions.create` calls you already have, just renamed to PyAI's
 models (`pyai-voice`, `pyai-hear`). Everything else is byte-for-byte your OpenAI
 code.
 
@@ -44,7 +43,7 @@ no relearning auth.
 ## Run it
 
 This example is self-contained: with only a PyAI key it synthesizes a line,
-writes `hello.mp3`, then transcribes that file back — proving both Speak and Hear
+writes `hello.mp3`, then transcribes that file back, proving both Speak and Hear
 through the OpenAI SDK in one round trip.
 
 ```bash
@@ -69,7 +68,7 @@ Output:
 
 ## Realtime, too
 
-Voice agents on OpenAI Realtime migrate the same way — keep the realtime client,
+Voice agents on OpenAI Realtime migrate the same way, keep the realtime client,
 point it at PyAI's OpenAI-compatible alias:
 
 ```
@@ -81,9 +80,9 @@ full browser voice agent, and `docs/quickstart.md` §4 for the native Omni socke
 
 ## Notes
 
-- Uses the **official OpenAI SDK** on purpose — the whole point is that your
+- Uses the **official OpenAI SDK** on purpose, the whole point is that your
   current code keeps working. For PyAI-native ergonomics (telephony formats,
   cloning, Omni) use [`@pyai/sdk`](../../sdk/typescript) / `pip install pyai-sdk`.
-- Keys are opaque — pass them through verbatim; never parse, split, or decode.
+- Keys are opaque, pass them through verbatim; never parse, split, or decode.
 - A first-call `402 credit_exhausted` on a brand-new `pyai_live_` key is the
-  billing gate, not a broken key — use a `pyai_test_` sandbox key to try it.
+  billing gate, not a broken key, use a `pyai_test_` sandbox key to try it.

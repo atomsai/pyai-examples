@@ -1,6 +1,6 @@
 # Omni browser voice widget
 
-Add a **talking voice agent to any website with one `<script>` tag** — no phone,
+Add a **talking voice agent to any website with one `<script>` tag**, no phone,
 no Twilio, no framework, no build step. The agent runs over a WebSocket directly
 between the visitor's browser and PyAI [Omni](https://docs.pyai.com); your secret
 key never leaves your server.
@@ -23,11 +23,11 @@ browser ──POST /token──▶ your server ──POST /v1/omni/sessions─�
 browser ──wss /v1/omni  (pyai-key.<ephemeral token>)───────────▶ PyAI   (audio, direct)
 ```
 
-- `public/pyai-widget.js` — the entire client: a self-contained, dependency-free
+- `public/pyai-widget.js`, the entire client: a self-contained, dependency-free
   widget. Captures the mic (Web Audio, 24 kHz PCM16), opens the Omni WebSocket
   with the token's subprotocol, sends the `configure` frame, and plays the
   agent's PCM16 back.
-- `server.js` — ~80 lines, **zero dependencies** (Node built-in `http`). Its only
+- `server.js`, ~80 lines, **zero dependencies** (Node built-in `http`). Its only
   job is to mint a short-lived, origin-locked session token via
   `POST /v1/omni/sessions` so your `pyai_live_` key never ships to the browser.
   This server is **never in the audio path**.
@@ -43,7 +43,7 @@ Open <http://localhost:8080>, click **Talk to us**, allow the mic, and speak.
 
 ## Put it on your own site
 
-1. Host `pyai-widget.js` somewhere your pages can load it — **a CDN is ideal**
+1. Host `pyai-widget.js` somewhere your pages can load it, **a CDN is ideal**
    (see below), or your own site/CDN.
 2. Run the `/token` endpoint from `server.js` on your backend (or fold it into
    your existing API). Set `ALLOWED_ORIGINS` to your site's origin(s).
@@ -54,10 +54,10 @@ Optional attributes: `data-label` (button text). Configure the agent's behavior
 
 ## Serve the widget from a CDN
 
-`pyai-widget.js` is a single, static, dependency-free file — perfect for a CDN.
+`pyai-widget.js` is a single, static, dependency-free file, perfect for a CDN.
 Cross-origin `<script>` execution needs no CORS, and the widget reads its config
 from its own `<script>` tag's `data-*` attributes, so the **same hosted file
-works for every site** — only `data-token-url` differs.
+works for every site**, only `data-token-url` differs.
 
 PyAI already runs one (`cdn.pyai.com` → a GCS bucket behind Cloud CDN, see
 `infra/terraform/lb_cdn.tf`). Publish to a **versioned, immutable** path:
@@ -74,16 +74,16 @@ Then the embed is just:
 ```
 
 Use a new version segment (`/widget/v2/…`) for breaking changes so cached pages
-keep working. Any CDN works the same way — e.g. publish the file to npm and load
+keep working. Any CDN works the same way, e.g. publish the file to npm and load
 it via `https://cdn.jsdelivr.net/npm/<pkg>@<version>/pyai-widget.js`.
 
 ## Production notes
 
-- **Lock down `/token`.** It mints billable sessions — add auth / CAPTCHA /
+- **Lock down `/token`.** It mints billable sessions, add auth / CAPTCHA /
   rate-limiting and keep `ALLOWED_ORIGINS` tight. Tokens are origin-locked and
   short-lived (~60s) by design.
 - **Never put your key in the page.** Always mint a token server-side; this
   recipe does that for you.
 - For lower-latency/robust capture, swap the demo's `ScriptProcessor` for an
   `AudioWorklet` (the deprecated API is used here only to stay dependency-free).
-- Native WebRTC (SDP/ICE) is **not** used or required — Omni is WebSocket + PCM16.
+- Native WebRTC (SDP/ICE) is **not** used or required, Omni is WebSocket + PCM16.

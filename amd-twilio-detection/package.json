@@ -1,0 +1,12 @@
+{
+  "name": "pyai-example-amd-twilio-detection",
+  "private": true,
+  "type": "module",
+  "description": "Rip out Twilio AMD with one line of TwiML: fork the call's media to PyAI AMD and receive the answering-machine decision on a webhook. Zero dependencies.",
+  "scripts": {
+    "start": "node --env-file=.env server.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

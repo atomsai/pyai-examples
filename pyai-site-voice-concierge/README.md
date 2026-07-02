@@ -1,8 +1,8 @@
-# PyAI site voice concierge — "Talk to PyAI"
+# PyAI site voice concierge, "Talk to PyAI"
 
 A production-shaped integration of **PyAI Omni** as the voice agent on
 **pyai.com** itself: a visitor clicks **Talk to PyAI**, speaks, and a realtime
-agent answers questions about PyAI's products, models, and pricing — grounded in
+agent answers questions about PyAI's products, models, and pricing, grounded in
 a knowledge base you control.
 
 ## Deploy in one click (zero-install)
@@ -12,7 +12,7 @@ You don't need to clone anything or run `ngrok` to try this on a real URL:
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/atomsai/pyai-examples)
 
 Render reads [`render.yaml`](./render.yaml), provisions a public Node service,
-and prompts for the **one** thing it needs — your `PYAI_API_KEY` (a `pyai_test_`
+and prompts for the **one** thing it needs, your `PYAI_API_KEY` (a `pyai_test_`
 key is fine). Everything else is automatic: `KB_TOKEN` is generated and
 `KB_PUBLIC_URL` is derived from the service's own URL at runtime, so per-turn
 **grounding works with no ngrok and no manual config**. Deploy → open the URL →
@@ -23,7 +23,7 @@ click **Talk to PyAI**.
 > Render, **New → Web Service**, point it at this repo, set **Root Directory** to
 > `examples/pyai-site-voice-concierge`, build `npm install`, start
 > `npm run start:noenv`, and add `PYAI_API_KEY`. Railway/Fly/Cloud Run work the
-> same way — any host that gives the service a public URL gets grounding for free
+> same way, any host that gives the service a public URL gets grounding for free
 > (it also honors `PUBLIC_URL`). To **read/edit the code** without installing
 > anything, open it in [StackBlitz](https://stackblitz.com/github/atomsai/pyai-examples/tree/main/pyai-site-voice-concierge).
 
@@ -32,7 +32,7 @@ Prefer to run it locally? See [Run it](#run-it) below.
 It ships **two supported web patterns**, switchable with one env var
 (`CONNECT_MODE`):
 
-**`direct` (preferred, default) — ephemeral session token.** The browser asks
+**`direct` (preferred, default), ephemeral session token.** The browser asks
 this server for a short-lived, origin-locked **session token**, then opens the
 Omni WebSocket **directly** to PyAI. Your server stays out of the audio path.
 
@@ -44,7 +44,7 @@ browser ──wss /v1/omni (pyai-key.<ephemeral token>)────────�
                                                (engine → your kb_endpoint, per turn)
 ```
 
-**`broker` (fallback) — relay through your server.** The browser opens a
+**`broker` (fallback), relay through your server.** The browser opens a
 WebSocket to *your* `/voice`, and your server relays audio + events to Omni with
 its key. Heavier (your server is in the media path), but the right choice when
 you also want to inspect or transform the stream.
@@ -58,33 +58,32 @@ browser ──ws /voice──▶ this server ──wss /v1/omni (pyai-key.<key>)
 You **cannot** put a usable *long-lived* Omni credential in a public web page:
 
 - A `pyai_live_` key in the browser has full project scope and would be scraped
-  within minutes — never ship a live key to a web page.
+  within minutes, never ship a live key to a web page.
 - PyAI **publishable tokens** (the browser-safe TTS kind) are scope-locked to
-  `voice:synthesize` — realtime/`omni:session` is **never** granted to them.
+  `voice:synthesize`, realtime/`omni:session` is **never** granted to them.
 
 The fix is the public/private split done right for realtime: your server holds
 the secret key and **mints an ephemeral session token** (`POST /v1/omni/sessions`)
 that is scope-locked to `omni:session`, locked to your origin, single-session
-(`concurrency: 1`), and expires in ~60 s. That token is safe to hand the page —
-this is `CONNECT_MODE=direct`. See
+(`concurrency: 1`), and expires in ~60 s. That token is safe to hand the page, this is `CONNECT_MODE=direct`. See
 [`docs/OMNI_EPHEMERAL_SESSION_TOKENS.md`](../../docs/OMNI_EPHEMERAL_SESSION_TOKENS.md).
 The broker remains available for when you want to sit in the media path.
 
 ## Do I need to "create" an Omni agent first? No.
 
-The session is authorized by your key's **org** — there is nothing to create.
+The session is authorized by your key's **org**, there is nothing to create.
 The optional `session_label` (alias: the deprecated `agent_id`) is just an
 **opaque tag**: PyAI keeps zero per-agent state and runs no registry. We pass
 `pyai-site-concierge` so we can recognize the session in our `kb_endpoint`, but
 you can omit it entirely. The agent's behavior (voice, persona, knowledge) is
-supplied **per session** in the `configure` frame — see `src/omni-session.js`.
+supplied **per session** in the `configure` frame, see `src/omni-session.js`.
 
 ## How grounding works
 
 Omni is stateless on PyAI, so knowledge is **customer-hosted**. Each turn the
 engine POSTs `{ session_label, query }` to the `kb_endpoint` we declared in
 `configure`, authed with our `kb_token`. We answer from an in-memory PyAI
-knowledge base (`src/knowledge.js`) with a trivial keyword retriever — the call
+knowledge base (`src/knowledge.js`) with a trivial keyword retriever, the call
 has a hard **~300 ms, fail-open** budget, so it must be fast and never block the
 turn. **This callback comes from PyAI's infrastructure, not the browser**, so
 `/kb` must be reachable from the public internet (tunnel it in local dev).

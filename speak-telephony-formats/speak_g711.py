@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Speak telephony formats — the one-param μ-law win, in Python.
+"""Speak telephony formats, the one-param μ-law win, in Python.
 
 AFTER: ask Speak for response_format="g711_ulaw" and the server returns 8 kHz
-mono μ-law — the exact bytes a Twilio Media Stream wants. No client-side
+mono μ-law, the exact bytes a Twilio Media Stream wants. No client-side
 resampler, no μ-law encoder.
 
 Run:  cp .env.example .env  (edit PYAI_API_KEY)  &&  python3 speak_g711.py
@@ -33,4 +33,4 @@ twilio_media_payload = base64.b64encode(ulaw).decode()
 
 print(f"AFTER  one param → {len(ulaw)} bytes μ-law (wrote out.ulaw)")
 print(f"       twilio media payload (base64, first 32): {twilio_media_payload[:32]}…")
-print("\nNo resampler, no μ-law encoder, no codec tests to maintain — the server did it.")
+print("\nNo resampler, no μ-law encoder, no codec tests to maintain, the server did it.")

@@ -1,4 +1,4 @@
-// OpenAI drop-in — your OpenAI audio code, served by PyAI.
+// OpenAI drop-in, your OpenAI audio code, served by PyAI.
 //
 // The ONLY structural change from an OpenAI integration is the client below:
 // set `baseURL` to PyAI and use your PyAI key. The two `client.audio.*` calls
@@ -6,7 +6,7 @@
 // differ (pyai-voice / pyai-hear instead of tts-1 / whisper-1).
 //
 // Self-contained: with just a key it synthesizes a line, writes hello.mp3, then
-// transcribes that file back — exercising Speak + Hear through the OpenAI SDK.
+// transcribes that file back, exercising Speak + Hear through the OpenAI SDK.
 //
 // Run: cp .env.example .env  &&  npm install  &&  npm start
 import { createReadStream } from "node:fs";
@@ -26,7 +26,7 @@ const client = new OpenAI({
 });
 // ─────────────────────────────────────────────────────────────────────────────
 
-const VOICE = process.env.PYAI_VOICE ?? "alloy"; // an OpenAI preset name — works unchanged
+const VOICE = process.env.PYAI_VOICE ?? "alloy"; // an OpenAI preset name, works unchanged
 const TEXT = "The fastest migration is the one where you change a single line.";
 
 // Speak (TTS): identical to OpenAI's client.audio.speech.create, model renamed.

@@ -2,7 +2,7 @@
 
 **Speak (`POST /v1/audio/speech`) now encodes the audio server-side.** Ask for
 `response_format: "g711_ulaw"` and you get back exactly the bytes a Twilio Media
-Stream or SIP leg wants — 8 kHz mono μ-law — with no client-side resampler and no
+Stream or SIP leg wants, 8 kHz mono μ-law, with no client-side resampler and no
 μ-law encoder. The same `response_format` + `sample_rate` give you `wav`, `pcm`,
 `mp3`, `opus`, and `g711_alaw` too.
 
@@ -27,7 +27,7 @@ Stream or SIP leg wants — 8 kHz mono μ-law — with no client-side resampler 
 | `g711_alaw` | 8000 (forced) | `audio/basic` | A-law (EU telephony) |
 
 Any value outside this set is rejected with `400 unsupported_format`. `sample_rate`
-is optional — omit it for the engine's native 24 kHz (`g711_*` is always 8 kHz);
+is optional, omit it for the engine's native 24 kHz (`g711_*` is always 8 kHz);
 omit `response_format` for the default `mp3`. Responses carry `x-pyai-format` and
 `x-pyai-sample-rate` headers so you can confirm what you got.
 
@@ -49,13 +49,13 @@ headers.
 
 ## The one-liner, three ways
 
-### Node — `@pyai/sdk` + `@pyai/twilio`
+### Node, `@pyai/sdk` + `@pyai/twilio`
 
 ```js
 import PyAI from "@pyai/sdk";
 const pyai = new PyAI({ apiKey: process.env.PYAI_API_KEY });
 
-// AFTER: server returns μ-law@8k directly — base64 straight into a Twilio frame.
+// AFTER: server returns μ-law@8k directly, base64 straight into a Twilio frame.
 const ulaw = new Uint8Array(
   await pyai.audio.speech({
     input: "Your appointment is confirmed.",
@@ -66,7 +66,7 @@ const ulaw = new Uint8Array(
 const twilioMediaPayload = Buffer.from(ulaw).toString("base64");
 ```
 
-### Python — `pyai-sdk`
+### Python, `pyai-sdk`
 
 ```python
 import base64, os
@@ -81,7 +81,7 @@ ulaw = pyai.audio.speech(
 twilio_media_payload = base64.b64encode(ulaw).decode()
 ```
 
-### Raw curl — no SDK
+### Raw curl, no SDK
 
 ```bash
 curl -sS https://api.pyai.com/v1/audio/speech \
@@ -93,7 +93,7 @@ curl -sS https://api.pyai.com/v1/audio/speech \
 #   content-type: audio/basic
 #   x-pyai-format: g711_ulaw
 #   x-pyai-sample-rate: 8000
-# `out.ulaw` is raw 8 kHz mono μ-law — base64 it into a Twilio <Stream> media frame.
+# `out.ulaw` is raw 8 kHz mono μ-law, base64 it into a Twilio <Stream> media frame.
 ```
 
 > Want a different rate? `pcm` at `sample_rate: 16000` for a 16 kHz agent

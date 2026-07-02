@@ -22,7 +22,7 @@
       ]
     },
     {
-      "caller_says": "Actually — wait, can you make it the afternoon instead?",
+      "caller_says": "Actually, wait, can you make it the afternoon instead?",
       "expect": [
         { "type": "contains", "value": "afternoon" },
         { "type": "latency_budget", "ttfbMs": 800, "turnMs": 1500 }

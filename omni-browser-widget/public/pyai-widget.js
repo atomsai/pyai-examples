@@ -1,13 +1,12 @@
-// PyAI Omni voice widget — a single-file, dependency-free embeddable.
+// PyAI Omni voice widget, a single-file, dependency-free embeddable.
 //
 // Drop it into ANY page with one tag:
 //   <script src="https://your-site.example/pyai-widget.js" data-token-url="/token"></script>
 //
 // It injects a floating mic button. On click it: mints a short-lived session
-// token from `data-token-url` (your backend — see server.js), opens the Omni
+// token from `data-token-url` (your backend, see server.js), opens the Omni
 // WebSocket DIRECTLY to PyAI with `pyai-key.<token>`, sends the `configure`
-// frame, streams mic PCM16 up at 24 kHz, and plays the agent's PCM16 back —
-// with barge-in. No key in the page; this file never sees your secret key.
+// frame, streams mic PCM16 up at 24 kHz, and plays the agent's PCM16 back, // with barge-in. No key in the page; this file never sees your secret key.
 //
 // Audio note: Omni speaks raw PCM16 little-endian. We request a 24 kHz
 // AudioContext so capture + playback match Omni with no manual resampling.
@@ -124,7 +123,7 @@
     };
     micSource.connect(processor);
     processor.connect(audioCtx.destination); // required for onaudioprocess to fire
-    setState("live", "Listening — tap to end");
+    setState("live", "Listening, tap to end");
   }
 
   // Build a 0x03-prefixed control frame (the engine's client→server framing).
@@ -137,17 +136,17 @@
   }
 
   // Demux by the first byte: 0x01 audio · 0x02 transcript · 0x03 control/event.
-  // (Treating every binary frame as audio — the classic bug — plays control
+  // (Treating every binary frame as audio, the classic bug, plays control
   // frames as a glitch and silently drops every event.)
   function onMessage(ev) {
-    if (typeof ev.data === "string") { // legacy text frame — tolerate
+    if (typeof ev.data === "string") { // legacy text frame, tolerate
       try { handleEvent(JSON.parse(ev.data)); } catch (e) {}
       return;
     }
     var u8 = new Uint8Array(ev.data);
     var tag = u8[0];
     if (tag === 0x01) return playAgentAudio(ev.data.slice(1)); // PCM16
-    if (tag === 0x02) return; // transcript JSON — this minimal widget doesn't render it
+    if (tag === 0x02) return; // transcript JSON, this minimal widget doesn't render it
     if (tag === 0x03) {
       try { handleEvent(JSON.parse(new TextDecoder().decode(u8.subarray(1)))); } catch (e) {}
       return;

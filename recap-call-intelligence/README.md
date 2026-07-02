@@ -3,7 +3,7 @@
 A Gong-style **conversation-intelligence** recipe built on PyAI
 [Hear](https://pyai.com/models/hear) batch jobs. Point it at a call recording
 and get back a **diarized transcript**, **talk-ratio** per speaker, **keyword
-counts**, and an LLM **summary** — the building blocks of a "mine your calls"
+counts**, and an LLM **summary**, the building blocks of a "mine your calls"
 feature.
 
 ```
@@ -13,10 +13,10 @@ call.wav ──POST /v1/transcription/jobs (diarize:true)──▶ { job_id, sta
         │
         ├─▶ talk-ratio   (sum of each speaker's segment durations)
         ├─▶ keywords     (top terms, stop-words removed)
-        └─▶ summary      (your LLM — stubbed here; swap in OpenAI/Anthropic/…)
+        └─▶ summary      (your LLM, stubbed here; swap in OpenAI/Anthropic/…)
 ```
 
-Batch is the **−50% async tier** ($0.0015/min vs $0.003/min realtime) — the right
+Batch is the **−50% async tier** ($0.0015/min vs $0.003/min realtime), the right
 tool for after-the-call analytics.
 
 ## Run it
@@ -55,24 +55,24 @@ Output:
 
 ## How it works
 
-1. **Submit** — `POST /v1/transcription/jobs` with the audio (multipart `audio`
+1. **Submit**, `POST /v1/transcription/jobs` with the audio (multipart `audio`
    part, or an `audio_url` we fetch) and `diarize: true` for single-track
    speaker separation. Stereo recording? Use `channel: true` instead for exact,
    model-free per-channel separation.
-2. **Poll** — `GET /v1/transcription/jobs/{job_id}` until `status: "completed"`
+2. **Poll**, `GET /v1/transcription/jobs/{job_id}` until `status: "completed"`
    (or supply a `webhook_url` for a signed callback). Large results are offloaded
    to a signed `result_url`; this example handles both inline `result` and
    `result_url`.
-3. **Analyze** — `result.segments` carry `{ speaker, start, end, text }`.
+3. **Analyze**, `result.segments` carry `{ speaker, start, end, text }`.
    Talk-ratio sums each speaker's durations; keywords come from `result.text`;
    the summary is where **your** LLM goes (stubbed so this runs with no extra
-   credentials — see `llmSummary()` in `index.mjs`).
+   credentials, see `llmSummary()` in `index.mjs`).
 
 ## Notes
 
 - **Scopes:** batch jobs need **`hear:transcribe` + `transcribe:jobs`**.
 - **Idempotency:** submit supports an `Idempotency-Key` header so a retried POST
-  doesn't double-bill — add one in production.
+  doesn't double-bill, add one in production.
 - **Diarization quality:** 2-party separation ships; 3-party is beta. Synthetic
   TTS voices separate well enough to demo; real calls do better.
-- Uses only the built-in `fetch`/`FormData` (Node ≥ 22) — see `index.mjs`.
+- Uses only the built-in `fetch`/`FormData` (Node ≥ 22), see `index.mjs`.

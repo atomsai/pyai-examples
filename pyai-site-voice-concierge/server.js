@@ -1,15 +1,15 @@
-// "Talk to PyAI" — the voice concierge for pyai.com.
+// "Talk to PyAI", the voice concierge for pyai.com.
 //
 // One small Fastify server, two supported web patterns (set CONNECT_MODE):
 //
-//   • CONNECT_MODE=direct (preferred) — the browser connects to PyAI DIRECTLY
+//   • CONNECT_MODE=direct (preferred), the browser connects to PyAI DIRECTLY
 //     using a short-lived, origin-locked SESSION TOKEN this server mints. The
 //     server stays out of the media path; the pyai_live_ key never leaves it.
 //
 //       browser ──POST /session──▶ this server ──POST /v1/omni/sessions──▶ PyAI
 //       browser ──wss /v1/omni (pyai-key.<ephemeral token>)─────────────▶ PyAI
 //
-//   • CONNECT_MODE=broker (fallback) — the browser opens a WebSocket to /voice
+//   • CONNECT_MODE=broker (fallback), the browser opens a WebSocket to /voice
 //     on THIS server, which relays audio + events to an Omni socket opened with
 //     the server-side key. Heavier (server is in the media path), but useful if
 //     you want to inspect/transform the stream.
@@ -62,7 +62,7 @@ const allowedOrigins = ALLOWED_ORIGINS.split(",").map((o) => o.trim()).filter(Bo
 
 // The engine's grounding callback must hit a PUBLIC url. On a one-click cloud
 // deploy (Render/Railway/Fly set RENDER_EXTERNAL_URL or PUBLIC_URL), derive
-// /kb from it so grounding works with zero extra config — no ngrok. An explicit
+// /kb from it so grounding works with zero extra config, no ngrok. An explicit
 // KB_PUBLIC_URL always wins.
 const publicBase = (process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || "").replace(/\/$/, "");
 const kbPublicUrl = KB_PUBLIC_URL || (publicBase ? `${publicBase}/kb` : "");
@@ -89,11 +89,11 @@ app.get("/config", async () => ({ mode: connectMode }));
 // --- Mint an ephemeral Omni session token (CONNECT_MODE=direct) ------------
 // The browser POSTs here; we mint a short-lived, origin-locked token with our
 // server-side key and hand it back. The browser then opens the Omni WebSocket
-// DIRECTLY with `pyai-key.<token>` — our key never leaves this process, and the
+// DIRECTLY with `pyai-key.<token>`, our key never leaves this process, and the
 // token is useless after ~60s or from any other origin. The grounding config
 // (kb_endpoint/kb_token, persona, voice) travels in the browser's `configure`
 // frame; the kb_token is a server secret, so we return it here only because
-// this same server hosts /kb — lock /session down (auth/CAPTCHA/rate-limit) for
+// this same server hosts /kb, lock /session down (auth/CAPTCHA/rate-limit) for
 // a real public page.
 app.post("/session", async (request, reply) => {
   const origin = (request.headers.origin || "").trim();
@@ -197,7 +197,7 @@ app.get("/voice", { websocket: true }, (browser, request) => {
   }
   // Cost guard: cap concurrent live sessions this broker holds open.
   if (liveSessions >= maxSessions) {
-    sendEvent(browser, { type: "error", code: "busy", message: "All lines are busy — try again in a moment." });
+    sendEvent(browser, { type: "error", code: "busy", message: "All lines are busy, try again in a moment." });
     browser.close(1013, "max_sessions");
     return;
   }

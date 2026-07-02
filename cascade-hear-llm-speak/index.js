@@ -1,6 +1,6 @@
 // The classic cascade: PyAI Hear (STT) -> your LLM -> PyAI Speak (TTS).
 //
-// This runs end to end with only an API key — no input file required. It first
+// This runs end to end with only an API key, no input file required. It first
 // SYNTHESIZES a sample question (so we have audio to transcribe), then:
 //
 //   1. Hear  : transcribe the audio  -> text

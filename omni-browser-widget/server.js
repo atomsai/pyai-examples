@@ -1,4 +1,4 @@
-// Drop-in Omni voice widget — the tiny backend.
+// Drop-in Omni voice widget, the tiny backend.
 //
 // This is the *minimal* browser-voice recipe: a single <script> tag adds a
 // floating "Talk" button to ANY existing page (see public/pyai-widget.js), and
@@ -9,7 +9,7 @@
 //   browser ──POST /token──▶ this server ──POST /v1/omni/sessions──▶ PyAI
 //   browser ──wss /v1/omni (pyai-key.<ephemeral token>)──────────────▶ PyAI
 //
-// The browser then talks to PyAI DIRECTLY — this server is never in the audio
+// The browser then talks to PyAI DIRECTLY, this server is never in the audio
 // path. For a fuller standalone app (broker mode + per-turn kb_endpoint
 // grounding + one-click deploy) see ../pyai-site-voice-concierge.
 //

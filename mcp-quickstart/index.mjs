@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * MCP quickstart — drive the PyAI MCP server (@pyai/mcp) over stdio.
+ * MCP quickstart, drive the PyAI MCP server (@pyai/mcp) over stdio.
  *
  * Spawns `npx -y @pyai/mcp`, performs the MCP handshake, lists the tools, mints a
  * free sandbox key (no human steps) unless PYAI_API_KEY is already set, then
- * synthesizes speech to hello.mp3 — proving "MCP -> working PyAI call" end to end.
+ * synthesizes speech to hello.mp3, proving "MCP -> working PyAI call" end to end.
  *
  * Transport: newline-delimited JSON-RPC 2.0 over stdio (the MCP stdio transport).
- * Zero dependencies — Node >= 22 only.
+ * Zero dependencies, Node >= 22 only.
  */
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
@@ -18,7 +18,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const haveKey = Boolean(process.env.PYAI_API_KEY);
 
 // Start the PyAI MCP server. It speaks JSON-RPC on stdout; diagnostics on stderr
-// (inherited so you can see them — they never corrupt the protocol stream).
+// (inherited so you can see them, they never corrupt the protocol stream).
 const server = spawn("npx", ["-y", "@pyai/mcp"], {
   stdio: ["pipe", "pipe", "inherit"],
   env: process.env,
@@ -115,7 +115,7 @@ async function main() {
     },
   }));
   console.log("synthesize_speech:", tts);
-  console.log(`\nDone — play ${outPath}`);
+  console.log(`\nDone, play ${outPath}`);
 }
 
 main()

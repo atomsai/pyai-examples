@@ -1,4 +1,4 @@
-// LLM-as-judge — STUB (clearly marked, pluggable).
+// LLM-as-judge, STUB (clearly marked, pluggable).
 //
 // ┌───────────────────────────────────────────────────────────────────────┐
 // │ THIS DOES NOT CALL ANY MODEL.                                          │
@@ -27,14 +27,14 @@ import { normalizedIncludes, tokenize } from "./text.js";
 /**
  * Heuristic task-success judge. Scores how well the agent reply covers the
  * turn's expected keywords, with a small bonus for actually responding. Purely
- * lexical — no semantics, no model. Treat its output as a placeholder dimension.
+ * lexical, no semantics, no model. Treat its output as a placeholder dimension.
  */
 export function heuristicJudge(input) {
   const { agentText = "", expectedKeywords = [] } = input ?? {};
   const responded = tokenize(agentText).length > 0;
 
   if (expectedKeywords.length === 0) {
-    // Nothing to check against — credit a non-empty response, flag an empty one.
+    // Nothing to check against, credit a non-empty response, flag an empty one.
     return {
       score: responded ? 0.75 : 0,
       pass: responded,

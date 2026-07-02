@@ -1,5 +1,5 @@
 // Scorecard rendering: turn the structured evaluate() result into a human
-// markdown report and a machine JSON file. Pure string/IO — no scoring logic
+// markdown report and a machine JSON file. Pure string/IO, no scoring logic
 // lives here.
 
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -21,20 +21,20 @@ function gateCell(m) {
 
 function assertionLine(a) {
   const tag = a.ok ? "PASS" : a.soft ? "WARN" : "FAIL";
-  return `  - [${tag}] ${a.type}${a.soft ? " (soft)" : ""} — ${a.detail}`;
+  return `  - [${tag}] ${a.type}${a.soft ? " (soft)" : ""}, ${a.detail}`;
 }
 
 /** Render a full markdown scorecard from an evaluate() result. */
 export function renderMarkdown(sc) {
   const lines = [];
-  lines.push(`# Omni Eval Scorecard — ${sc.scenarioId}`);
+  lines.push(`# Omni Eval Scorecard, ${sc.scenarioId}`);
   lines.push("");
   lines.push(`- **Verdict:** ${sc.verdict}`);
   lines.push(`- **Mode:** ${sc.mode}${sc.source ? ` (\`${sc.source}\`)` : ""}`);
   lines.push(`- **Agent:** ${sc.agentId ?? "n/a"}`);
   lines.push(`- **Generated:** ${sc.generatedAt}`);
   lines.push(
-    `- **LLM-judge:** ${sc.judge.stub ? "STUB" : "custom"} (${sc.judge.name}) — ${
+    `- **LLM-judge:** ${sc.judge.stub ? "STUB" : "custom"} (${sc.judge.name}), ${
       sc.judge.stub ? "deterministic placeholder, NOT a real model" : "pluggable judge"
     }`,
   );
@@ -60,7 +60,7 @@ export function renderMarkdown(sc) {
   lines.push("");
   for (const t of sc.turns) {
     const verdict = !t.hardOk ? "FAIL" : !t.softOk ? "WARN" : "PASS";
-    lines.push(`### Turn ${t.index + 1} — ${verdict}`);
+    lines.push(`### Turn ${t.index + 1}, ${verdict}`);
     lines.push(`- caller: "${t.callerText}"`);
     lines.push(`- agent: "${t.agentText}"`);
     const bits = [`ttfb ${msOrNa(t.ttfbMs)}`, `turn ${msOrNa(t.turnMs)}`];
@@ -72,7 +72,7 @@ export function renderMarkdown(sc) {
       lines.push("- assertions:");
       for (const a of t.assertions) lines.push(assertionLine(a));
     }
-    lines.push(`- judge ${t.judge.stub ? "[STUB]" : ""}: ${t.judge.pass ? "pass" : "fail"} score ${t.judge.score} — ${t.judge.rationale}`);
+    lines.push(`- judge ${t.judge.stub ? "[STUB]" : ""}: ${t.judge.pass ? "pass" : "fail"} score ${t.judge.score}, ${t.judge.rationale}`);
     lines.push("");
   }
 

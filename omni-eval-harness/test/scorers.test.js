@@ -9,7 +9,7 @@ import { heuristicJudge, expectedKeywordsFor } from "../src/judge.js";
 // --- text / WER -------------------------------------------------------------
 
 test("normalize strips punctuation, casing, and collapses whitespace", () => {
-  assert.equal(normalize("Hi,  I'd  LIKE — that!"), "hi i d like that");
+  assert.equal(normalize("Hi,  I'd  LIKE, that!"), "hi i d like that");
   assert.equal(normalize(""), "");
   assert.equal(normalize(null), "");
 });
