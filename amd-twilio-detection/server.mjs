@@ -47,13 +47,19 @@ async function configureAmd() {
  * The per-call `aggressiveness` <Parameter> overrides the account default; the
  * `webhook` <Parameter> is where PyAI posts this call's decision.
  */
+const escapeXml = (s) =>
+  s.replace(/[<>&'"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" }[c]));
+
 function twiml() {
-  // Twilio cannot send auth headers or WS subprotocols on <Stream>, so the key
-  // rides the URL as ?api_key= (the gateway's documented server-side WS auth).
+  // Twilio cannot send auth headers, WS subprotocols, or even URL query params
+  // on <Stream> (the query string is stripped before connecting). The key
+  // travels as a <Parameter>: PyAI verifies it from the stream's `start` frame
+  // before processing any audio, and drops connections that never present one.
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Connect>
-    <Stream url="wss://api.pyai.com/v1/amd/stream?api_key=${encodeURIComponent(API_KEY)}">
+    <Stream url="wss://api.pyai.com/v1/amd/stream">
+      <Parameter name="api_key" value="${escapeXml(API_KEY)}"/>
       <Parameter name="aggressiveness" value="${AGGRESSIVENESS}"/>
       <Parameter name="webhook" value="${BASE_URL}/amd-events"/>
     </Stream>
