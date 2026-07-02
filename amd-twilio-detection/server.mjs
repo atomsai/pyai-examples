@@ -48,10 +48,12 @@ async function configureAmd() {
  * `webhook` <Parameter> is where PyAI posts this call's decision.
  */
 function twiml() {
+  // Twilio cannot send auth headers or WS subprotocols on <Stream>, so the key
+  // rides the URL as ?api_key= (the gateway's documented server-side WS auth).
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Connect>
-    <Stream url="wss://api.pyai.com/v1/amd/stream">
+    <Stream url="wss://api.pyai.com/v1/amd/stream?api_key=${encodeURIComponent(API_KEY)}">
       <Parameter name="aggressiveness" value="${AGGRESSIVENESS}"/>
       <Parameter name="webhook" value="${BASE_URL}/amd-events"/>
     </Stream>
