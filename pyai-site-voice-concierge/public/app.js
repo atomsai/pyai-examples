@@ -9,8 +9,10 @@
 //   • broker (fallback): open a WebSocket to our own /voice, which relays to
 //     PyAI server-side. The browser code below the transport layer is identical.
 //
-// Audio is raw PCM16 little-endian at 24 kHz, the format Omni speaks: capture
-// the mic at 24 kHz, send Int16 frames up, play back the Int16 frames down.
+// Audio is PCM16 little-endian at 24 kHz, the format Omni speaks: capture the
+// mic at 24 kHz, send Int16 frames up, play back the Int16 frames down. On the
+// Omni wire (direct mode) every frame carries a 1-byte type tag; the broker link
+// is our own protocol and relays the PCM untagged.
 // Text frames are session events (ready / transcript / barge_in / session_end /
 // error) in broker mode, or Omni's native event frames in direct mode.
 
@@ -146,7 +148,9 @@ function startCapture() {
       const s = Math.max(-1, Math.min(1, input[i]));
       pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
     }
-    ws.send(pcm.buffer);
+    // DIRECT mode talks the engine's wire, so tag the frame. BROKER mode talks
+    // our own relay, which tags upstream (see src/omni-session.js).
+    ws.send(connectMode === "direct" ? frame01(pcm) : pcm.buffer);
   };
   micSource.connect(processor);
   processor.connect(audioCtx.destination); // required for onaudioprocess to fire
@@ -160,6 +164,15 @@ function frame03(obj) {
   const out = new Uint8Array(json.length + 1);
   out[0] = 0x03;
   out.set(json, 1);
+  return out.buffer;
+}
+
+// Build a 0x01-prefixed caller-audio frame. The engine demuxes client frames on
+// the first byte with no default branch, so untagged PCM is dropped silently.
+function frame01(pcm) {
+  const out = new Uint8Array(pcm.byteLength + 1);
+  out[0] = 0x01;
+  out.set(new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength), 1);
   return out.buffer;
 }
 

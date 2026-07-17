@@ -72,6 +72,11 @@ const esl = {
 // Engine control frames are 0x03-prefixed JSON (OMNI_PROTOCOL_V2.md §2/§3).
 const b03 = (obj) => Buffer.concat([Buffer.from([0x03]), Buffer.from(JSON.stringify(obj))]);
 
+// Caller audio is 0x01-prefixed PCM16 (OMNI_PROTOCOL_V2.md §2). The engine
+// demuxes on the first byte with no default branch: untagged audio is dropped
+// silently and the agent never hears the caller.
+const b01 = (pcm) => Buffer.concat([Buffer.from([0x01]), pcm]);
+
 function connectOmni() {
   const ws = new WebSocket(`${BASE}/v1/omni?format=pcm16&rate=${RATE}`, [`pyai-key.${KEY}`]);
   ws.binaryType = "nodebuffer";
@@ -148,10 +153,11 @@ wss.on("connection", (fs) => {
 
   fs.on("message", (data, isBinary) => {
     if (isBinary) {
-      // Caller audio (L16/16k) -> Omni (PCM16). No conversion when rates match.
-      const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
-      if (omniReady && omni.readyState === omni.OPEN) omni.send(buf);
-      else pending.push(buf);
+      // Caller audio (L16/16k) -> Omni (0x01 + PCM16). No conversion when rates
+      // match. Tag here, once: `pending` is flushed verbatim on open.
+      const frame = b01(Buffer.isBuffer(data) ? data : Buffer.from(data));
+      if (omniReady && omni.readyState === omni.OPEN) omni.send(frame);
+      else pending.push(frame);
       return;
     }
     const ctrl = FS_PROTOCOL.parseControl(data.toString());

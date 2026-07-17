@@ -15,12 +15,16 @@
 //       { type:"configure", voice_id?, persona?, kb_endpoint?, kb_token? }
 //     This example sends only voice_id/persona/kb_*; roadmap fields
 //     (language/model_tier) are no-ops today and omitted.
-//   - Audio is BINARY PCM16 little-endian in both directions.
+//   - Audio is BINARY PCM16 little-endian in both directions, each frame
+//     prefixed with the 0x01 type tag. The engine demuxes client frames on the
+//     first byte and has no default branch, so an untagged frame is dropped
+//     silently: a clean handshake, no transcripts, a deaf agent.
 //   - Session events (session_started, transcript, barge_in, …) are TEXT JSON.
 
 import WebSocket from "ws";
 
 const DEFAULT_BASE = "https://api.pyai.com";
+const TAG_AUDIO = Buffer.from([0x01]);
 
 /**
  * @typedef {Object} OmniSessionOptions
@@ -120,11 +124,14 @@ export class OmniSession {
     }
   }
 
-  /** Forward one chunk of caller PCM16 LE audio upstream (buffers until open). */
+  /** Forward one chunk of caller PCM16 LE audio upstream as a 0x01-prefixed
+   *  frame (buffers until open). */
   sendAudio(bytes) {
     if (this.closed || !bytes?.length) return;
-    if (this.open) this.ws.send(bytes);
-    else this.backlog.push(Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes));
+    // Tag here, once: the backlog is flushed verbatim in #handleOpen().
+    const frame = Buffer.concat([TAG_AUDIO, Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes)]);
+    if (this.open) this.ws.send(frame);
+    else this.backlog.push(frame);
   }
 
   /** Forward a DTMF digit (e.g. from an on-screen keypad). */
