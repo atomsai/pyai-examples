@@ -29,21 +29,33 @@ both ways, transcripts, barge-in, and DTMF.
 
 - **Binary, type-tagged frames** (the engine's real framing): every server →
   client frame carries a first-byte tag, **`0x01` audio · `0x02` transcript ·
-  `0x03` control/event JSON**. **Demux on the first byte.** Client control frames
-  (`configure`, `dtmf`) are `0x03`-prefixed too. A client that treats all binary
-  as audio plays the control/transcript frames as a glitch and misses every
-  event, the same way it fails against prod.
+  `0x03` control/event JSON**. **Demux on the first byte.** Client → server
+  frames carry the same tags: caller audio is **`0x01`-prefixed** PCM16, control
+  frames (`configure`, `dtmf`) are `0x03`-prefixed. A client that treats all
+  binary as audio plays the control/transcript frames as a glitch and misses
+  every event, the same way it fails against prod.
 - **Handshake:** `hello` → `session_started` (0x03), then a `config_ack` (0x03)
   after your `configure` frame (server frames keyed on `event`).
-- **Audio:** send binary PCM16 at the `?rate=` you connect with; after a short
-  silence the mock "replies" with a tone (streamed in 150 ms chunks).
+- **Audio:** send `0x01` + binary PCM16 at the `?rate=` you connect with; after a
+  short silence the mock "replies" with a tone (streamed in 150 ms chunks).
 - **Barge-in:** send audio while the mock is talking and it emits `flush` and
   stops, exactly the event your client must handle.
 - **DTMF & lifecycle:** `{"type":"dtmf","digit":"5"}` is echoed; `{"type":"session_ending"}` closes with `session_end`.
 
-## The conformance check (why this beats a dumb echo)
+## The conformance checks (why this beats a dumb echo)
 
-The #1 Omni bug is sending an **event-keyed** configure
+Caller audio must be **`0x01`-prefixed**. The engine demuxes every client frame
+on its first byte and has no default branch, so untagged PCM16 is dropped where
+it lands: no error, no log, no transcript, and an agent that asks if you're
+still there. A mock that accepted raw audio would let that ship. This one drops
+it and says so:
+
+```
+[BUG] client sent untagged caller audio (first byte 0x7f), real engine drops
+this silently. Prefix each PCM16 chunk with 0x01.
+```
+
+The other classic is sending an **event-keyed** configure
 (`{"event":"configure",…}`) instead of a **type-keyed** one
 (`{"type":"configure",…}`). Against production this is silent: the transparent
 gateway ACKs it, the engine drops your `persona`, and you get a clean handshake

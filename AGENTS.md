@@ -93,6 +93,10 @@ barge-in. No STT-LLM-TTS pipeline to stitch together.
 - **Connect:** `wss://api.pyai.com/v1/omni?format=pcm16&rate=24000`
   (OpenAI-realtime-compatible alias: `wss://api.pyai.com/v1/realtime?model=pyai-omni-realtime`)
 - **Scope:** `omni:session`
+- **Framing:** binary frames are type-tagged by their first byte, **both
+  directions**: `0x01` audio · `0x02` transcript · `0x03` control JSON. Caller
+  audio goes up as `0x01` + PCM16. The engine demuxes on that byte and drops
+  what it can't type, so untagged audio is silently never heard.
 - **Zero-state:** there is nothing to create first. The session is authorized by
   your key's org; you set the **whole agent** with one `configure` frame right
   after connecting, `voice_id` (stock, cloned, or designed), `persona`,

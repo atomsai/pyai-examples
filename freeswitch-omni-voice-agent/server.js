@@ -69,7 +69,9 @@ const esl = {
   },
 };
 
-// Engine control frames are 0x03-prefixed JSON (OMNI_PROTOCOL_V2.md §2/§3).
+// Client→engine frames carry the same first-byte tag as the engine's own:
+// 0x01 caller audio (PCM16), 0x03 control JSON (OMNI_PROTOCOL_V2.md §2/§3).
+const b01 = (pcm) => Buffer.concat([Buffer.from([0x01]), pcm]);
 const b03 = (obj) => Buffer.concat([Buffer.from([0x03]), Buffer.from(JSON.stringify(obj))]);
 
 function connectOmni() {
@@ -90,7 +92,7 @@ wss.on("connection", (fs) => {
     // Stateless on PyAI: the agent's whole behavior travels in this frame.
     omni.send(b03({ type: "configure", persona: PERSONA, ...(VOICE ? { voice_id: VOICE } : {}) }));
     omniReady = true;
-    for (const buf of pending) omni.send(buf);
+    for (const buf of pending) omni.send(b01(buf));
     pending.length = 0;
   });
 
@@ -150,8 +152,8 @@ wss.on("connection", (fs) => {
     if (isBinary) {
       // Caller audio (L16/16k) -> Omni (PCM16). No conversion when rates match.
       const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
-      if (omniReady && omni.readyState === omni.OPEN) omni.send(buf);
-      else pending.push(buf);
+      if (omniReady && omni.readyState === omni.OPEN) omni.send(b01(buf));
+      else pending.push(buf); // tagged on flush, above
       return;
     }
     const ctrl = FS_PROTOCOL.parseControl(data.toString());

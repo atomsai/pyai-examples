@@ -160,6 +160,8 @@ component.
 
 - **Audio format is load-bearing.** Omni speaks PCM16 LE; we open the browser
   `AudioContext` at 24 kHz so capture and playback match with no resampling.
+  Caller audio also carries the engine's `0x01` first-byte tag (`0x03` for
+  control frames); untagged PCM16 is dropped by the engine without an error.
 - **Exact event/frame names.** Transcript/barge-in JSON field names aren't fully
   byte-pinned across the docs; `src/omni-session.js` and `public/app.js` accept
   the documented spellings and ignore unknown frames (forward-compatible).

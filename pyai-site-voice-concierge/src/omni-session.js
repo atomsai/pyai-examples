@@ -15,12 +15,17 @@
 //       { type:"configure", voice_id?, persona?, kb_endpoint?, kb_token? }
 //     This example sends only voice_id/persona/kb_*; roadmap fields
 //     (language/model_tier) are no-ops today and omitted.
-//   - Audio is BINARY PCM16 little-endian in both directions.
+//   - Audio is BINARY PCM16 little-endian in both directions. Caller audio going
+//     UP is prefixed with the 0x01 tag; the engine demuxes on the first byte and
+//     drops what it can't type, so untagged PCM16 is never heard.
 //   - Session events (session_started, transcript, barge_in, …) are TEXT JSON.
 
 import WebSocket from "ws";
 
 const DEFAULT_BASE = "https://api.pyai.com";
+
+// Caller audio is 0x01-prefixed PCM16; the engine demuxes on the first byte.
+const b01 = (pcm) => Buffer.concat([Buffer.from([0x01]), pcm]);
 
 /**
  * @typedef {Object} OmniSessionOptions
@@ -49,7 +54,7 @@ export class OmniSession {
     this.rate = opts.rate ?? 24000;
     this.open = false;
     this.closed = false;
-    /** @type {Buffer[]} audio that arrived before the socket opened */
+    /** @type {Buffer[]} tagged audio frames that arrived before the socket opened */
     this.backlog = [];
 
     const base = (opts.baseURL ?? DEFAULT_BASE).replace(/\/$/, "").replace(/^http/, "ws");
@@ -123,8 +128,9 @@ export class OmniSession {
   /** Forward one chunk of caller PCM16 LE audio upstream (buffers until open). */
   sendAudio(bytes) {
     if (this.closed || !bytes?.length) return;
-    if (this.open) this.ws.send(bytes);
-    else this.backlog.push(Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes));
+    const frame = b01(Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes));
+    if (this.open) this.ws.send(frame);
+    else this.backlog.push(frame);
   }
 
   /** Forward a DTMF digit (e.g. from an on-screen keypad). */

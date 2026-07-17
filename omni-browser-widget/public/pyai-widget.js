@@ -8,7 +8,8 @@
 // WebSocket DIRECTLY to PyAI with `pyai-key.<token>`, sends the `configure`
 // frame, streams mic PCM16 up at 24 kHz, and plays the agent's PCM16 back, // with barge-in. No key in the page; this file never sees your secret key.
 //
-// Audio note: Omni speaks raw PCM16 little-endian. We request a 24 kHz
+// Audio note: Omni speaks PCM16 little-endian, first-byte tagged in both
+// directions (mic audio goes up as 0x01 + PCM16). We request a 24 kHz
 // AudioContext so capture + playback match Omni with no manual resampling.
 
 (function () {
@@ -119,11 +120,19 @@
         var s = Math.max(-1, Math.min(1, input[i]));
         pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
       }
-      ws.send(pcm.buffer);
+      ws.send(frame01(pcm));
     };
     micSource.connect(processor);
     processor.connect(audioCtx.destination); // required for onaudioprocess to fire
     setState("live", "Listening, tap to end");
+  }
+
+  // Build a 0x01-prefixed audio frame (the engine's client→server framing).
+  function frame01(pcm) {
+    var out = new Uint8Array(pcm.byteLength + 1);
+    out[0] = 0x01;
+    out.set(new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength), 1);
+    return out.buffer;
   }
 
   // Build a 0x03-prefixed control frame (the engine's client→server framing).
