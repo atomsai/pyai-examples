@@ -5,8 +5,8 @@
 //
 //   server → client binary frames are tagged by their first byte:
 //     0x01 = agent audio (PCM16)   0x02 = transcript (JSON)   0x03 = control/event JSON
-//   client → server: control frames (configure/dtmf) are 0x03-prefixed JSON;
-//   caller audio is PCM16 (raw, or 0x01-tagged, both accepted here).
+//   client → server: the SAME tags. Caller audio is 0x01-prefixed PCM16; control
+//   frames (configure/dtmf) are 0x03-prefixed JSON. Untagged audio is dropped.
 //
 // Point your real Omni client at it:
 //   wss://api.pyai.com/v1/omni  →  ws://localhost:8787/v1/omni
@@ -15,6 +15,12 @@
 // point is the *protocol*: if your client treats every binary frame as audio (the
 // classic bug), it will play the 0x03/0x02 frames as a glitch and never see the
 // events, exactly as it would fail against prod. Demux on the first byte.
+//
+// The mirror of that bug is on the way up: the engine demuxes caller frames on
+// the first byte too, so PCM16 sent WITHOUT the 0x01 tag is dropped, with no
+// error and no transcript, and the agent just asks if you're still there. This
+// mock drops it as well, loudly, rather than letting it "work" here and go deaf
+// against prod.
 //
 // Run: cp .env.example .env  &&  npm install  &&  npm start
 import { WebSocketServer } from "ws";
@@ -53,6 +59,7 @@ wss.on("connection", (ws, req) => {
   console.log(`\n[conn] ${pathname}  format=${format} rate=${rate}${label ? ` session_label=${label}` : ""}`);
   if (pathname !== "/v1/omni" && pathname !== "/v2/omni/chat")
     console.warn(`[warn] path "${pathname}", the real endpoint is wss://api.pyai.com/v1/omni`);
+  if (format !== "pcm16") console.warn(`[warn] format="${format}", the engine speaks pcm16 (PCM16 LE samples)`);
 
   // Handshake (0x03 control frames).
   sendEvent(ws, { event: "hello", protocol: 2, audio_in: `${format}@${rate}`, audio_out: `${format}@${rate}`, server: "omni-mock" });
@@ -61,6 +68,9 @@ wss.on("connection", (ws, req) => {
   let speaking = false;
   let playTimer = null;
   let turnTimer = null;
+  let configured = false;
+  let earlyAudioWarned = false;
+  let untagged = 0; // caller binary frames that arrived without the 0x01 tag
   const stopPlayback = () => {
     if (playTimer) clearInterval(playTimer);
     playTimer = null;
@@ -83,6 +93,10 @@ wss.on("connection", (ws, req) => {
   };
 
   const onCallerAudio = () => {
+    if (!configured && !earlyAudioWarned) {
+      earlyAudioWarned = true;
+      console.warn("[warn] caller audio arrived before configure; send the 0x03 configure frame first");
+    }
     if (speaking) {
       stopPlayback();
       sendEvent(ws, { event: "flush" });
@@ -105,6 +119,7 @@ wss.on("connection", (ws, req) => {
     }
     switch (msg.type) {
       case "configure":
+        configured = true;
         if (!msg.persona) console.warn('[warn] configure had no "persona"');
         sendEvent(ws, { event: "config_ack", voice_id: msg.voice_id || "mock_voice", honored: Object.keys(msg).filter((k) => k !== "type"), ignored: [] });
         console.log(`[cfg] config_ack voice_id=${msg.voice_id || "(default)"} persona=${msg.persona ? "set" : "MISSING"}`);
@@ -143,13 +158,31 @@ wss.on("connection", (ws, req) => {
       }
       return;
     }
-    // Otherwise: caller audio, PCM16, raw or 0x01-tagged.
+    // CONFORMANCE: caller audio must carry the 0x01 tag. The engine demuxes on
+    // the first byte and has no default branch, so an untagged frame is dropped
+    // where it lands: no error, no transcript, no turn. Drop it here too.
+    if (buf[0] !== TAG.AUDIO) {
+      untagged++;
+      if (untagged === 1) {
+        const first = buf.length ? `0x${buf[0].toString(16).padStart(2, "0")}` : "an empty frame";
+        sendEvent(ws, {
+          event: "warning",
+          code: "untagged_caller_audio",
+          message: `Binary frame started ${first}; caller audio must be 0x01-prefixed PCM16.`,
+        });
+        console.error(
+          `[BUG] client sent untagged caller audio (first byte ${first}), real engine drops this silently. Prefix each PCM16 chunk with 0x01.`,
+        );
+      }
+      return;
+    }
     onCallerAudio();
   });
 
   ws.on("close", () => {
     stopPlayback();
     if (turnTimer) clearTimeout(turnTimer);
+    if (untagged) console.error(`[BUG] dropped ${untagged} untagged caller audio frame(s) this session; prod would have been deaf too.`);
     console.log("[conn] closed");
   });
   ws.on("error", () => stopPlayback());
