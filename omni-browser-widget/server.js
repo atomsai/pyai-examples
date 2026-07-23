@@ -45,6 +45,8 @@ const allowedOrigins = ALLOWED_ORIGINS.split(",").map((o) => o.trim()).filter(Bo
 const STATIC = {
   "/": ["index.html", "text/html; charset=utf-8"],
   "/index.html": ["index.html", "text/html; charset=utf-8"],
+  "/showcase": ["showcase.html", "text/html; charset=utf-8"],
+  "/showcase.html": ["showcase.html", "text/html; charset=utf-8"],
   "/widget/v2/pyai-widget.js": ["v2/pyai-widget.js", "text/javascript; charset=utf-8"],
   // Kept for consumers testing the immutable v1 source locally.
   "/pyai-widget.js": ["pyai-widget.js", "text/javascript; charset=utf-8"],
