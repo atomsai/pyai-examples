@@ -9,14 +9,16 @@
 //   • broker (fallback): open a WebSocket to our own /voice, which relays to
 //     PyAI server-side. The browser code below the transport layer is identical.
 //
-// Audio is PCM16 little-endian at 24 kHz, the format Omni speaks: capture the
-// mic at 24 kHz, send Int16 frames up, play back the Int16 frames down. On the
+// Audio is PCM16 little-endian at 24 kHz, the format Omni speaks: resample the
+// mic from the AudioContext's actual rate, send PCM16 up, and play PCM16 down. On the
 // Omni wire (direct mode) every frame carries a 1-byte type tag; the broker link
 // is our own protocol and relays the PCM untagged.
 // Text frames are session events (ready / transcript / barge_in / session_end /
 // error) in broker mode, or Omni's native event frames in direct mode.
 
 const RATE = 24000;
+const MAX_BACKLOG_SECONDS = 1;
+const FADE_SECONDS = 0.015;
 
 const $ = (id) => document.getElementById(id);
 const toggle = $("toggle");
@@ -29,6 +31,8 @@ let audioCtx;
 let micStream;
 let micSource;
 let processor;
+let captureMute;
+let outputGain;
 let running = false;
 
 // Playback scheduling for the agent's audio.
@@ -78,18 +82,23 @@ async function start() {
     return setStatus("Microphone permission denied.", "err");
   }
 
-  // Ask for a 24 kHz context so capture and playback both match Omni's rate
-  // with no manual resampling. Browsers honor this on modern engines.
+  // Browsers may ignore the requested rate, so capture uses audioCtx.sampleRate
+  // and resamples explicitly before encoding.
   audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: RATE });
   await audioCtx.resume();
   nextPlayTime = audioCtx.currentTime;
+  outputGain = audioCtx.createGain();
+  outputGain.gain.value = 1;
+  outputGain.connect(audioCtx.destination);
 
   try {
     if (connectMode === "direct") await connectDirect();
     else connectBroker();
   } catch (err) {
+    const message = err?.message || "Could not start the call.";
+    stop(message);
     toggle.disabled = false;
-    return setStatus(err?.message || "Could not start the call.", "err");
+    return setStatus(message, "err");
   }
 
   running = true;
@@ -118,7 +127,10 @@ async function connectDirect() {
     startCapture();
   };
   ws.onmessage = onMessage;
-  ws.onerror = () => setStatus("Connection error.", "err");
+  ws.onerror = () => {
+    stop("Connection error.");
+    setStatus("Connection error.", "err");
+  };
   ws.onclose = () => { if (running) stop("Call ended."); };
 }
 
@@ -131,7 +143,10 @@ function connectBroker() {
     startCapture();
   };
   ws.onmessage = onMessage;
-  ws.onerror = () => setStatus("Connection error.", "err");
+  ws.onerror = () => {
+    stop("Connection error.");
+    setStatus("Connection error.", "err");
+  };
   ws.onclose = () => { if (running) stop("Call ended."); };
 }
 
@@ -140,20 +155,20 @@ function startCapture() {
   // ScriptProcessor is deprecated but dependency-free and fine for a demo; for
   // production prefer an AudioWorklet. 2048 frames ≈ 85 ms at 24 kHz.
   processor = audioCtx.createScriptProcessor(2048, 1, 1);
+  captureMute = audioCtx.createGain();
+  captureMute.gain.value = 0;
   processor.onaudioprocess = (ev) => {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     const input = ev.inputBuffer.getChannelData(0);
-    const pcm = new Int16Array(input.length);
-    for (let i = 0; i < input.length; i++) {
-      const s = Math.max(-1, Math.min(1, input[i]));
-      pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-    }
+    const pcm = pcm16(input, audioCtx.sampleRate);
     // DIRECT mode talks the engine's wire, so tag the frame. BROKER mode talks
     // our own relay, which tags upstream (see src/omni-session.js).
-    ws.send(connectMode === "direct" ? frame01(pcm) : pcm.buffer);
+    ws.send(connectMode === "direct" ? frame01(pcm) : pcm);
   };
   micSource.connect(processor);
-  processor.connect(audioCtx.destination); // required for onaudioprocess to fire
+  // Keep ScriptProcessor live without routing microphone capture to speakers.
+  processor.connect(captureMute);
+  captureMute.connect(audioCtx.destination);
   setOrb("live");
   setStatus("Listening, go ahead and ask.", "live");
 }
@@ -172,8 +187,34 @@ function frame03(obj) {
 function frame01(pcm) {
   const out = new Uint8Array(pcm.byteLength + 1);
   out[0] = 0x01;
-  out.set(new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength), 1);
-  return out.buffer;
+  out.set(pcm, 1);
+  return out;
+}
+
+function resample(input, fromRate, toRate) {
+  if (!input.length || fromRate === toRate) return input;
+  const length = Math.max(1, Math.round(input.length * toRate / fromRate));
+  const output = new Float32Array(length);
+  const scale = fromRate / toRate;
+  for (let i = 0; i < length; i++) {
+    const position = i * scale;
+    const left = Math.min(input.length - 1, Math.floor(position));
+    const right = Math.min(input.length - 1, left + 1);
+    const mix = position - left;
+    output[i] = input[left] * (1 - mix) + input[right] * mix;
+  }
+  return output;
+}
+
+function pcm16(input, inputRate) {
+  const samples = resample(input, inputRate, RATE);
+  const pcm = new Uint8Array(samples.length * 2);
+  const view = new DataView(pcm.buffer);
+  for (let i = 0; i < samples.length; i++) {
+    const sample = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+  }
+  return pcm;
 }
 
 function onMessage(ev) {
@@ -197,9 +238,10 @@ function onMessage(ev) {
 // every event, the #1 Omni integration bug.
 function onBinaryFrame(arrayBuffer) {
   const u8 = new Uint8Array(arrayBuffer);
+  if (!u8.length) return;
   switch (u8[0]) {
     case 0x01:
-      return playAgentAudio(arrayBuffer.slice(1)); // PCM16 LE
+      return playAgentAudio(u8.subarray(1)); // PCM16 LE
     case 0x02:
       try { renderTranscript(JSON.parse(new TextDecoder().decode(u8.subarray(1)))); } catch {}
       return;
@@ -207,7 +249,8 @@ function onBinaryFrame(arrayBuffer) {
       try { handleEvent(JSON.parse(new TextDecoder().decode(u8.subarray(1)))); } catch {}
       return;
     default:
-      return playAgentAudio(arrayBuffer); // untagged fallback
+      console.warn("Ignored unknown Omni binary frame tag", u8[0]);
+      return;
   }
 }
 
@@ -230,7 +273,7 @@ function handleEvent(evt) {
       break;
     case "barge_in":
     case "flush":
-      stopPlayback(); // user interrupted, drop buffered agent audio immediately
+      stopPlayback(true); // fade, then drop buffered agent audio immediately
       setOrb("live");
       break;
     case "session_end":
@@ -244,16 +287,21 @@ function handleEvent(evt) {
   }
 }
 
-function playAgentAudio(arrayBuffer) {
-  const bytes = new Int16Array(arrayBuffer);
-  if (!bytes.length || !audioCtx) return;
-  const buffer = audioCtx.createBuffer(1, bytes.length, RATE);
+function playAgentAudio(bytes) {
+  if (!audioCtx || !outputGain) return;
+  const sampleCount = Math.floor(bytes.byteLength / 2);
+  if (!sampleCount) return;
+  if (Math.max(0, nextPlayTime - audioCtx.currentTime) > MAX_BACKLOG_SECONDS) {
+    stopPlayback(true);
+  }
+  const buffer = audioCtx.createBuffer(1, sampleCount, RATE);
   const ch = buffer.getChannelData(0);
-  for (let i = 0; i < bytes.length; i++) ch[i] = bytes[i] / 0x8000;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, sampleCount * 2);
+  for (let i = 0; i < sampleCount; i++) ch[i] = view.getInt16(i * 2, true) / 0x8000;
 
   const src = audioCtx.createBufferSource();
   src.buffer = buffer;
-  src.connect(audioCtx.destination);
+  src.connect(outputGain);
 
   const startAt = Math.max(audioCtx.currentTime, nextPlayTime);
   src.start(startAt);
@@ -263,14 +311,26 @@ function playAgentAudio(arrayBuffer) {
   setOrb("speaking");
   src.onended = () => {
     playing.delete(src);
+    src.disconnect();
     if (playing.size === 0 && running) setOrb("live");
   };
 }
 
-function stopPlayback() {
-  for (const src of playing) { try { src.stop(); } catch {} }
+function stopPlayback(fade = false) {
+  const now = audioCtx ? audioCtx.currentTime : 0;
+  const fadeEnd = fade && outputGain ? now + FADE_SECONDS : now;
+  if (fade && outputGain) {
+    outputGain.gain.cancelScheduledValues(now);
+    outputGain.gain.setValueAtTime(outputGain.gain.value, now);
+    outputGain.gain.linearRampToValueAtTime(0, fadeEnd);
+  }
+  for (const src of playing) { try { src.stop(fadeEnd); } catch {} }
   playing.clear();
-  nextPlayTime = audioCtx ? audioCtx.currentTime : 0;
+  nextPlayTime = now;
+  if (fade && outputGain) {
+    outputGain.gain.setValueAtTime(0, fadeEnd);
+    outputGain.gain.linearRampToValueAtTime(1, fadeEnd + FADE_SECONDS);
+  }
 }
 
 function renderTranscript(evt) {
@@ -296,13 +356,27 @@ function renderTranscript(evt) {
 
 function stop(reason = "Call ended.") {
   running = false;
-  stopPlayback();
+  stopPlayback(false);
+  try { if (processor) processor.onaudioprocess = null; } catch {}
   try { processor && processor.disconnect(); } catch {}
   try { micSource && micSource.disconnect(); } catch {}
+  try { captureMute && captureMute.disconnect(); } catch {}
+  try { outputGain && outputGain.disconnect(); } catch {}
   try { micStream && micStream.getTracks().forEach((t) => t.stop()); } catch {}
   try { audioCtx && audioCtx.close(); } catch {}
-  try { ws && ws.readyState <= 1 && ws.close(); } catch {}
+  try {
+    if (ws) {
+      ws.onopen = ws.onmessage = ws.onerror = ws.onclose = null;
+      if (ws.readyState <= WebSocket.OPEN) ws.close(1000, "client_closed");
+    }
+  } catch {}
   audioCtx = null;
+  processor = null;
+  micSource = null;
+  captureMute = null;
+  outputGain = null;
+  micStream = null;
+  ws = null;
   lastAssistantTurn = null;
   toggle.textContent = "Start talking";
   toggle.classList.remove("stop");

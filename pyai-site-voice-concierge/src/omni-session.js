@@ -11,7 +11,7 @@
 //   - Connect to wss://api.pyai.com/v1/omni?format=pcm16&rate=24000 (with an
 //     optional opaque session_label=<tag>; agent_id is a deprecated alias).
 //   - Auth on the upgrade via the subprotocol `pyai-key.<key>` (key is opaque).
-//   - Right after open, send ONE `configure` control frame as JSON TEXT:
+//   - Right after open, send ONE 0x03-prefixed `configure` control frame:
 //       { type:"configure", voice_id?, persona?, kb_endpoint?, kb_token? }
 //     This example sends only voice_id/persona/kb_*; roadmap fields
 //     (language/model_tier) are no-ops today and omitted.
@@ -19,12 +19,13 @@
 //     prefixed with the 0x01 type tag. The engine demuxes client frames on the
 //     first byte and has no default branch, so an untagged frame is dropped
 //     silently: a clean handshake, no transcripts, a deaf agent.
-//   - Session events (session_started, transcript, barge_in, …) are TEXT JSON.
+//   - Server frames are binary: 0x01 audio, 0x02 transcript JSON, 0x03 control.
 
 import WebSocket from "ws";
 
 const DEFAULT_BASE = "https://api.pyai.com";
 const TAG_AUDIO = Buffer.from([0x01]);
+const TAG_CONTROL = Buffer.from([0x03]);
 
 /**
  * @typedef {Object} OmniSessionOptions
@@ -81,15 +82,14 @@ export class OmniSession {
     this.open = true;
     // Supply the agent's behavior for THIS session. Stateless on PyAI: nothing
     // is stored, so everything the agent needs is in this one frame.
-    // The engine dispatches control frames on `event`, a configure missing
-    // `event: "configure"` is silently ignored (no persona/greeting/voice).
-    const configure = { event: "configure", type: "configure" };
+    // Client control is keyed on `type`; server control is keyed on `event`.
+    const configure = { type: "configure" };
     if (this.opts.voice) configure.voice_id = this.opts.voice;
     if (this.opts.persona) configure.persona = this.opts.persona;
     if (this.opts.greeting) configure.greeting = this.opts.greeting;
     if (this.opts.kbEndpoint) configure.kb_endpoint = this.opts.kbEndpoint;
     if (this.opts.kbToken) configure.kb_token = this.opts.kbToken;
-    this.#sendText(configure);
+    this.#sendControl(configure);
 
     for (const chunk of this.backlog) this.ws.send(chunk);
     this.backlog.length = 0;
@@ -97,28 +97,41 @@ export class OmniSession {
   }
 
   #handleMessage(data, isBinary) {
-    if (isBinary) {
-      // Agent speech: PCM16 LE bytes, ready to relay straight to the browser.
-      const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
-      if (buf.length) this.opts.onAudio?.(buf);
-      return;
-    }
     let evt;
-    try {
-      evt = JSON.parse(data.toString());
-    } catch {
-      return; // ignore non-JSON keepalives
+    if (isBinary) {
+      const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
+      if (!buf.length) return;
+      const tag = buf[0];
+      if (tag === 0x01) {
+        if (buf.length > 1) this.opts.onAudio?.(buf.subarray(1));
+        return;
+      }
+      if (tag !== 0x02 && tag !== 0x03) return;
+      try {
+        evt = JSON.parse(buf.subarray(1).toString());
+        if (!evt || typeof evt !== "object" || Array.isArray(evt)) return;
+        if (tag === 0x02 && !evt.event) evt.event = "transcript";
+      } catch {
+        return;
+      }
+    } else {
+      try {
+        evt = JSON.parse(data.toString());
+        if (!evt || typeof evt !== "object" || Array.isArray(evt)) return;
+      } catch {
+        return; // tolerate legacy text control relays
+      }
     }
     this.opts.onEvent?.(evt);
-    const type = typeof evt.type === "string" ? evt.type : "";
-    if (type === "barge_in" || type === "flush") this.opts.onBargeIn?.();
-    else if (type === "session_end" || type === "session_ending") this.close();
+    const event = typeof evt.event === "string" ? evt.event : typeof evt.type === "string" ? evt.type : "";
+    if (event === "barge_in" || event === "flush") this.opts.onBargeIn?.();
+    else if (event === "session_end" || event === "session_ending") this.close();
   }
 
-  #sendText(obj) {
+  #sendControl(obj) {
     if (this.closed) return;
     try {
-      this.ws.send(JSON.stringify(obj));
+      this.ws.send(Buffer.concat([TAG_CONTROL, Buffer.from(JSON.stringify(obj))]));
     } catch {
       /* socket not ready / closing */
     }
@@ -136,7 +149,7 @@ export class OmniSession {
 
   /** Forward a DTMF digit (e.g. from an on-screen keypad). */
   sendDtmf(digit) {
-    this.#sendText({ type: "dtmf", digit });
+    this.#sendControl({ type: "dtmf", digits: digit });
   }
 
   close(code = 1000, reason = "client_closed") {

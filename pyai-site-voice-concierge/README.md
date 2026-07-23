@@ -158,8 +158,9 @@ component.
 
 ## Notes & caveats
 
-- **Audio format is load-bearing.** Omni speaks PCM16 LE; we open the browser
-  `AudioContext` at 24 kHz so capture and playback match with no resampling.
+- **Audio format is load-bearing.** Omni speaks PCM16 LE at 24 kHz. Browsers may
+  ignore the requested `AudioContext` rate, so the client resamples capture from
+  the context's actual rate before sending it.
 - **Exact event/frame names.** Transcript/barge-in JSON field names aren't fully
   byte-pinned across the docs; `src/omni-session.js` and `public/app.js` accept
   the documented spellings and ignore unknown frames (forward-compatible).
