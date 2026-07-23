@@ -22,17 +22,19 @@ test("shared browser fixtures pin control JSON and little-endian PCM", () => {
   );
 });
 
-test("widget v2 tags caller PCM and never falls back to unknown binary audio", () => {
-  const widget = read("./omni-browser-widget/public/v2/pyai-widget.js");
-  assert.match(widget, /out\[0\] = 0x01/);
-  assert.match(widget, /ws\.send\(frame01\(/);
-  assert.match(widget, /audioCtx\.sampleRate/);
-  assert.match(widget, /captureMute\.gain\.value = 0/);
-  assert.match(widget, /outputGain\.gain\.linearRampToValueAtTime/);
-  assert.match(widget, /ignored unknown Omni frame tag/);
-  assert.doesNotMatch(widget, /ws\.send\(pcm\.buffer\)/);
-  assert.doesNotMatch(widget, /unexpected\/untagged|best-effort as audio/);
-});
+for (const version of ["v2", "v3"]) {
+  test(`widget ${version} tags caller PCM and never falls back to unknown binary audio`, () => {
+    const widget = read(`./omni-browser-widget/public/${version}/pyai-widget.js`);
+    assert.match(widget, /out\[0\] = 0x01/);
+    assert.match(widget, /ws\.send\(frame01\(/);
+    assert.match(widget, /audioCtx\.sampleRate/);
+    assert.match(widget, /captureMute\.gain\.value = 0/);
+    assert.match(widget, /outputGain\.gain\.linearRampToValueAtTime/);
+    assert.match(widget, /ignored unknown Omni frame tag/);
+    assert.doesNotMatch(widget, /ws\.send\(pcm\.buffer\)/);
+    assert.doesNotMatch(widget, /unexpected\/untagged|best-effort as audio/);
+  });
+}
 
 test("concierge direct browser transport is tagged, resampled, and strict", () => {
   const client = read("./pyai-site-voice-concierge/public/app.js");

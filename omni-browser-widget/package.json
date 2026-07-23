@@ -5,7 +5,9 @@
   "description": "Drop-in embeddable browser voice widget for PyAI Omni, one <script> tag + a tiny zero-dependency token-broker server.",
   "scripts": {
     "start": "node --env-file=.env server.js",
-    "test": "node --test test/*.test.mjs ../browser-omni-transport.test.mjs"
+    "test": "npm run test:widget-v3 && npm run test:transport",
+    "test:widget-v3": "node --test test/widget-v3.test.mjs",
+    "test:transport": "node --test ../browser-omni-transport.test.mjs"
   },
   "engines": {
     "node": ">=22"

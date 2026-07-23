@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
 
-const source = readFileSync(new URL("../public/v2/pyai-widget.js", import.meta.url), "utf8");
+const source = readFileSync(new URL("../public/v3/pyai-widget.js", import.meta.url), "utf8");
+const transportSource = readFileSync(new URL("../public/v2/pyai-widget.js", import.meta.url), "utf8");
 
 function loadHelpers() {
   const dispatched = [];
@@ -247,6 +249,23 @@ test("event actions dispatch the documented CustomEvent detail", () => {
       value: "pricing",
     },
   );
+});
+
+test("immutable v2 remains transport-only while v3 owns configuration", () => {
+  assert.equal(Buffer.byteLength(transportSource), 9695);
+  assert.equal(
+    createHash("sha256").update(transportSource).digest("hex"),
+    "b00a23c0b1709c6e0c0415ab48c5bd30a505ea063bdde63540038a32d20fd950",
+  );
+  assert.equal(Buffer.byteLength(source), 41458);
+  assert.equal(
+    createHash("sha256").update(source).digest("hex"),
+    "9dd90a74eb8fcfee3524d29176c12aea5a12c41020dbe5a21938133e9090d3ae",
+  );
+  assert.doesNotMatch(transportSource, /Powered by PyAI|data-referral|window\.PyAIWidget/);
+  assert.match(source, /Powered by PyAI/);
+  assert.match(source, /data-referral/);
+  assert.match(source, /window\.PyAIWidget = api/);
 });
 
 test("runtime source keeps security, accessibility, and responsive invariants", () => {

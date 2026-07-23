@@ -1,7 +1,7 @@
 // Drop-in Omni voice widget, the tiny backend.
 //
 // This is the *minimal* browser-voice recipe: a single <script> tag adds a
-// floating "Talk" button to ANY existing page (see public/v2/pyai-widget.js), and
+// floating "Talk" button to ANY existing page (see public/v3/pyai-widget.js), and
 // this ~80-line, zero-dependency Node server does exactly one job that has to
 // live server-side: mint a short-lived Omni SESSION TOKEN so your real
 // pyai_live_ key never ships to the browser.
@@ -47,8 +47,10 @@ const STATIC = {
   "/index.html": ["index.html", "text/html; charset=utf-8"],
   "/showcase": ["showcase.html", "text/html; charset=utf-8"],
   "/showcase.html": ["showcase.html", "text/html; charset=utf-8"],
+  "/widget/v3/pyai-widget.js": ["v3/pyai-widget.js", "text/javascript; charset=utf-8"],
+  // Historical immutable transport-only v2, retained for compatibility.
   "/widget/v2/pyai-widget.js": ["v2/pyai-widget.js", "text/javascript; charset=utf-8"],
-  // Kept for consumers testing the immutable v1 source locally.
+  // Historical immutable v1, retained for compatibility.
   "/pyai-widget.js": ["pyai-widget.js", "text/javascript; charset=utf-8"],
 };
 

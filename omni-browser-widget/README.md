@@ -1,4 +1,4 @@
-# Omni browser voice widget v2
+# Omni browser voice widget v3
 
 Add an Omni voice launcher or a safe declarative action to any page with one
 dependency-free script. Voice sessions run directly between the browser and
@@ -7,7 +7,7 @@ ships to the page.
 
 ```html
 <script
-  src="https://cdn.pyai.com/widget/v2/pyai-widget.js"
+  src="https://cdn.pyai.com/widget/v3/pyai-widget.js"
   data-widget="wdgt_x"
   data-token-url="/token"
   data-variant="pill"
@@ -17,8 +17,13 @@ ships to the page.
 </script>
 ```
 
-`public/v2/pyai-widget.js` is the prepared immutable v2 asset.
-`public/pyai-widget.js` remains the unchanged v1 source.
+`public/v3/pyai-widget.js` is the current configurable launcher with referral
+and branding support. `public/v2/pyai-widget.js` is the historical
+transport-only release, and `public/pyai-widget.js` is the historical v1 source.
+All three paths are immutable compatibility contracts. Never overwrite a
+published version. Any behavior change must use a new versioned path. The v3
+file stays byte-for-byte identical to the object already on the CDN, including
+its internal runtime identifiers.
 
 ## Run the examples
 
@@ -37,7 +42,7 @@ npm start
 Orb, a compact fixed microphone:
 
 ```html
-<script src="https://cdn.pyai.com/widget/v2/pyai-widget.js"
+<script src="https://cdn.pyai.com/widget/v3/pyai-widget.js"
   data-widget="support-voice" data-token-url="/token"
   data-variant="orb" data-position="bottom-right"></script>
 ```
@@ -45,7 +50,7 @@ Orb, a compact fixed microphone:
 Card with a safe URL action (no token endpoint needed):
 
 ```html
-<script src="https://cdn.pyai.com/widget/v2/pyai-widget.js"
+<script src="https://cdn.pyai.com/widget/v3/pyai-widget.js"
   data-widget="sales-link" data-variant="card"
   data-title="Meet the team" data-subtitle="Choose a time that works"
   data-label="Book" data-action="url"
@@ -56,7 +61,7 @@ Inline event action:
 
 ```html
 <div id="pricing-action"></div>
-<script src="https://cdn.pyai.com/widget/v2/pyai-widget.js"
+<script src="https://cdn.pyai.com/widget/v3/pyai-widget.js"
   data-widget="pricing" data-variant="inline" data-target="#pricing-action"
   data-label="See pricing" data-action="event"
   data-event-value="pricing"></script>
@@ -73,7 +78,7 @@ They open the visitor's native dialer.
 Visible branding with a PyAI-issued referral code:
 
 ```html
-<script src="https://cdn.pyai.com/widget/v2/pyai-widget.js"
+<script src="https://cdn.pyai.com/widget/v3/pyai-widget.js"
   data-widget="referred-voice" data-token-url="/token"
   data-branding="show" data-referral="ref_A8b2C9xY"></script>
 ```
@@ -120,7 +125,7 @@ Use a headless instance with any customer-owned button:
 
 ```html
 <button type="button" data-pyai-widget-open="support-voice">Talk now</button>
-<script src="https://cdn.pyai.com/widget/v2/pyai-widget.js"
+<script src="https://cdn.pyai.com/widget/v3/pyai-widget.js"
   data-widget="support-voice" data-token-url="/token"
   data-headless="true"></script>
 ```
@@ -213,11 +218,24 @@ Adjust `connect-src` if `data-token-url` is on another origin.
 
 ## Immutable CDN publication
 
-Do not overwrite v1. After review, publish this exact v2 file with:
+The v3 asset is already published. The original publication command was:
 
 ```bash
 gsutil -h "Cache-Control:public,max-age=31536000,immutable" \
-  cp public/v2/pyai-widget.js gs://pyai-cdn-assets/widget/v2/pyai-widget.js
+  cp public/v3/pyai-widget.js gs://pyai-cdn-assets/widget/v3/pyai-widget.js
 ```
 
-This task prepares the asset only; it does not upload or deploy it.
+Do not rerun that command with changed bytes. Never overwrite v1, v2, or v3.
+For any behavior change, copy the new source to a new local version directory
+and publish it to the matching new CDN path.
+
+Verify the checked-in v3 source against the published immutable object with:
+
+```bash
+curl -fsSL https://cdn.pyai.com/widget/v3/pyai-widget.js \
+  -o /tmp/pyai-widget-v3.js
+cmp public/v3/pyai-widget.js /tmp/pyai-widget-v3.js
+```
+
+No backend or CDN deploy is required for this versioning fix. The public example
+will update through the normal examples sync after merge.
