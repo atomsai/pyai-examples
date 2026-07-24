@@ -1,4 +1,30 @@
-# Omni browser voice widget v3
+# Omni browser voice widgets
+
+## Hosted v4 (recommended)
+
+Publish a website widget from **Agent → Connect → Website**, then paste one
+line. PyAI hosts the registry and session broker; the page contains no API key
+and needs no customer backend:
+
+```html
+<script src="https://cdn.pyai.com/widget/v4/pyai-widget.js"
+  data-widget="wdgt_public_x" async></script>
+```
+
+The opaque widget id resolves only safe presentation/profile data. Every voice
+start asks the control plane for a one-session, short-lived, origin-locked
+`omni:session` token. The configured domain allow-list and daily/per-IP mint
+limits are enforced before a microphone is opened. Recording-enabled Agents
+show the configured consent notice before requesting microphone permission.
+
+`data-referral` may override the registry referral only when it is a valid
+existing PyAI referral code. No org, project, Agent, API-key, callback, HTML, or
+JavaScript value is accepted from the embed.
+
+Local showcase: <http://localhost:8080/hosted> (replace its placeholder id with
+a published development widget).
+
+## Advanced customer-brokered v3
 
 Add an Omni voice launcher or a safe declarative action to any page with one
 dependency-free script. Voice sessions run directly between the browser and
@@ -194,9 +220,9 @@ audio path.
   does not store clicks or maintain referral ownership mappings.
 - Use HTTPS in production. Microphone access requires a secure context.
 
-A future hosted widget registry/session broker can replace the customer
-`data-token-url` without changing the runtime's voice transport. This example
-does not implement that hosted service or modify the product registry.
+Hosted v4 uses PyAI's widget registry/session broker and requires no
+`data-token-url`. Advanced v3 intentionally keeps the customer-operated broker
+contract for applications that supply session configuration at runtime.
 
 ## CSP
 
@@ -239,3 +265,15 @@ cmp public/v3/pyai-widget.js /tmp/pyai-widget-v3.js
 
 No backend or CDN deploy is required for this versioning fix. The public example
 will update through the normal examples sync after merge.
+
+After the backend migration, control plane, gateway route, and console have
+deployed and the hosted flow has passed certification, upload the new immutable
+v4 asset exactly once:
+
+```bash
+gsutil -h "Cache-Control:public,max-age=31536000,immutable" \
+  cp public/v4/pyai-widget.js gs://pyai-cdn-assets/widget/v4/pyai-widget.js
+```
+
+Do not run this command before merge and do not overwrite that object after
+publication.
