@@ -1,13 +1,13 @@
 # Omni browser voice widgets
 
-## Hosted v5 (recommended)
+## Hosted v6 (recommended)
 
 Publish a website widget from **Agent → Connect → Website**, then paste one
 line. PyAI hosts the registry and session broker; the page contains no API key
 and needs no customer backend:
 
 ```html
-<script src="https://cdn.pyai.com/widget/v5/pyai-widget.js"
+<script src="https://cdn.pyai.com/widget/v6/pyai-widget.js"
   data-widget="wdgt_public_x" async></script>
 ```
 
@@ -220,7 +220,7 @@ audio path.
   does not store clicks or maintain referral ownership mappings.
 - Use HTTPS in production. Microphone access requires a secure context.
 
-Hosted v5 uses PyAI's widget registry/session broker and requires no
+Hosted v6 uses PyAI's widget registry/session broker and requires no
 `data-token-url`. Advanced v3 intentionally keeps the customer-operated broker
 contract for applications that supply session configuration at runtime.
 
@@ -251,7 +251,7 @@ gsutil -h "Cache-Control:public,max-age=31536000,immutable" \
   cp public/v3/pyai-widget.js gs://pyai-cdn-assets/widget/v3/pyai-widget.js
 ```
 
-Do not rerun that command with changed bytes. Never overwrite v1-v4.
+Do not rerun that command with changed bytes. Never overwrite v1-v5.
 For any behavior change, copy the new source to a new local version directory
 and publish it to the matching new CDN path.
 
@@ -271,7 +271,7 @@ deployed dark, upload the absent v5 object exactly once from merged `main`:
 
 ```bash
 gsutil -h "Cache-Control:public,max-age=31536000,immutable" \
-  cp -n public/v5/pyai-widget.js gs://pyai-cdn-assets/widget/v5/pyai-widget.js
+  cp -n public/v6/pyai-widget.js gs://pyai-cdn-assets/widget/v6/pyai-widget.js
 ```
 
 Do not run this command before merge and do not overwrite that object after

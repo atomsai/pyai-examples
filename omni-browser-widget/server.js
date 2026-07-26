@@ -50,6 +50,7 @@ const STATIC = {
   "/hosted": ["hosted.html", "text/html; charset=utf-8"],
   "/hosted.html": ["hosted.html", "text/html; charset=utf-8"],
   "/widget/v5/pyai-widget.js": ["v5/pyai-widget.js", "text/javascript; charset=utf-8"],
+  "/widget/v6/pyai-widget.js": ["v6/pyai-widget.js", "text/javascript; charset=utf-8"],
   "/widget/v4/pyai-widget.js": ["v4/pyai-widget.js", "text/javascript; charset=utf-8"],
   "/widget/v3/pyai-widget.js": ["v3/pyai-widget.js", "text/javascript; charset=utf-8"],
   // Historical immutable transport-only v2, retained for compatibility.
