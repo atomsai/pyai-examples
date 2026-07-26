@@ -1,0 +1,61 @@
+{
+  "capture": {
+    "frame_count": 22,
+    "content_retained": false,
+    "variants": [
+      {
+        "name": "utf8_caller_delta",
+        "count": 22,
+        "body_type": "string",
+        "json": false,
+        "synthetic_body": "synthetic caller fragment"
+      }
+    ]
+  },
+  "fresh_timing": {
+    "captured_at": "2026-07-26",
+    "content_retained": false,
+    "runs": 2,
+    "caller_delta_counts": [13, 18],
+    "audio_frame_counts": [84, 123],
+    "within_turn_max_delta_gap_ms": 668,
+    "last_delta_to_first_response_audio_ms": [1241, 629, 591, 549],
+    "explicit_turn_end_control_count": 0,
+    "response_boundary": "first_response_audio_after_open_caller_turn",
+    "inactivity_fallback_ms": 1200
+  },
+  "backward_compatible": [
+    {
+      "name": "direct_transcript_object",
+      "body_type": "object",
+      "keys": {
+        "role": "string",
+        "text": "string",
+        "final": "boolean",
+        "sequence": "number"
+      },
+      "synthetic_body": {
+        "role": "assistant",
+        "text": "Synthetic agent response.",
+        "final": true,
+        "sequence": 2
+      }
+    },
+    {
+      "name": "direct_delta_object",
+      "body_type": "object",
+      "keys": {
+        "role": "string",
+        "delta": "string",
+        "final": "boolean",
+        "sequence": "number"
+      },
+      "synthetic_body": {
+        "role": "user",
+        "delta": "Synthetic caller fragment.",
+        "final": false,
+        "sequence": 1
+      }
+    }
+  ]
+}
