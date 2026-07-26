@@ -1,13 +1,13 @@
 # Omni browser voice widgets
 
-## Hosted v4 (recommended)
+## Hosted v5 (recommended)
 
 Publish a website widget from **Agent → Connect → Website**, then paste one
 line. PyAI hosts the registry and session broker; the page contains no API key
 and needs no customer backend:
 
 ```html
-<script src="https://cdn.pyai.com/widget/v4/pyai-widget.js"
+<script src="https://cdn.pyai.com/widget/v5/pyai-widget.js"
   data-widget="wdgt_public_x" async></script>
 ```
 
@@ -220,7 +220,7 @@ audio path.
   does not store clicks or maintain referral ownership mappings.
 - Use HTTPS in production. Microphone access requires a secure context.
 
-Hosted v4 uses PyAI's widget registry/session broker and requires no
+Hosted v5 uses PyAI's widget registry/session broker and requires no
 `data-token-url`. Advanced v3 intentionally keeps the customer-operated broker
 contract for applications that supply session configuration at runtime.
 
@@ -251,7 +251,7 @@ gsutil -h "Cache-Control:public,max-age=31536000,immutable" \
   cp public/v3/pyai-widget.js gs://pyai-cdn-assets/widget/v3/pyai-widget.js
 ```
 
-Do not rerun that command with changed bytes. Never overwrite v1, v2, or v3.
+Do not rerun that command with changed bytes. Never overwrite v1-v4.
 For any behavior change, copy the new source to a new local version directory
 and publish it to the matching new CDN path.
 
@@ -267,12 +267,11 @@ No backend or CDN deploy is required for this versioning fix. The public example
 will update through the normal examples sync after merge.
 
 After the backend migration, control plane, gateway route, and console have
-deployed and the hosted flow has passed certification, upload the new immutable
-v4 asset exactly once:
+deployed dark, upload the absent v5 object exactly once from merged `main`:
 
 ```bash
 gsutil -h "Cache-Control:public,max-age=31536000,immutable" \
-  cp public/v4/pyai-widget.js gs://pyai-cdn-assets/widget/v4/pyai-widget.js
+  cp -n public/v5/pyai-widget.js gs://pyai-cdn-assets/widget/v5/pyai-widget.js
 ```
 
 Do not run this command before merge and do not overwrite that object after
