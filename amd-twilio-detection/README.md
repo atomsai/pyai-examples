@@ -2,7 +2,7 @@
 
 Rip out Twilio AMD with **one line of TwiML**. This tiny, zero-dependency Node
 server forks a Twilio call's media to **PyAI AMD**, which tells you *who or what*
-answered, human, voicemail, IVR, iPhone/Google **screening**, dead number, fax, in a fraction of Twilio's dead-air dwell, with the **reason** it decided.
+answered, human, voicemail, IVR, iPhone/Google **screening**, dead number, with the **reason** it decided.
 
 No carrier change, no new SDK: PyAI speaks Twilio's Media Streams protocol
 natively, and the decision carries an `answered_by_twilio` field mapped to
@@ -51,18 +51,23 @@ TwiML `<Parameter name="aggressiveness">`).
 {
   "event": "amd.call.completed",
   "call_id": "C_123",
+  "org_id": "org_...",
+  "session_label": null,
+  "status": "completed",
   "answered_by": "voicemail",
   "answered_by_twilio": "machine_start",
   "confidence": 0.96,
   "decision_ms": 720,
-  "reason": "machine phrase: 'please leave a message' at 1.2s"
+  "reason": "machine phrase: 'please leave a message' at 1.2s",
+  "created_at": 1786000000000
 }
 ```
 
-`answered_by` uses PyAI's richer vocabulary: `human`, `voicemail`,
-`live_voicemail`, `screening`, `ivr`, `human_gatekeeper`, `sit_invalid` (dead
-number), `fax`, `silence`, `unknown`. Read a decision back later with
-`GET /v1/amd/calls/{call_id}`.
+On the completed-call record (and this webhook), `answered_by` carries the
+machine subtype: `human`, `machine`, `voicemail`, `screening`, `ivr`, `music`,
+`sit_invalid` (dead number), `unknown`. The mid-call wire event on the stream
+itself carries only the routing class: `human`, `machine`, `sit_invalid`,
+`unknown`. Read a decision back later with `GET /v1/amd/calls/{call_id}`.
 
 ## Billing
 

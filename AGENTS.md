@@ -155,7 +155,7 @@ streaming surface as Hear (`GET /v1/audio/transcriptions/stream`, scope
 
 ### 5) AMD, answering machine detection (Twilio drop-in)
 Tell an outbound dialer **who or what answered** a call, human, voicemail, IVR,
-live receptionist, iPhone/Google **screening** assistant, dead number, or fax, in a fraction of Twilio's dead-air dwell, with the word-level **reason**.
+iPhone/Google **screening** assistant, or dead number, with the word-level **reason**.
 
 - **Connect:** `wss://api.pyai.com/v1/amd/stream`, scope `amd:detect`. Speaks
   Twilio's Media Streams protocol natively, so it's a **one-line-TwiML drop-in**;
