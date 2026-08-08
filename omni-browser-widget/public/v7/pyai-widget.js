@@ -219,6 +219,17 @@
     return typeof value === "string" && value ? value : fallback;
   }
 
+  function accentText(accent) {
+    var match = /^#([0-9a-f]{6})$/i.exec(accent || "");
+    if (!match) return "#fff";
+    var channels = [0, 2, 4].map(function (offset) {
+      var channel = parseInt(match[1].slice(offset, offset + 2), 16) / 255;
+      return channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
+    });
+    var luminance = 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+    return luminance > 0.179 ? "#171411" : "#fff";
+  }
+
   function installStyles() {
     if (document.getElementById("pyai-widget-v7-styles")) return;
     var style = element("style");
@@ -227,8 +238,8 @@
     if (nonce) style.nonce = nonce;
     style.textContent =
       ".pyai-v7-unavailable{position:fixed;z-index:2147483000;bottom:max(20px,env(safe-area-inset-bottom));right:20px;max-width:320px;padding:14px 16px;border:1px solid #ddd6cc;border-radius:14px;background:#fff;color:#171411;font:500 14px/1.4 Inter,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif}" +
-      ".pyai-v4{--pa:#5b5bd6;font-family:Inter,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:#171411}" +
-      ".pyai-v4-launch{position:fixed;z-index:2147483000;bottom:max(20px,env(safe-area-inset-bottom));right:20px;border:0;background:var(--pa);color:#fff;border-radius:999px;min-height:52px;padding:0 20px;font:600 15px inherit;box-shadow:0 12px 35px rgba(0,0,0,.22);cursor:pointer}" +
+      ".pyai-v4{--pa:#5b5bd6;--pa-text:#fff;font-family:Inter,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:#171411}" +
+      ".pyai-v4-launch{position:fixed;z-index:2147483000;bottom:max(20px,env(safe-area-inset-bottom));right:20px;border:0;background:var(--pa);color:var(--pa-text);border-radius:999px;min-height:52px;padding:0 20px;font:600 15px inherit;box-shadow:0 12px 35px rgba(0,0,0,.22);cursor:pointer}" +
       ".pyai-v4-left{right:auto;left:20px}.pyai-v4-orb{width:56px;height:56px;padding:0;font-size:0}.pyai-v4-orb:after{content:'🎙';font-size:21px}" +
       ".pyai-v4-card{width:300px;border-radius:20px;text-align:left;padding:18px;background:#fff;color:#171411;border:1px solid #e6e1d8}.pyai-v4-card b,.pyai-v4-card span{display:block}.pyai-v4-card span{margin-top:5px;color:#696158;font-size:13px}" +
       ".pyai-v4-inline{position:static;box-shadow:none}.pyai-v4[hidden]{display:none!important}" +
@@ -236,7 +247,7 @@
       ".pyai-v4-dialog{width:min(420px,100%);max-height:min(680px,calc(100vh - 40px));display:flex;flex-direction:column;background:#fff;border-radius:24px;box-shadow:0 22px 70px rgba(0,0,0,.28);overflow:hidden}" +
       ".pyai-v4-head{display:flex;align-items:flex-start;justify-content:space-between;padding:20px;border-bottom:1px solid #ece8e2}.pyai-v4-head h2{font-size:18px;margin:0}.pyai-v4-head p{font-size:13px;color:#716960;margin:5px 0 0}.pyai-v4-close{border:0;background:transparent;font-size:24px;cursor:pointer}" +
       ".pyai-v4-body{padding:18px;overflow:auto;min-height:180px}.pyai-v4-status{font-size:14px;color:#655e56}.pyai-v4-consent{margin:14px 0;padding:14px;border-radius:14px;background:#f4f1ff;font-size:14px;line-height:1.45}.pyai-v4-transcript{margin-top:14px;display:grid;gap:8px;font-size:14px}.pyai-v4-transcript div{padding:9px 11px;border-radius:12px;background:#f6f4f0}" +
-      ".pyai-v4-actions{display:flex;gap:10px;padding:16px 18px;border-top:1px solid #ece8e2}.pyai-v4-btn{flex:1;border:1px solid #ddd6cc;background:#fff;border-radius:999px;min-height:44px;font:600 14px inherit;cursor:pointer}.pyai-v4-primary{border-color:var(--pa);background:var(--pa);color:#fff}" +
+      ".pyai-v4-actions{display:flex;gap:10px;padding:16px 18px;border-top:1px solid #ece8e2}.pyai-v4-btn{flex:1;border:1px solid #ddd6cc;background:#fff;border-radius:999px;min-height:44px;font:600 14px inherit;cursor:pointer}.pyai-v4-primary{border-color:var(--pa);background:var(--pa);color:var(--pa-text)}" +
       ".pyai-v4-brand{display:block;text-align:center;padding:0 0 14px;font-size:11px;color:#817970}.pyai-v4-brand:focus-visible,.pyai-v4-btn:focus-visible,.pyai-v4-launch:focus-visible{outline:3px solid color-mix(in srgb,var(--pa) 45%,transparent);outline-offset:3px}" +
       "@media(max-width:640px){.pyai-v4-backdrop{padding:0;align-items:end}.pyai-v4-dialog{width:100%;max-height:88vh;border-radius:24px 24px 0 0;padding-bottom:env(safe-area-inset-bottom)}}" +
       "@media(prefers-color-scheme:dark){.pyai-v4[data-theme=auto] .pyai-v4-dialog,.pyai-v4[data-theme=dark] .pyai-v4-dialog{background:#181613;color:#f7f2ea}.pyai-v4[data-theme=auto] .pyai-v4-head,.pyai-v4[data-theme=auto] .pyai-v4-actions,.pyai-v4[data-theme=dark] .pyai-v4-head,.pyai-v4[data-theme=dark] .pyai-v4-actions{border-color:#332e28}.pyai-v4[data-theme=auto] .pyai-v4-transcript div,.pyai-v4[data-theme=dark] .pyai-v4-transcript div{background:#24201c}}";
@@ -663,6 +674,7 @@
     var root = element("div", "pyai-v4 pyai-v4-backdrop");
     root.setAttribute("data-theme", state.config.theme);
     root.style.setProperty("--pa", state.config.accent);
+    root.style.setProperty("--pa-text", accentText(state.config.accent));
     var dialog = element("section", "pyai-v4-dialog");
     dialog.setAttribute("role", "dialog");
     dialog.setAttribute("aria-modal", "true");
@@ -803,6 +815,7 @@
     var launcher = element("button", "pyai-v4 pyai-v4-launch");
     launcher.type = "button";
     launcher.style.setProperty("--pa", config.accent);
+    launcher.style.setProperty("--pa-text", accentText(config.accent));
     launcher.setAttribute("aria-label", config.label);
     if (config.position === "bottom-left") launcher.classList.add("pyai-v4-left");
     if (config.variant === "orb") launcher.classList.add("pyai-v4-orb");

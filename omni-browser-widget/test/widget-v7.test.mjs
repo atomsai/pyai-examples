@@ -413,6 +413,13 @@ test("v7 is CSP-aware and rejects executable or unsafe configuration surfaces", 
   assert.match(source, /MutationObserver/);
 });
 
+test("v7 chooses readable text for light and dark accent colors", () => {
+  assert.match(source, /function accentText\(accent\)/);
+  assert.match(source, /luminance > 0\.179 \? "#171411" : "#fff"/);
+  assert.match(source, /color:var\(--pa-text\)/);
+  assert.match(source, /setProperty\("--pa-text", accentText\(config\.accent\)\)/);
+});
+
 test("v1-v6 assets remain byte-for-byte immutable", () => {
   for (const [version, bytes, expected] of immutable) {
     assert.equal(createHash("sha256").update(bytes).digest("hex"), expected, `${version} changed`);
