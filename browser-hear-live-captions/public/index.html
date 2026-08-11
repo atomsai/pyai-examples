@@ -97,7 +97,7 @@
         const sampleRate = Math.round(audioCtx.sampleRate); // Hear accepts 8000-48000
 
         const url = `${baseEl.value.replace(/\/$/, "")}/v1/audio/transcriptions/stream` +
-          `?model=pyai-hear&sample_rate=${sampleRate}&encoding=pcm16&interim_results=true`;
+          `?protocol=pyai-hear-v1&model=pyai-hear&sample_rate=${sampleRate}&encoding=pcm16&interim_results=true`;
         ws = new WebSocket(url, [`pyai-key.${key}`]);
         ws.binaryType = "arraybuffer";
 

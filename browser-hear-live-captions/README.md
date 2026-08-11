@@ -19,7 +19,7 @@ italic and finalize as you pause.
 - Captures mic audio with `getUserMedia` + an `AudioContext`, converts each
   buffer to **PCM16**, and sends it as binary WebSocket frames.
 - Connects to `wss://api.pyai.com/v1/audio/transcriptions/stream` with
-  `?sample_rate=<ctx rate>&encoding=pcm16&interim_results=true`. Hear accepts any
+  `?protocol=pyai-hear-v1&sample_rate=<ctx rate>&encoding=pcm16&interim_results=true`. Hear accepts any
   rate from 8000-48000, so the page just reports the `AudioContext`'s real rate, no in-browser resampling needed.
 - Authenticates with the **subprotocol** `pyai-key.<key>`, the browser-safe way
   to pass the key on a WS upgrade (you can't set headers on a browser WebSocket).

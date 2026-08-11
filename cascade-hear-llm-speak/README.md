@@ -37,7 +37,7 @@ Output:
   instead of the synthesized sample.
 - **Stream for low latency.** This demo uses the simple synchronous endpoints.
   For live calls, use Hear's streaming socket
-  (`wss://api.pyai.com/v1/audio/transcriptions/stream`, see the
+  (`wss://api.pyai.com/v1/audio/transcriptions/stream?protocol=pyai-hear-v1`, see the
   [browser captions example](../browser-hear-live-captions)) and Speak's
   streamed response so you start talking back within tens of milliseconds.
 

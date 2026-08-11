@@ -17,8 +17,8 @@ Stream or SIP leg wants, 8 kHz mono μ-law, with no client-side resampler and no
 
 | `response_format` | sample rates (Hz) | Content-Type | notes |
 |---|---|---|---|
-| `mp3` | 8000 / 16000 / 24000 / 48000 | `audio/mpeg` | default; buffered (not chunk-streamed) |
-| `wav` | 8000 / 16000 / 24000 / 48000 | `audio/wav` | |
+| `mp3` | 8000 / 16000 / 24000 / 48000 | `audio/mpeg` | buffered (not chunk-streamed) |
+| `wav` | 8000 / 16000 / 24000 / 48000 | `audio/wav` | default |
 | `opus` | 8000 / 16000 / 24000 / 48000 | `audio/ogg` | buffered |
 | `aac` | 8000 / 16000 / 24000 / 48000 | `audio/aac` | buffered |
 | `flac` | 8000 / 16000 / 24000 / 48000 | `audio/flac` | lossless |
@@ -28,7 +28,7 @@ Stream or SIP leg wants, 8 kHz mono μ-law, with no client-side resampler and no
 
 Any value outside this set is rejected with `400 unsupported_format`. `sample_rate`
 is optional, omit it for the engine's native 24 kHz (`g711_*` is always 8 kHz);
-omit `response_format` for the default `mp3`. Responses carry `x-pyai-format` and
+omit `response_format` for the default `wav`. Responses carry `x-pyai-format` and
 `x-pyai-sample-rate` headers so you can confirm what you got.
 
 ## Run it

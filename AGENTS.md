@@ -91,7 +91,8 @@ and speaks back in **emotion-aware voices**, with natural turn-taking and
 barge-in. No STT-LLM-TTS pipeline to stitch together.
 
 - **Connect:** `wss://api.pyai.com/v1/omni?format=pcm16&rate=24000`
-  (OpenAI-realtime-compatible alias: `wss://api.pyai.com/v1/realtime?model=pyai-omni-realtime`)
+  (`/v1/realtime` is a legacy PyAI kind-byte bridge, not an OpenAI Realtime
+  JSON-event drop-in)
 - **Scope:** `omni:session`
 - **Zero-state:** there is nothing to create first. The session is authorized by
   your key's org; you set the **whole agent** with one `configure` frame right
@@ -116,7 +117,8 @@ call:
 
 - **Synchronous:** `POST /v1/audio/transcriptions`, scope `hear:transcribe`.
   Send a file, get the transcript back.
-- **Streaming:** `GET /v1/audio/transcriptions/stream`, scope `hear:stream`.
+- **Streaming:** `GET /v1/audio/transcriptions/stream?protocol=pyai-hear-v1`,
+  scope `hear:stream`.
   Stream audio, render live partial + final captions.
 - **Async batch jobs:** `POST/GET /v1/transcription/jobs`, scopes
   `hear:transcribe` + `transcribe:jobs`. The −50% batch tier for after-the-call
@@ -141,17 +143,10 @@ Low-latency TTS with natural voices; first audio in tens of milliseconds.
 - **Start from:** [`speak-telephony-formats`](./speak-telephony-formats),
   [`openai-drop-in`](./openai-drop-in), [`voice-cloning`](./voice-cloning).
 
-### 4) Cue, turn detection for bring-your-own brain & voice
-When you want to own the LLM and the TTS but not the hard real-time parts, **Cue**
-gives you production-grade **turn detection** (knowing when the caller has
-finished speaking) plus optional knowledge-base grounding, over the same
-streaming surface as Hear (`GET /v1/audio/transcriptions/stream`, scope
-`hear:stream`), metered as `cue.minutes`.
-
-- **Use it for:** a custom voice pipeline, **Hear → your LLM → your TTS**, with
-  PyAI handling turn-taking/grounding so the conversation feels natural.
-- **Start from:** [`cascade-hear-llm-speak`](./cascade-hear-llm-speak) (the
-  bring-your-own-LLM pipeline).
+### 4) Cue, reserved turn detection and grounding surface
+Cue configuration exists in the contract but is not active on the serving Hear
+stream. Do not expect grounding results or `cue.minutes` today. Use Hear for
+English transcription or Omni for the complete realtime loop.
 
 ### 5) AMD, answering machine detection (Twilio drop-in)
 Tell an outbound dialer **who or what answered** a call, human, voicemail, IVR,

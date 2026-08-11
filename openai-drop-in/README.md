@@ -66,17 +66,18 @@ Output:
 ✓ Round-trip through the OpenAI SDK, served by PyAI.
 ```
 
-## Realtime, too
+## Realtime uses a protocol adapter
 
-Voice agents on OpenAI Realtime migrate the same way, keep the realtime client,
-point it at PyAI's OpenAI-compatible alias:
+The REST examples above are OpenAI-compatible. Realtime is not a base-URL-only
+migration: Omni uses one-byte kind tags for audio and control frames rather than
+OpenAI Realtime JSON events. Use the native socket:
 
 ```
-wss://api.pyai.com/v1/realtime?model=pyai-omni-realtime
+wss://api.pyai.com/v1/omni?format=pcm16&rate=24000
 ```
 
 See the [`pyai-site-voice-concierge`](../pyai-site-voice-concierge) example for a
-full browser voice agent, and `docs/quickstart.md` §4 for the native Omni socket.
+full browser voice agent and framing adapter.
 
 ## Notes
 

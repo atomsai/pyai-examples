@@ -16,7 +16,7 @@ call.wav ──POST /v1/transcription/jobs (diarize:true)──▶ { job_id, sta
         └─▶ summary      (your LLM, stubbed here; swap in OpenAI/Anthropic/…)
 ```
 
-Batch is the **−50% async tier** ($0.0015/min vs $0.003/min realtime), the right
+Batch is the **−50% async tier** ($0.0005/min vs $0.001/min realtime), the right
 tool for after-the-call analytics.
 
 ## Run it

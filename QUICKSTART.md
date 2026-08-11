@@ -49,7 +49,7 @@ Synthesize a sentence. Stream the bytes for real-time playback, or save the file
 curl -s https://api.pyai.com/v1/audio/speech \
   -H "Authorization: Bearer $PYAI_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"model":"pyai-speak","voice":"nova","input":"Hello from PyAI."}' \
+  -d '{"model":"pyai-speak","voice":"nova","input":"Hello from PyAI.","response_format":"mp3"}' \
   --output hello.mp3
 ```
 
@@ -72,7 +72,7 @@ curl -s https://api.pyai.com/v1/audio/transcriptions \
 
 Other shapes:
 
-- **Live captions**, stream audio to `GET /v1/audio/transcriptions/stream`
+- **Live captions**, stream audio to `GET /v1/audio/transcriptions/stream?protocol=pyai-hear-v1`
   (see [`browser-hear-live-captions`](./browser-hear-live-captions)).
 - **After-the-call analytics**, `POST /v1/transcription/jobs` with
   `diarize: true` for speaker-separated batch transcripts (the −50% batch tier;
