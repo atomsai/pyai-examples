@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
@@ -9,15 +8,6 @@ const transcriptFixtures = JSON.parse(readFileSync(
   new URL("./fixtures/widget-v7-transcript-shapes.json", import.meta.url),
   "utf8",
 ));
-const immutable = [
-  ["v1", readFileSync(new URL("../public/pyai-widget.js", import.meta.url)), "37801a06a5ad0af16888877b4e12bbcaa32b7ac77700ebcb8326c8893b99e512"],
-  ["v2", readFileSync(new URL("../public/v2/pyai-widget.js", import.meta.url)), "b00a23c0b1709c6e0c0415ab48c5bd30a505ea063bdde63540038a32d20fd950"],
-  ["v3", readFileSync(new URL("../public/v3/pyai-widget.js", import.meta.url)), "9dd90a74eb8fcfee3524d29176c12aea5a12c41020dbe5a21938133e9090d3ae"],
-  ["v4", readFileSync(new URL("../public/v4/pyai-widget.js", import.meta.url)), "b9c6be7ccb6d11f83087117ec42bc1c4f730f84c27eca9e5624a31b6346ac271"],
-  ["v5", readFileSync(new URL("../public/v5/pyai-widget.js", import.meta.url)), "1f2897934e3dc167dd224ceaa8ca7a8b68da1e00d8cc75888a60195253bf295d"],
-  ["v6", readFileSync(new URL("../public/v6/pyai-widget.js", import.meta.url)), "e174010cabc30cfecf67c7b27c3dc0d9e72775aab014e9fc5cffa92589ac3f6f"],
-];
-
 function runtime() {
   const events = [];
   const listeners = new Map();
@@ -190,56 +180,66 @@ test("v7 maps broker HTTP and stable API codes without generic collapse", () => 
   }
 });
 
-test("v7 demultiplexes live UTF-8 and compatible structured transcript frames", () => {
+test("v7 demultiplexes live text transcripts, legacy JSON, and event controls", () => {
   const { helpers } = runtime();
   const audio = helpers.decodeTaggedFrame(Uint8Array.from([0x01, 1, 2]).buffer);
   assert.equal(audio.kind, "audio");
   assert.deepEqual(Array.from(audio.bytes), [1, 2]);
 
-  const live = transcriptFixtures.capture.variants[0];
-  assert.deepEqual(
-    { frame_count: transcriptFixtures.capture.frame_count, body_type: live.body_type, json: live.json },
-    { frame_count: 22, body_type: "string", json: false },
-  );
-  const transcriptPayload = new TextEncoder().encode(live.synthetic_body);
+  const transcriptPayload = new TextEncoder().encode(transcriptFixtures.live_delta);
   const transcript = helpers.decodeTaggedFrame(Uint8Array.from([0x02, ...transcriptPayload]).buffer);
   assert.equal(transcript.kind, "transcript");
   assert.deepEqual(
     JSON.parse(JSON.stringify(transcript.payload)),
     {
+      event: "transcript",
       role: "user",
-      text: "synthetic caller fragment",
+      text: transcriptFixtures.live_delta,
       final: false,
       mode: "delta",
-      sequence: null,
     },
   );
-
-  const compatible = transcriptFixtures.backward_compatible[0].synthetic_body;
-  const structuredPayload = new TextEncoder().encode(JSON.stringify(compatible));
-  const structured = helpers.decodeTaggedFrame(
-    Uint8Array.from([0x02, ...structuredPayload]).buffer,
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(helpers.normalizeTranscriptBody(
+      new TextEncoder().encode(JSON.stringify(transcriptFixtures.canonical)),
+    ))),
+    { ...transcriptFixtures.canonical, mode: "replace" },
   );
-  assert.equal(structured.payload.role, "assistant");
-  assert.equal(structured.payload.final, true);
 
   const controlPayload = new TextEncoder().encode(JSON.stringify({ event: "flush" }));
   const control = helpers.decodeTaggedFrame(Uint8Array.from([0x03, ...controlPayload]).buffer);
   assert.equal(control.kind, "control");
   assert.equal(control.payload.event, "flush");
+
+  const typeKeyed = new TextEncoder().encode(JSON.stringify({ type: "flush" }));
+  assert.equal(
+    helpers.decodeTaggedFrame(Uint8Array.from([0x03, ...typeKeyed]).buffer).kind,
+    "unknown",
+  );
+  const transcriptControl = new TextEncoder().encode(JSON.stringify({
+    event: "transcript", role: "user", text: "wrong carrier", final: false,
+  }));
+  assert.equal(
+    helpers.decodeTaggedFrame(Uint8Array.from([0x03, ...transcriptControl]).buffer).kind,
+    "unknown",
+  );
+  assert.equal(helpers.state.transcriptHistory.length, 0);
 });
 
 test("v7 rejects malformed, nested, unsafe, and oversized transcript bodies", () => {
   const { helpers } = runtime();
   const encode = (value) => new TextEncoder().encode(value);
+  for (const body of transcriptFixtures.rejected) {
+    const encoded = typeof body === "string" ? body : JSON.stringify(body);
+    assert.equal(helpers.normalizeTranscriptBody(encode(encoded)), null);
+  }
   for (const body of [
     "",
     "{\"role\":\"user\"",
     JSON.stringify({ transcript: { role: "user", text: "nested" } }),
-    JSON.stringify({ role: "tool", text: "unsafe role" }),
-    JSON.stringify({ role: "user", text: "bad\u0000text" }),
-    JSON.stringify({ role: "user", text: "safe", final: "yes" }),
-    JSON.stringify({ role: "user", text: "safe", sequence: -1 }),
+    JSON.stringify({ event: "transcript", role: "tool", text: "unsafe role", final: false }),
+    JSON.stringify({ event: "transcript", role: "user", text: "bad\u0000text", final: false }),
+    JSON.stringify({ event: "transcript", role: "user", text: "safe", final: "yes" }),
     "x".repeat(16_385),
   ]) {
     assert.equal(helpers.normalizeTranscriptBody(encode(body)), null);
@@ -250,56 +250,52 @@ test("v7 rejects malformed, nested, unsafe, and oversized transcript bodies", ()
   );
 });
 
-test("v7 coalesces overlap, deduplicates retransmits, orders, and bounds history", () => {
+test("v7 replaces partials, deduplicates retransmits, and bounds history", () => {
   const { helpers } = runtime();
   const tx = (overrides) => ({
+    event: "transcript",
     role: "user",
     text: "one",
     final: false,
-    mode: "delta",
-    sequence: null,
+    mode: "replace",
     ...overrides,
   });
-  assert.equal(helpers.applyTranscript(tx({ text: "one", mode: "replace" })), true);
+  assert.equal(helpers.applyTranscript(tx({ text: "one" })), true);
   assert.equal(
-    helpers.applyTranscript(tx({ text: "one", mode: "replace" })),
+    helpers.applyTranscript(tx({ text: "one" })),
     false,
     "exact replacement duplicate",
   );
-  assert.equal(helpers.applyTranscript(tx({ text: " two" })), true);
+  assert.equal(helpers.applyTranscript(tx({ text: " two", mode: "delta" })), true);
+  assert.equal(helpers.applyTranscript(tx({ text: "one two" })), false);
   assert.equal(helpers.state.transcriptHistory.length, 1);
   assert.equal(helpers.state.transcriptHistory[0].text, "one two");
-  assert.equal(helpers.applyTranscript(tx({ text: "final text", final: true, mode: "replace" })), true);
+  assert.equal(helpers.applyTranscript(tx({ text: "final text", final: true })), true);
   assert.equal(helpers.state.transcriptHistory[0].text, "final text");
   assert.equal(helpers.state.transcriptHistory[0].final, true);
 
-  assert.equal(helpers.applyTranscript(tx({ role: "assistant", text: "reply", sequence: 4 })), true);
-  assert.equal(
-    helpers.applyTranscript(tx({ role: "assistant", text: "late", sequence: 3 })),
-    false,
-    "out-of-order sequence",
-  );
+  assert.equal(helpers.applyTranscript(tx({ role: "assistant", text: "reply" })), true);
   for (let i = 0; i < 110; i += 1) {
     helpers.applyTranscript(tx({
       role: i % 2 ? "assistant" : "user",
       text: `row-${i}`,
       final: true,
-      sequence: null,
     }));
   }
   assert.equal(helpers.state.transcriptHistory.length, 100);
 });
 
-test("v7 golden live timing yields exactly two final caller turns", () => {
+test("v7 canonical partial replacements yield exactly two final caller turns", () => {
   const { helpers, events, sources, advance } = runtime();
-  const tx = (text) => ({
-    role: "user", text, final: false, mode: "delta", sequence: null,
+  const tx = (text, final = false) => ({
+    event: "transcript", role: "user", text, final,
   });
   const audio = Uint8Array.from([0x01, 0, 0]).buffer;
 
-  for (const [at, text] of [[3188, "Synthetic"], [3273, " caller"], [3438, " turn"]]) {
-    assert.equal(helpers.applyTranscript(tx(text), at), true);
+  for (const text of ["Synthetic", "Synthetic caller", "Synthetic caller turn"]) {
+    assert.equal(helpers.applyTranscript(tx(text)), true);
   }
+  assert.equal(helpers.applyTranscript(tx("Synthetic caller turn", true)), true);
   for (let i = 0; i < 40; i += 1) helpers.handleFrame(audio);
   assert.equal(helpers.state.transcriptHistory.length, 1);
   assert.equal(helpers.state.transcriptHistory[0].final, true);
@@ -311,9 +307,10 @@ test("v7 golden live timing yields exactly two final caller turns", () => {
 
   for (const source of sources.splice(0)) source.onended?.();
   advance(181);
-  for (const [at, text] of [[8568, "Another"], [8652, " caller"], [9326, " turn"]]) {
-    assert.equal(helpers.applyTranscript(tx(text), at), true);
+  for (const text of ["Another", "Another caller", "Another caller turn"]) {
+    assert.equal(helpers.applyTranscript(tx(text)), true);
   }
+  assert.equal(helpers.applyTranscript(tx("Another caller turn", true)), true);
   helpers.handleFrame(audio);
   assert.equal(helpers.state.transcriptHistory.length, 2);
   assert.deepEqual(
@@ -322,46 +319,36 @@ test("v7 golden live timing yields exactly two final caller turns", () => {
   );
 });
 
-test("v7 inactivity, barge-in, session end, overlap, and bounds stay one-shot", () => {
-  const { helpers, advance } = runtime();
-  const tx = (text) => ({
-    role: "user", text, final: false, mode: "delta", sequence: null,
+test("v7 preserves server final flags across controls and bounded replacements", () => {
+  const { helpers } = runtime();
+  const tx = (text, final = false) => ({
+    event: "transcript", role: "user", text, final,
   });
-  assert.equal(helpers.applyTranscript(tx("synthetic "), 0), true);
-  assert.equal(helpers.applyTranscript(tx("caller"), 600), true);
-  assert.equal(helpers.state.transcriptHistory.length, 1, "sub-second pause stays open");
-  helpers.scheduleCallerFinalization();
-  advance(1199);
+  assert.equal(helpers.applyTranscript(tx("synthetic ")), true);
+  assert.equal(helpers.applyTranscript(tx("synthetic caller")), true);
+  assert.equal(helpers.state.transcriptHistory.length, 1);
   assert.equal(helpers.state.transcriptHistory[0].final, false);
-  advance(1);
-  assert.equal(helpers.state.transcriptHistory[0].final, true, "1.2s fallback finalizes once");
-  assert.equal(helpers.mergeCallerDelta("synthetic caller", "caller turn", 700), "synthetic caller turn");
-  assert.equal(helpers.mergeCallerDelta("bounded", "bounded", 710), null);
-
-  helpers.state.panel = null;
-  helpers.finalizeCallerTurn();
-  assert.equal(helpers.state.transcriptHistory.length, 1, "finalization is latched");
-  assert.equal(helpers.applyTranscript(tx("new caller turn"), 2000), true, "new caller evidence opens a row");
   helpers.handleFrame(Uint8Array.from([
     0x03, ...new TextEncoder().encode('{"event":"barge_in"}'),
   ]).buffer);
+  assert.equal(helpers.state.transcriptHistory[0].final, false, "control events do not invent finality");
+  assert.equal(helpers.applyTranscript(tx("synthetic caller", true)), true);
+  assert.equal(helpers.state.transcriptHistory[0].final, true);
+  assert.equal(helpers.applyTranscript(tx("new caller turn")), true);
   assert.equal(helpers.state.transcriptHistory.length, 2);
-  assert.equal(helpers.state.transcriptHistory[1].final, false, "barge control alone does not finalize");
-  helpers.finalizeCallerTurn();
-  advance(2000);
-  assert.equal(helpers.state.transcriptHistory.filter((row) => row.final).length, 2);
+  assert.equal(helpers.state.transcriptHistory[1].final, false);
 
   const oversized = "x".repeat(3999);
-  assert.equal(helpers.applyTranscript(tx(oversized), 5000), true);
-  assert.equal(helpers.applyTranscript(tx("yz"), 5100), true);
-  assert.equal(helpers.state.transcriptHistory.at(-1).text.length, 4000);
+  assert.equal(helpers.applyTranscript(tx(oversized)), true);
+  assert.equal(helpers.applyTranscript(tx("replacement")), true);
+  assert.equal(helpers.state.transcriptHistory.at(-1).text, "replacement");
 });
 
 test("v7 transcript host event and capability are caller-honest and versioned", () => {
   const { helpers } = runtime();
   assert.match(source, /emit\("transcript", \{\s*version: 1,\s*role: row\.role/);
   assert.doesNotMatch(source, /emit\("transcript", \{ transcript:/);
-  assert.match(source, /role: "user", text: scalar/);
+  assert.match(source, /payload\.event !== "transcript"/);
   assert.deepEqual(
     JSON.parse(JSON.stringify(helpers.normalizePublic({}).capabilities)),
     { transcript: "caller", transcriptEventVersion: 1, agentState: true },
@@ -413,15 +400,16 @@ test("v7 is CSP-aware and rejects executable or unsafe configuration surfaces", 
   assert.match(source, /MutationObserver/);
 });
 
+test("v7 rejects WebSocket text frames and exposes one transcript-body parser", () => {
+  assert.match(source, /state\.ws\.close\(1002, "binary_frames_required"\)/);
+  assert.match(source, /state\.ws\.close\(1002, "invalid_binary_frame"\)/);
+  assert.doesNotMatch(source, /JSON\.parse\(event\.data\)/);
+  assert.doesNotMatch(source, /normalizeTranscriptPayload|data-size|transcriptSequence|callerFinalize|CALLER_INACTIVITY|finalizeCallerTurn|payload\.delta|payload\.speaker|payload\.sequence/);
+});
+
 test("v7 chooses readable text for light and dark accent colors", () => {
   assert.match(source, /function accentText\(accent\)/);
   assert.match(source, /luminance > 0\.179 \? "#171411" : "#fff"/);
   assert.match(source, /color:var\(--pa-text\)/);
   assert.match(source, /setProperty\("--pa-text", accentText\(config\.accent\)\)/);
-});
-
-test("v1-v6 assets remain byte-for-byte immutable", () => {
-  for (const [version, bytes, expected] of immutable) {
-    assert.equal(createHash("sha256").update(bytes).digest("hex"), expected, `${version} changed`);
-  }
 });

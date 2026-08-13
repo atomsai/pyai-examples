@@ -5,7 +5,7 @@
 //   {
 //     "id": "appointment-booking",
 //     "persona": "You are the front-desk scheduler for ...",
-//     "agent_id": "clinic-front-desk",
+//     "session_label": "clinic-front-desk",
 //     "opening": "Thanks for calling ...",
 //     "turns": [
 //       { "caller_says": "...", "expect": [ <Assertion>, ... ] }

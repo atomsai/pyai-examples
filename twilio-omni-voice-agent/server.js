@@ -14,7 +14,7 @@ import { OmniAgent, connectStreamTwiML } from "@pyai/twilio";
 
 const {
   PYAI_API_KEY,
-  PYAI_AGENT_ID = "support-bot",
+  PYAI_SESSION_LABEL = "support-bot",
   PYAI_VOICE,
   PYAI_BASE_URL,
   PUBLIC_HOST,
@@ -45,7 +45,7 @@ app.post("/voice", (req, reply) => {
 app.get("/media", { websocket: true }, (twilioWS) => {
   const bridge = OmniAgent.bridge(twilioWS, {
     apiKey: PYAI_API_KEY,
-    agentId: PYAI_AGENT_ID,
+    sessionLabel: PYAI_SESSION_LABEL,
     voice: PYAI_VOICE,
     baseURL: PYAI_BASE_URL, // omit in prod; defaults to https://api.pyai.com
     persona: "You are a warm, concise phone support agent for Acme Co. Keep replies short.",

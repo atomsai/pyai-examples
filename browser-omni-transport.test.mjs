@@ -22,19 +22,19 @@ test("shared browser fixtures pin control JSON and little-endian PCM", () => {
   );
 });
 
-for (const version of ["v2", "v3"]) {
-  test(`widget ${version} tags caller PCM and never falls back to unknown binary audio`, () => {
-    const widget = read(`./omni-browser-widget/public/${version}/pyai-widget.js`);
-    assert.match(widget, /out\[0\] = 0x01/);
-    assert.match(widget, /ws\.send\(frame01\(/);
-    assert.match(widget, /audioCtx\.sampleRate/);
-    assert.match(widget, /captureMute\.gain\.value = 0/);
-    assert.match(widget, /outputGain\.gain\.linearRampToValueAtTime/);
-    assert.match(widget, /ignored unknown Omni frame tag/);
-    assert.doesNotMatch(widget, /ws\.send\(pcm\.buffer\)/);
-    assert.doesNotMatch(widget, /unexpected\/untagged|best-effort as audio/);
-  });
-}
+test("widget v7 tags caller PCM and accepts only strict server frames", () => {
+  const widget = read("./omni-browser-widget/public/v7/pyai-widget.js");
+  const server = read("./omni-browser-widget/server.js");
+  assert.match(widget, /frame\[0\] = 0x01/);
+  assert.match(widget, /state\.ws\.send\(pcm16Frame\(/);
+  assert.match(widget, /bytes\[0\] === 0x01/);
+  assert.match(widget, /typeof payload\.event !== "string"/);
+  assert.match(widget, /state\.ws\.close\(1002, "binary_frames_required"\)/);
+  assert.match(widget, /state\.ws\.close\(1002, "invalid_binary_frame"\)/);
+  assert.doesNotMatch(widget, /normalizeTranscriptPayload|best-effort as audio|payload\.delta|payload\.speaker|payload\.sequence/);
+  assert.match(server, /"\/widget\/v7\/pyai-widget\.js"/);
+  assert.doesNotMatch(server, /"\/pyai-widget\.js"|widget\/v[2-6]/);
+});
 
 test("concierge direct browser transport is tagged, resampled, and strict", () => {
   const client = read("./pyai-site-voice-concierge/public/app.js");
@@ -42,7 +42,8 @@ test("concierge direct browser transport is tagged, resampled, and strict", () =
   assert.match(client, /pcm16\(input, audioCtx\.sampleRate\)/);
   assert.match(client, /captureMute\.gain\.value = 0/);
   assert.match(client, /outputGain\.gain\.linearRampToValueAtTime/);
-  assert.match(client, /Ignored unknown Omni binary frame tag/);
+  assert.match(client, /ws\?\.close\(1002, "unknown_binary_tag"\)/);
+  assert.match(client, /value\.event !== "transcript"/);
   assert.doesNotMatch(client, /untagged fallback|return playAgentAudio\(arrayBuffer\)/);
 });
 
@@ -51,17 +52,9 @@ test("concierge broker speaks native tagged Omni without changing key handling",
   assert.match(broker, /const TAG_AUDIO = Buffer\.from\(\[0x01\]\)/);
   assert.match(broker, /const TAG_CONTROL = Buffer\.from\(\[0x03\]\)/);
   assert.match(broker, /const configure = \{ type: "configure" \}/);
+  assert.match(broker, /typeof evt\.event !== "string"/);
+  assert.match(broker, /value\.event !== "transcript"/);
   assert.match(broker, /buf\.subarray\(1\)/);
   assert.doesNotMatch(broker, /event: "configure"/);
   assert.doesNotMatch(broker, /this\.ws\.send\(JSON\.stringify/);
-});
-
-test("marketing live Omni demo has no untagged or unknown-audio path", () => {
-  const demo = read("../marketing/src/components/interactive/omni-voice-demo.tsx");
-  assert.match(demo, /out\[0\] = 0x01/);
-  assert.match(demo, /ws\.send\(frame01\(/);
-  assert.match(demo, /ctx\.sampleRate/);
-  assert.match(demo, /mute\.gain\.value = 0/);
-  assert.match(demo, /Ignored unknown Omni binary frame tag/);
-  assert.doesNotMatch(demo, /ws\.send\(pcm\.buffer\)|return playAgentAudio\(buf\)/);
 });

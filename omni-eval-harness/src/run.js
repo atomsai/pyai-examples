@@ -11,7 +11,7 @@
 //
 // Usage:
 //   node src/run.js [scenario] [--live] [--mode voice|text] [--fixture <path>]
-//                   [--out <dir>] [--agent-id <id>] [--voice <id>]
+//                   [--out <dir>] [--session-label <label>] [--voice <id>]
 //                   [--base-url <url>] [--no-exit-code]
 //
 //   scenario  a path (scenarios/foo.json) or bare id (foo). Default:
@@ -35,7 +35,7 @@ function parseArgs(argv) {
     mode: "voice",
     fixture: null,
     out: "out",
-    agentId: null,
+    sessionLabel: null,
     voice: null,
     baseURL: null,
     exitCode: true,
@@ -50,7 +50,7 @@ function parseArgs(argv) {
       case "--voice-mode": opts.mode = "voice"; break;
       case "--fixture": opts.fixture = argv[++i]; break;
       case "--out": opts.out = argv[++i]; break;
-      case "--agent-id": opts.agentId = argv[++i]; break;
+      case "--session-label": opts.sessionLabel = argv[++i]; break;
       case "--voice": opts.voice = argv[++i]; break;
       case "--base-url": opts.baseURL = argv[++i]; break;
       case "--no-exit-code": opts.exitCode = false; break;
@@ -66,7 +66,8 @@ function parseArgs(argv) {
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
   const scenario = loadScenario(resolveScenarioPath(opts.scenario, BASE_DIR));
-  const agentId = opts.agentId ?? process.env.PYAI_AGENT_ID ?? scenario.agent_id ?? "harness-agent";
+  const sessionLabel =
+    opts.sessionLabel ?? process.env.PYAI_SESSION_LABEL ?? scenario.session_label ?? "harness-session";
 
   let run;
   if (opts.live) {
@@ -87,7 +88,7 @@ async function main() {
     try {
       run = await runLive(scenario, {
         apiKey,
-        agentId,
+        sessionLabel,
         mode: opts.mode,
         voice: opts.voice ?? process.env.PYAI_VOICE,
         baseURL: opts.baseURL ?? process.env.PYAI_BASE_URL,
@@ -101,7 +102,7 @@ async function main() {
       ? resolveFixturePath(opts.fixture, BASE_DIR)
       : resolveFixturePath(scenario.id, BASE_DIR);
     run = loadFixture(fixturePath);
-    run.agentId = run.agentId ?? agentId;
+    run.sessionLabel = run.sessionLabel ?? sessionLabel;
     run.source = rel(fixturePath); // show a repo-relative path in the scorecard
   }
 

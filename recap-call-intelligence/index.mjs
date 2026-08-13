@@ -50,7 +50,7 @@ async function speakPcm(input, voice) {
   const res = await fetch(`${BASE}/v1/audio/speech`, {
     method: "POST",
     headers: { ...auth, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "pyai-voice", input, voice, response_format: "pcm", sample_rate: RATE }),
+    body: JSON.stringify({ model: "pyai-speak", input, voice, response_format: "pcm", sample_rate: RATE }),
   });
   if (!res.ok) throw await apiError("Speak", res);
   return Buffer.from(await res.arrayBuffer());

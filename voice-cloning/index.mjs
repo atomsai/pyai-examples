@@ -15,7 +15,7 @@ const KEEP = process.env.KEEP_CLONE === "1";
 const POLL_TIMEOUT_MS = Number(process.env.POLL_TIMEOUT_MS ?? 90_000);
 
 if (!KEY) {
-  console.error("Missing PYAI_API_KEY (needs the voice:clone scope). Copy .env.example to .env.");
+  console.error("Missing PYAI_API_KEY (needs the speak:clone scope). Copy .env.example to .env.");
   process.exit(1);
 }
 const auth = { Authorization: `Bearer ${KEY}` };
@@ -35,7 +35,7 @@ async function speak(input, { voice, format = "wav" } = {}) {
   const res = await fetch(`${BASE}/v1/audio/speech`, {
     method: "POST",
     headers: { ...auth, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "pyai-voice", input, response_format: format, ...(voice ? { voice } : {}) }),
+    body: JSON.stringify({ model: "pyai-speak", input, response_format: format, ...(voice ? { voice } : {}) }),
   });
   if (!res.ok) throw await apiError("Speak", res);
   return Buffer.from(await res.arrayBuffer());

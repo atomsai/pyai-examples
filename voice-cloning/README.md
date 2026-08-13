@@ -20,7 +20,7 @@ person's recording with `REFERENCE_AUDIO=./me.wav` (and set `KEEP_CLONE=1`).
 ## Run it
 
 ```bash
-cp .env.example .env        # then edit PYAI_API_KEY (needs the voice:clone scope)
+cp .env.example .env        # then edit PYAI_API_KEY (needs the speak:clone scope)
 npm start                   # writes reference.wav + cloned.wav, then cleans up
 
 # Use your own reference clip (recommended for a real clone):
@@ -49,14 +49,14 @@ material. A clip that *looks* like 24 kHz but was upsampled from a phone line is
 | `status: failed` / poor likeness | Clip too **short** | Give **≥10 s** (6-15 s of clean, continuous speech is the sweet spot) |
 | Muddy / averaged voice | Background noise, music, or **multiple speakers** | One speaker, quiet room, no music bed |
 | Likeness off for non-English | **EN-only today** | Use English reference + text for now |
-| `403 forbidden` | Key lacks the **`voice:clone`** scope | Add the scope to the key in the console |
+| `403 forbidden` | Key lacks the **`speak:clone`** scope | Add the scope to the key in the console |
 | `401 unauthorized` | Missing/invalid key | Re-copy the key |
 
 > **Heads-up:** clones are **durable, billed assets** (synthesis bills `voice`
 > minutes). This example deletes the clone it creates; in your own code, list
 > with `GET /v1/voice/clones` and delete with `DELETE /v1/voice/clones/{id}`.
 > Because they hold cost and create durable state, publishable/browser tokens are
-> **never** granted `voice:clone`, mint clones from a server-side key only.
+> **never** granted `speak:clone`, mint clones from a server-side key only.
 
 ## Use the clone in Omni
 

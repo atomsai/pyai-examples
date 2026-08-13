@@ -31,7 +31,7 @@ export function renderMarkdown(sc) {
   lines.push("");
   lines.push(`- **Verdict:** ${sc.verdict}`);
   lines.push(`- **Mode:** ${sc.mode}${sc.source ? ` (\`${sc.source}\`)` : ""}`);
-  lines.push(`- **Agent:** ${sc.agentId ?? "n/a"}`);
+  lines.push(`- **Session label:** ${sc.sessionLabel ?? "n/a"}`);
   lines.push(`- **Generated:** ${sc.generatedAt}`);
   lines.push(
     `- **LLM-judge:** ${sc.judge.stub ? "STUB" : "custom"} (${sc.judge.name}), ${

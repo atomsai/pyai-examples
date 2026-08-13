@@ -77,6 +77,32 @@ const b03 = (obj) => Buffer.concat([Buffer.from([0x03]), Buffer.from(JSON.string
 // silently and the agent never hears the caller.
 const b01 = (pcm) => Buffer.concat([Buffer.from([0x01]), pcm]);
 
+function normalizeTranscriptBody(body) {
+  if (!body.length || body.length > 16_384) return null;
+  let decoded;
+  try {
+    decoded = new TextDecoder("utf-8", { fatal: true }).decode(body);
+  } catch {
+    return null;
+  }
+  const text = (value) =>
+    typeof value === "string" && value.length > 0 && value.length <= 4_000 &&
+    !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value) ? value : null;
+  try {
+    const value = JSON.parse(decoded);
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const keys = Object.keys(value);
+    if (keys.length !== 4 || !["event", "role", "text", "final"].every((key) => keys.includes(key))) return null;
+    if (value.event !== "transcript") return null;
+    if (value.role !== "user" && value.role !== "assistant") return null;
+    const transcript = text(value.text);
+    if (!transcript || typeof value.final !== "boolean") return null;
+    return { event: "transcript", role: value.role, text: transcript, final: value.final };
+  } catch {
+    return null;
+  }
+}
+
 function connectOmni() {
   const ws = new WebSocket(`${BASE}/v1/omni?format=pcm16&rate=${RATE}`, [`pyai-key.${KEY}`]);
   ws.binaryType = "nodebuffer";
@@ -101,32 +127,37 @@ wss.on("connection", (fs) => {
 
   omni.on("message", (data, isBinary) => {
     const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
-    let evt = null;
-    if (isBinary) {
-      // Engine binary frames are type-tagged: 0x01 audio · 0x02 transcript ·
-      // 0x03 control JSON. Demux on the first byte (treating all binary as audio
-      // plays control frames as a glitch and drops every event).
-      const tag = buf[0];
-      if (tag === 0x01) {
-        if (fs.readyState === fs.OPEN) fs.send(FS_PROTOCOL.playAudio(buf.subarray(1))); // PCM16 into the call
-        return;
-      }
-      if (tag !== 0x03) return; // 0x02 transcript (log/forward as you like) / untagged
-      try {
-        evt = JSON.parse(buf.subarray(1).toString());
-      } catch {
-        return;
-      }
-    } else {
-      try {
-        evt = JSON.parse(buf.toString()); // legacy text control frame, tolerated
-      } catch {
-        return;
-      }
+    if (!isBinary) {
+      omni.close(1002, "binary_frames_required");
+      return;
     }
-    // Read `event` first, then `type` (switching on `type` alone silently misses
-    // every Omni server frame, the #1 integration bug).
-    const kind = evt.event || evt.type;
+    // Engine binary frames are type-tagged: 0x01 audio · 0x02 transcript ·
+    // 0x03 control JSON. Demux on the first byte.
+    const tag = buf[0];
+    if (tag === 0x01) {
+      if (fs.readyState === fs.OPEN) fs.send(FS_PROTOCOL.playAudio(buf.subarray(1))); // PCM16 into the call
+      return;
+    }
+    if (tag === 0x02) {
+      const transcript = normalizeTranscriptBody(buf.subarray(1));
+      if (!transcript) omni.close(1002, "invalid_transcript_frame");
+      else if (transcript.final) console.log(`[omni][${transcript.role}] ${transcript.text}`);
+      return;
+    }
+    if (tag !== 0x03) {
+      omni.close(1002, "unknown_binary_tag");
+      return;
+    }
+    let evt;
+    try {
+      evt = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(buf.subarray(1)));
+      if (!evt || typeof evt !== "object" || Array.isArray(evt) ||
+          typeof evt.event !== "string" || !evt.event || evt.event === "transcript") throw new Error();
+    } catch {
+      omni.close(1002, "invalid_control_frame");
+      return;
+    }
+    const kind = evt.event;
     if (kind === "flush" || kind === "barge_in") {
       if (fs.readyState === fs.OPEN) fs.send(FS_PROTOCOL.killAudio()); // caller interrupted
     } else if (kind === "transfer_to_human") {
@@ -143,7 +174,7 @@ wss.on("connection", (fs) => {
       // to ensure DTMF capture is on for evt.kind === "dtmf".
       console.log(`[omni] collect requested: field=${evt.field} kind=${evt.kind ?? "speech"}`);
     }
-    // Other frames (session_started / transcript / session_ending …): log/forward as you like.
+    // Other frames (session_started / turn / session_end …): log/forward as needed.
   });
 
   omni.on("close", () => {

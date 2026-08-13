@@ -31,7 +31,7 @@ What a sandbox key gives you:
 
 - **Works on the first call.** It skips the credit gate, so it never returns
   `402`, it's bounded instead by a daily usage cap and low concurrency.
-- **Scopes:** enough to drive STT, TTS, realtime, and AMD, `hear:transcribe`, `hear:stream`, `transcribe:jobs`, `voice:synthesize`,
+- **Scopes:** enough to drive STT, TTS, realtime, and AMD, `hear:transcribe`, `hear:stream`, `transcribe:jobs`, `speak:synthesize`,
   `omni:session`, `amd:detect`, `amd:configure`, `amd:read`.
 - **Auto-expires** (~7 days) and is per-source-IP rate-limited (a network at its
   cap gets `429 sandbox_limit_reached`, that's anti-abuse, not a bug).
@@ -91,8 +91,6 @@ and speaks back in **emotion-aware voices**, with natural turn-taking and
 barge-in. No STT-LLM-TTS pipeline to stitch together.
 
 - **Connect:** `wss://api.pyai.com/v1/omni?format=pcm16&rate=24000`
-  (`/v1/realtime` is a legacy PyAI kind-byte bridge, not an OpenAI Realtime
-  JSON-event drop-in)
 - **Scope:** `omni:session`
 - **Zero-state:** there is nothing to create first. The session is authorized by
   your key's org; you set the **whole agent** with one `configure` frame right
@@ -131,13 +129,13 @@ call:
 ### 3) Speak, text-to-speech (streaming + full-file)
 Low-latency TTS with natural voices; first audio in tens of milliseconds.
 
-- **Synthesize:** `POST /v1/audio/speech`, scope `voice:synthesize`. **Stream**
+- **Synthesize:** `POST /v1/audio/speech`, scope `speak:synthesize`. **Stream**
   the audio as it's generated for real-time playback, or take the **full file**
   for assets. Telephony-ready output formats (`g711_ulaw`/`g711_alaw`/`pcm`/
   `mp3`/`opus`) come from a single parameter, no hand-rolled μ-law encoder.
 - **OpenAI preset voices** (`alloy`/`echo`/`fable`/`onyx`/`nova`/`shimmer`) are
   accepted as drop-in aliases. Catalog at `GET /v1/voices`.
-- **Voice cloning:** create and use your own voice (`voice:clone`).
+- **Voice cloning:** create and use your own voice (`speak:clone`).
 - **Long-form narration** (audiobooks, podcasts) is the **Cast** studio surface.
 - **Use it for:** agent speech, IVR prompts, notifications, narration.
 - **Start from:** [`speak-telephony-formats`](./speak-telephony-formats),

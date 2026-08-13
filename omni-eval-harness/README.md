@@ -74,7 +74,7 @@ A scenario is a JSON file under `scenarios/`:
 {
   "id": "appointment-booking",
   "persona": "You are the front-desk scheduler for Brightsmile Dental ...",
-  "agent_id": "clinic-front-desk",
+  "session_label": "clinic-front-desk",
   "opening": "Thanks for calling Brightsmile Dental, how can I help?",
   "turns": [
     { "caller_says": "Hi, I'd like to book a cleaning for next week.",
@@ -172,7 +172,7 @@ captures, serialized so the scorers can replay them with no network:
 ```json
 {
   "scenario": "appointment-booking",
-  "agent_id": "clinic-front-desk",
+  "session_label": "clinic-front-desk",
   "mode": "live-voice",
   "turns": [
     { "caller_says": "...",          // reference text
@@ -212,8 +212,9 @@ agent goes quiet for a settle window).
 
 - **absent** → prints a skip notice and **exits 0** (dormant gate, CI-safe).
 - **present** → dynamically imports `src/live.js` and runs against
-  `https://api.pyai.com` (override with `PYAI_BASE_URL`). `agent_id` resolves from
-  `--agent-id` → `PYAI_AGENT_ID` → the scenario → `harness-agent`.
+  `https://api.pyai.com` (override with `PYAI_BASE_URL`). `session_label`
+  resolves from `--session-label` → `PYAI_SESSION_LABEL` → the scenario →
+  `harness-session`.
 
 Those two SDKs are TypeScript, consumed from their build output. The offline path
 and tests never import them; live mode does, so build them once first:

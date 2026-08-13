@@ -52,9 +52,9 @@ export const DOCS = [
   {
     id: "omni-agent-id",
     title: "Omni session_label and zero-state",
-    tags: ["session_label", "session label", "agent_id", "agent id", "create agent", "registry", "opaque", "kb_endpoint", "grounding"],
+    tags: ["session_label", "session label", "create agent", "registry", "opaque", "kb_endpoint", "grounding"],
     content:
-      "You don't create an Omni agent first. The optional session_label on the connect URL (agent_id is a deprecated alias) is an opaque tag authorized by your org, PyAI stores no per-agent state. Any value is accepted and echoed back to your own kb_endpoint, where the engine POSTs each turn's query for grounding (hard 300 ms, fail-open). The agent's behavior travels in the configure frame.",
+      "You don't create an Omni agent first. The optional session_label on the connect URL is an opaque tag authorized by your org, PyAI stores no per-agent state. Any value is accepted and echoed back to your own kb_endpoint, where the engine POSTs each turn's query for grounding (hard 300 ms, fail-open). The agent's behavior travels in the configure frame.",
   },
   {
     id: "hear",
@@ -68,7 +68,7 @@ export const DOCS = [
     title: "Speak, text-to-speech",
     tags: ["speak", "tts", "text to speech", "voice", "voices", "cloning", "clone", "synthesis"],
     content:
-      "Speak is low-latency streaming text-to-speech with first audio in roughly 32-98 ms and 36 stock voices. Voice cloning enrollment and prompt-to-voice design are both free. It's $0.06 per minute realtime. Endpoint: POST /v1/audio/speech, scope voice:synthesize.",
+      "Speak is low-latency streaming text-to-speech with first audio in roughly 32-98 ms and 36 stock voices. Voice cloning enrollment and prompt-to-voice design are both free. It's $0.06 per minute realtime. Endpoint: POST /v1/audio/speech, scope speak:synthesize.",
   },
   {
     id: "cast",
@@ -110,7 +110,7 @@ export const DOCS = [
     title: "OpenAI compatibility",
     tags: ["openai", "compatible", "drop-in", "migrate", "base url", "sdk"],
     content:
-      "PyAI is OpenAI-compatible: point your existing OpenAI client at https://api.pyai.com/v1 with your PyAI key and the request/response shapes match. There are also official SDKs (@pyai/sdk for TypeScript, pyai-sdk for Python). Omni also offers an OpenAI-realtime-compatible URL: wss://api.pyai.com/v1/realtime?model=pyai-omni-realtime.",
+      "PyAI is OpenAI-compatible over HTTP: point your existing OpenAI client at https://api.pyai.com/v1 with your PyAI key and the request/response shapes match. There are also official SDKs (@pyai/sdk for TypeScript, pyai-sdk for Python). Omni realtime connects natively at wss://api.pyai.com/v1/omni.",
   },
 ];
 

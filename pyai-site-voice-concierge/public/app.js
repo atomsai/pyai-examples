@@ -226,10 +226,44 @@ function onMessage(ev) {
     playAgentAudio(ev.data);
     return;
   }
+  if (connectMode === "direct") {
+    ws?.close(1002, "binary_frames_required");
+    return;
+  }
   try {
     handleEvent(JSON.parse(ev.data));
   } catch {
     /* ignore malformed */
+  }
+}
+
+function normalizeTranscriptBody(body) {
+  if (!body.length || body.length > 16_384) return null;
+  let decoded;
+  try {
+    decoded = new TextDecoder("utf-8", { fatal: true }).decode(body);
+  } catch {
+    return null;
+  }
+  const safeText = (value) =>
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= 4_000 &&
+    !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)
+      ? value
+      : null;
+  try {
+    const value = JSON.parse(decoded);
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const keys = Object.keys(value);
+    if (keys.length !== 4 || !["event", "role", "text", "final"].every((key) => keys.includes(key))) return null;
+    if (value.event !== "transcript") return null;
+    if (value.role !== "user" && value.role !== "assistant") return null;
+    const text = safeText(value.text);
+    if (!text || typeof value.final !== "boolean") return null;
+    return { event: "transcript", role: value.role, text, final: value.final };
+  } catch {
+    return null;
   }
 }
 
@@ -242,24 +276,29 @@ function onBinaryFrame(arrayBuffer) {
   switch (u8[0]) {
     case 0x01:
       return playAgentAudio(u8.subarray(1)); // PCM16 LE
-    case 0x02:
-      try { renderTranscript(JSON.parse(new TextDecoder().decode(u8.subarray(1)))); } catch {}
+    case 0x02: {
+      const transcript = normalizeTranscriptBody(u8.subarray(1));
+      if (transcript) renderTranscript(transcript);
       return;
+    }
     case 0x03:
-      try { handleEvent(JSON.parse(new TextDecoder().decode(u8.subarray(1)))); } catch {}
+      try {
+        const event = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(u8.subarray(1)));
+        if (!event || typeof event !== "object" || typeof event.event !== "string" ||
+            !event.event || event.event === "transcript") throw new Error();
+        handleEvent(event);
+      } catch {
+        ws?.close(1002, "invalid_control_frame");
+      }
       return;
     default:
-      console.warn("Ignored unknown Omni binary frame tag", u8[0]);
+      ws?.close(1002, "unknown_binary_tag");
       return;
   }
 }
 
 function handleEvent(evt) {
-  // Omni server frames are keyed on `event`; the broker also synthesizes a few
-  // `type`-keyed control frames (`ready`/`session_end`/`error`). Read `event`
-  // first, then fall back to `type` so both modes work. (Switching on `type`
-  // alone is the #1 Omni bug, it silently misses every server frame.)
-  const kind = evt.event || evt.type;
+  const kind = typeof evt.event === "string" ? evt.event : "";
   switch (kind) {
     case "config_ack":     // direct mode: ack for our configure
       setStatus("Listening, go ahead and ask.", "live");

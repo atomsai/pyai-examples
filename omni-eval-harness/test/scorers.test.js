@@ -170,7 +170,7 @@ function mkScenario(expect, thresholds = {}) {
 function mkRun(turnOver = {}) {
   return {
     scenarioId: "t",
-    agentId: "a",
+    sessionLabel: "a",
     mode: "offline",
     turns: [
       {

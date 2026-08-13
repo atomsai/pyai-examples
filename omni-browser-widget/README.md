@@ -1,281 +1,51 @@
-# Omni browser voice widgets
-
-## Hosted v7 (recommended)
+# Hosted Omni browser widget v7
 
 Publish a website widget from **Agent → Connect → Website**, then paste one
-line. PyAI hosts the registry and session broker; the page contains no API key
-and needs no customer backend:
+script tag:
 
 ```html
 <script src="https://cdn.pyai.com/widget/v7/pyai-widget.js"
   data-widget="wdgt_public_x" async></script>
 ```
 
-The opaque widget id resolves only safe presentation/profile data. Every voice
-start asks the control plane for a one-session, short-lived, origin-locked
-`omni:session` token. The configured domain allow-list and daily/per-IP mint
-limits are enforced before a microphone is opened. Recording-enabled Agents
-show the configured consent notice before requesting microphone permission.
+The page contains no API key and needs no customer token endpoint. The opaque
+widget id resolves safe presentation/profile data, and every voice start asks
+PyAI for a one-session, short-lived, origin-locked `omni:session` token.
 
-`data-referral` may override the registry referral only when it is a valid
-existing PyAI referral code. No org, project, Agent, API-key, callback, HTML, or
-JavaScript value is accepted from the embed.
+The runtime connects only to native Omni at `/v1/omni` with `session_label`.
+Server messages must use binary native framing:
 
-Local showcase: <http://localhost:8080/hosted> (replace its placeholder id with
-a published development widget).
+- `0x01` + PCM16 agent audio
+- `0x02` + `{ "event":"transcript", "role", "text", "final" }`
+- `0x03` + JSON control keyed on `event`
 
-## Advanced customer-brokered v3
+Text WebSocket frames, type-keyed server controls, unknown binary tags, and
+transcript controls outside `0x02` are rejected. Client audio/control remains
+`0x01` PCM16 and `0x03` JSON keyed on `type`.
 
-Add an Omni voice launcher or a safe declarative action to any page with one
-dependency-free script. Voice sessions run directly between the browser and
-PyAI after your backend mints a short-lived session token; your API key never
-ships to the page.
-
-```html
-<script
-  src="https://cdn.pyai.com/widget/v3/pyai-widget.js"
-  data-widget="wdgt_x"
-  data-token-url="/token"
-  data-variant="pill"
-  data-position="bottom-left"
-  data-label="Talk to us"
-  data-theme="auto">
-</script>
-```
-
-`public/v3/pyai-widget.js` is the current configurable launcher with referral
-and branding support. `public/v2/pyai-widget.js` is the historical
-transport-only release, and `public/pyai-widget.js` is the historical v1 source.
-All three paths are immutable compatibility contracts. Never overwrite a
-published version. Any behavior change must use a new versioned path. The v3
-file stays byte-for-byte identical to the object already on the CDN, including
-its internal runtime identifiers.
-
-## Run the examples
+## Local smoke
 
 ```bash
-cp .env.example .env     # add PYAI_API_KEY; a sandbox key is fine
+cp .env.example .env
 npm test
 npm start
 ```
 
-- Minimal page: <http://localhost:8080>
-- All variants, positions, actions, and a custom button:
-  <http://localhost:8080/showcase>
+Open <http://localhost:8080>. Replace the placeholder public id and local API
+origin in `public/index.html` with a published development widget setup.
 
-## Launcher examples
+`server.js` is static-only. Production pages load the asset from
+`cdn.pyai.com`; PyAI owns the public config and ephemeral-session broker.
 
-Orb, a compact fixed microphone:
+## Public runtime
 
-```html
-<script src="https://cdn.pyai.com/widget/v3/pyai-widget.js"
-  data-widget="support-voice" data-token-url="/token"
-  data-variant="orb" data-position="bottom-right"></script>
-```
+The embed accepts:
 
-Card with a safe URL action (no token endpoint needed):
+- `data-widget`, required hosted widget public id
+- `data-api-origin`, localhost-only test override
+- `data-referral`, optional valid PyAI referral code
 
-```html
-<script src="https://cdn.pyai.com/widget/v3/pyai-widget.js"
-  data-widget="sales-link" data-variant="card"
-  data-title="Meet the team" data-subtitle="Choose a time that works"
-  data-label="Book" data-action="url"
-  data-url="https://example.com/book" data-action-target="new"></script>
-```
-
-Inline event action:
-
-```html
-<div id="pricing-action"></div>
-<script src="https://cdn.pyai.com/widget/v3/pyai-widget.js"
-  data-widget="pricing" data-variant="inline" data-target="#pricing-action"
-  data-label="See pricing" data-action="event"
-  data-event-value="pricing"></script>
-<script>
-  window.addEventListener("pyai:widget:action", (event) => {
-    if (event.detail.widgetId === "pricing") showPricing();
-  });
-</script>
-```
-
-Telephone actions use `data-action="tel"` and a validated `data-tel="+14155550123"`.
-They open the visitor's native dialer.
-
-Visible branding with a PyAI-issued referral code:
-
-```html
-<script src="https://cdn.pyai.com/widget/v3/pyai-widget.js"
-  data-widget="referred-voice" data-token-url="/token"
-  data-branding="show" data-referral="ref_A8b2C9xY"></script>
-```
-
-Set `data-branding="hide"` to remove the branding anchor entirely. Branding is
-shown by default. A referral code is an opaque code generated by PyAI; it is
-not an organization ID, customer ID, agent ID, URL, or query string.
-
-## Configuration
-
-All customer values are read as text from the script's `data-*` attributes.
-Unknown enum values use a safe default. Invalid actions are blocked or fall back
-to voice with a console warning; strings are never interpreted as HTML or
-JavaScript.
-
-| Attribute | Values / default | Purpose |
-|---|---|---|
-| `data-widget` | safe identifier / generated | Public ID used by the API and event details. Internal instance IDs are always unique. |
-| `data-variant` | `orb`, `pill`, `card`, `inline` / `pill` | Launcher shape. All voice variants use the same dialog panel. |
-| `data-position` | `bottom-right`, `bottom-left` / `bottom-right` | Fixed launcher position. Safe-area insets are included. Ignored by `inline`. |
-| `data-target` | CSS selector | Inline mount target. An invalid/missing selector falls back to the script parent. |
-| `data-theme` | `auto`, `light`, `dark` / `auto` | Panel and card theme. `auto` follows the OS preference. |
-| `data-accent` | valid opaque CSS color / `#5b5bd6` | Accent. Unsafe CSS values and transparent colors are rejected; black or white foreground is derived for contrast. |
-| `data-density` | `compact`, `comfortable` / `comfortable` | Launcher and panel spacing/size density. `data-size` is accepted as an alias. |
-| `data-label` | text / `Talk to us` | Pill/inline text and card action. |
-| `data-title` | text / `Talk with our team` | Card and dialog title. |
-| `data-subtitle` | text / `Ask a question by voice.` | Card subtitle. |
-| `data-action` | `voice`, `url`, `tel`, `event` / `voice` | Declarative click behavior. No arbitrary callback or script is accepted. |
-| `data-token-url` | HTTP(S) URL or relative path | Required only for `voice`. The endpoint must return `{token,url,configure?}`. |
-| `data-url` | HTTP(S) URL | Required for `url`; executable and non-web schemes are rejected. |
-| `data-action-target` | `same`, `new` / `new` | URL navigation target. New tabs use `noopener,noreferrer`. |
-| `data-tel` | 3–15 digit telephone number | Required for `tel`; formatting punctuation is removed. |
-| `data-event-value` | text | Optional value included in `pyai:widget:action` details. |
-| `data-headless` | `true`, `false` / `false` | Hide the built-in launcher while retaining the voice panel and API. |
-| `data-branding` | `show`, `hide` / `show` | Show a subtle `Powered by PyAI` link in the panel and below card launchers. Unknown values default to `show`; `hide` creates no branding element. |
-| `data-referral` | PyAI-issued opaque code, 8–64 URL-safe characters | Builds a compatible `pyai.com/r/{code}` link. URLs, query strings, markup, and org/customer/agent/project/widget IDs are rejected and use the generic link. |
-
-Fixed launchers intentionally support bottom positions only. On narrow screens,
-the call dialog becomes a bottom sheet and includes the device safe-area inset.
-
-## Custom buttons and multiple instances
-
-Use a headless instance with any customer-owned button:
-
-```html
-<button type="button" data-pyai-widget-open="support-voice">Talk now</button>
-<script src="https://cdn.pyai.com/widget/v3/pyai-widget.js"
-  data-widget="support-voice" data-token-url="/token"
-  data-headless="true"></script>
-```
-
-The delegated binding also works for matching buttons added later. The global
-API selects the newest instance by default or a specific `data-widget`/instance
-ID when supplied:
-
-```js
-window.PyAIWidget.open("support-voice");
-window.PyAIWidget.close("support-voice");
-window.PyAIWidget.toggle("support-voice");
-window.PyAIWidget.destroy("support-voice");
-window.PyAIWidget.getConfig("support-voice"); // includes branding + validated referralCode
-```
-
-Multiple script tags share one runtime and stylesheet, while each widget keeps
-its own panel, WebSocket, microphone, playback queue, transcript, and unique
-instance ID. `getConfig` returns the safe public runtime configuration and never
-returns the token URL, session token, WebSocket, or internal instance state.
-
-## Lifecycle events
-
-Listen on `window` for:
-
-- `pyai:widget:ready`
-- `pyai:widget:open`
-- `pyai:widget:connected`
-- `pyai:widget:transcript`
-- `pyai:widget:state`
-- `pyai:widget:error`
-- `pyai:widget:close`
-- `pyai:widget:action`
-- `pyai:widget:branding-click`
-
-Standard lifecycle `event.detail` objects include `widgetId` and `instanceId`.
-Transcript events also include the transport payload, and action events include
-the declarative action and optional value. The branding-click event is
-intentionally narrower: it includes only `widgetId`, `variant`, and a validated
-`referralCode` when one exists. It never includes page data, the token URL, or
-internal instance state.
-
-The voice panel has dialog semantics, trapped keyboard focus, a polite live
-status, caller transcript log, mute/end controls, focus restoration, and
-Escape-to-end. Public config advertises `capabilities.transcript: "caller"`;
-the runtime does not infer or fabricate Agent text from response audio.
-The transport preserves native 0x01/0x02/0x03 framing, 24 kHz resampling,
-bounded playback, and `flush`/`barge_in` queue cancellation.
-
-## Token endpoint and security
-
-```
-browser ──POST /token──▶ your server ──POST /v1/omni/sessions──▶ PyAI
-browser ──wss /v1/omni (pyai-key.<short-lived token>)──────────▶ PyAI
-```
-
-`server.js` is a zero-dependency reference token endpoint. It is never in the
-audio path.
-
-- Never put a long-lived API key in HTML, JavaScript, data attributes, query
-  strings, or the token response.
-- Lock down the token endpoint with a strict origin allowlist, short token TTL,
-  per-IP/session rate limits, and abuse protection suitable for a public page.
-- URL actions accept only HTTP(S). Telephone actions accept a constrained phone
-  number. The runtime never evaluates configuration and never accepts arbitrary
-  HTML or click-handler JavaScript.
-- Referral codes are treated as opaque routing codes. The widget only creates
-  the compatible `/r/{code}` link and dispatches a privacy-safe click event; it
-  does not store clicks or maintain referral ownership mappings.
-- Use HTTPS in production. Microphone access requires a secure context.
-
-Hosted v7 uses PyAI's widget registry/session broker and requires no
-`data-token-url`. Advanced v3 intentionally keeps the customer-operated broker
-contract for applications that supply session configuration at runtime.
-
-## CSP
-
-The widget has no third-party dependency. A baseline policy for the CDN-hosted
-asset and a same-origin token endpoint is:
-
-```text
-script-src 'self' https://cdn.pyai.com;
-connect-src 'self' https://api.pyai.com wss://api.pyai.com;
-style-src 'self' 'unsafe-inline';
-media-src 'self' blob:;
-```
-
-The runtime creates one stylesheet and sets validated CSS custom properties, so
-strict sites must permit those inline styles. A script `nonce` is copied to the
-generated stylesheet; sites that also block style attributes must allow the
-small validated custom-property assignments or host a fixed-theme build.
-Adjust `connect-src` if `data-token-url` is on another origin.
-
-## Immutable CDN publication
-
-The v3 asset is already published. The original publication command was:
-
-```bash
-gsutil -h "Cache-Control:public,max-age=31536000,immutable" \
-  cp public/v3/pyai-widget.js gs://pyai-cdn-assets/widget/v3/pyai-widget.js
-```
-
-Do not rerun that command with changed bytes. Never overwrite v1-v6.
-For any behavior change, copy the new source to a new local version directory
-and publish it to the matching new CDN path.
-
-Verify the checked-in v3 source against the published immutable object with:
-
-```bash
-curl -fsSL https://cdn.pyai.com/widget/v3/pyai-widget.js \
-  -o /tmp/pyai-widget-v3.js
-cmp public/v3/pyai-widget.js /tmp/pyai-widget-v3.js
-```
-
-No backend or CDN deploy is required for this versioning fix. The public example
-will update through the normal examples sync after merge.
-
-After the backend migration, control plane, gateway route, and console have
-deployed dark, upload the absent v5 object exactly once from merged `main`:
-
-```bash
-gsutil -h "Cache-Control:public,max-age=31536000,immutable" \
-  cp -n public/v7/pyai-widget.js gs://pyai-cdn-assets/widget/v7/pyai-widget.js
-```
-
-Do not run this command before merge and do not overwrite that object after
-publication.
+Presentation, consent, action, and agent behavior come from the published
+widget record. The runtime exposes `window.PyAIWidget.open/close/toggle/destroy`
+and emits versioned `pyai:widget:*` lifecycle, transcript, state, and error
+events.

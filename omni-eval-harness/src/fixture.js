@@ -11,7 +11,7 @@
 //   {
 //     "fixture": "appointment-booking.offline",
 //     "scenario": "appointment-booking",
-//     "agent_id": "clinic-front-desk",
+//     "session_label": "clinic-front-desk",
 //     "mode": "live-voice",
 //     "recorded_at": "2026-06-16T12:00:00Z",
 //     "turns": [
@@ -40,7 +40,7 @@ export function normalizeFixture(obj, source = null) {
   }
   return {
     scenarioId: obj.scenario ?? null,
-    agentId: obj.agent_id ?? null,
+    sessionLabel: obj.session_label ?? null,
     mode: obj.mode ?? "offline",
     recordedAt: obj.recorded_at ?? null,
     source,

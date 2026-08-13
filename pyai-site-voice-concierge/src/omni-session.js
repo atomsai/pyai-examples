@@ -9,7 +9,7 @@
 //
 // Wire protocol (docs/OMNI_PROTOCOL_V2.md, mirrored from sdk/twilio/src/omni.ts):
 //   - Connect to wss://api.pyai.com/v1/omni?format=pcm16&rate=24000 (with an
-//     optional opaque session_label=<tag>; agent_id is a deprecated alias).
+//     optional opaque session_label=<tag>).
 //   - Auth on the upgrade via the subprotocol `pyai-key.<key>` (key is opaque).
 //   - Right after open, send ONE 0x03-prefixed `configure` control frame:
 //       { type:"configure", voice_id?, persona?, kb_endpoint?, kb_token? }
@@ -19,13 +19,54 @@
 //     prefixed with the 0x01 type tag. The engine demuxes client frames on the
 //     first byte and has no default branch, so an untagged frame is dropped
 //     silently: a clean handshake, no transcripts, a deaf agent.
-//   - Server frames are binary: 0x01 audio, 0x02 transcript JSON, 0x03 control.
+//   - Server frames are binary: 0x01 audio, 0x02 transcript body, 0x03 control.
 
 import WebSocket from "ws";
 
 const DEFAULT_BASE = "https://api.pyai.com";
 const TAG_AUDIO = Buffer.from([0x01]);
 const TAG_CONTROL = Buffer.from([0x03]);
+const MAX_TRANSCRIPT_BYTES = 16_384;
+const MAX_TRANSCRIPT_CHARS = 4_000;
+
+function transcriptText(value) {
+  return typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= MAX_TRANSCRIPT_CHARS &&
+    !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)
+    ? value
+    : null;
+}
+
+/** The sole parser for the exact event-keyed JSON body carried by 0x02. */
+export function normalizeOmniTranscriptBody(body) {
+  if (!body?.length || body.length > MAX_TRANSCRIPT_BYTES) return null;
+  let decoded;
+  try {
+    decoded = new TextDecoder("utf-8", { fatal: true }).decode(body);
+  } catch {
+    return null;
+  }
+  let value;
+  try {
+    value = JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const keys = Object.keys(value);
+  if (keys.length !== 4 || !["event", "role", "text", "final"].every((key) => keys.includes(key))) return null;
+  if (value.event !== "transcript") return null;
+  if (value.role !== "user" && value.role !== "assistant") return null;
+  const text = transcriptText(value.text);
+  if (!text || typeof value.final !== "boolean") return null;
+  return {
+    event: "transcript",
+    role: value.role,
+    text,
+    final: value.final,
+  };
+}
 
 /**
  * @typedef {Object} OmniSessionOptions
@@ -97,35 +138,51 @@ export class OmniSession {
   }
 
   #handleMessage(data, isBinary) {
+    if (!isBinary) {
+      this.opts.onError?.(new Error("Unexpected Omni text frame"));
+      return;
+    }
+    const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
+    if (!buf.length) {
+      this.opts.onError?.(new Error("Empty Omni binary frame"));
+      return;
+    }
+    const tag = buf[0];
+    if (tag === 0x01) {
+      if (buf.length > 1) this.opts.onAudio?.(buf.subarray(1));
+      return;
+    }
     let evt;
-    if (isBinary) {
-      const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
-      if (!buf.length) return;
-      const tag = buf[0];
-      if (tag === 0x01) {
-        if (buf.length > 1) this.opts.onAudio?.(buf.subarray(1));
+    if (tag === 0x02) {
+      evt = normalizeOmniTranscriptBody(buf.subarray(1));
+      if (!evt) {
+        this.opts.onError?.(new Error("Unparseable Omni transcript frame"));
         return;
       }
-      if (tag !== 0x02 && tag !== 0x03) return;
+    } else if (tag === 0x03) {
       try {
-        evt = JSON.parse(buf.subarray(1).toString());
-        if (!evt || typeof evt !== "object" || Array.isArray(evt)) return;
-        if (tag === 0x02 && !evt.event) evt.event = "transcript";
+        evt = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(buf.subarray(1)));
+        if (!evt || typeof evt !== "object" || Array.isArray(evt)) throw new Error();
       } catch {
+        this.opts.onError?.(new Error("Unparseable Omni control frame"));
         return;
       }
     } else {
-      try {
-        evt = JSON.parse(data.toString());
-        if (!evt || typeof evt !== "object" || Array.isArray(evt)) return;
-      } catch {
-        return; // tolerate legacy text control relays
-      }
+      this.opts.onError?.(new Error(`Unknown Omni binary frame tag 0x${tag.toString(16).padStart(2, "0")}`));
+      return;
+    }
+    if (typeof evt.event !== "string" || !evt.event) {
+      this.opts.onError?.(new Error("Omni server control frame is missing its event key"));
+      return;
+    }
+    if (tag === 0x03 && evt.event === "transcript") {
+      this.opts.onError?.(new Error("Omni transcript events must use a binary 0x02 frame"));
+      return;
     }
     this.opts.onEvent?.(evt);
-    const event = typeof evt.event === "string" ? evt.event : typeof evt.type === "string" ? evt.type : "";
+    const event = evt.event;
     if (event === "barge_in" || event === "flush") this.opts.onBargeIn?.();
-    else if (event === "session_end" || event === "session_ending") this.close();
+    else if (event === "session_end") this.close();
   }
 
   #sendControl(obj) {

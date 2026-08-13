@@ -33,13 +33,17 @@ both ways, transcripts, barge-in, and DTMF.
   (`configure`, `dtmf`) are `0x03`-prefixed too. A client that treats all binary
   as audio plays the control/transcript frames as a glitch and misses every
   event, the same way it fails against prod.
+- **One transcript body:** `0x02` carries exactly
+  `{"event":"transcript","role":"user|assistant","text":"…","final":false}`;
+  there are no scalar, nested, or alternate-field forms.
 - **Handshake:** `hello` → `session_started` (0x03), then a `config_ack` (0x03)
   after your `configure` frame (server frames keyed on `event`).
-- **Audio:** send binary PCM16 at the `?rate=` you connect with; after a short
-  silence the mock "replies" with a tone (streamed in 150 ms chunks).
+- **Audio:** send `0x01`-prefixed PCM16 at the `?rate=` you connect with; after
+  a short silence the mock "replies" with a tone (streamed in 150 ms chunks).
 - **Barge-in:** send audio while the mock is talking and it emits `flush` and
   stops, exactly the event your client must handle.
-- **DTMF & lifecycle:** `{"type":"dtmf","digit":"5"}` is echoed; `{"type":"session_ending"}` closes with `session_end`.
+- **DTMF & lifecycle:** `{"type":"dtmf","digit":"5"}` is echoed;
+  `{"type":"session_ending"}` closes with `session_end`.
 
 ## The conformance check (why this beats a dumb echo)
 

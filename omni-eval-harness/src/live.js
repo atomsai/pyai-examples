@@ -56,7 +56,7 @@ function buildHint(pkg, dir, err) {
 /**
  * Run a scenario live against Omni. Returns a normalized RunResult.
  * @param {object} scenario validated scenario
- * @param {object} opts { apiKey, agentId, mode, voice, baseURL, omniRate }
+ * @param {object} opts { apiKey, sessionLabel, mode, voice, baseURL, omniRate }
  */
 export async function runLive(scenario, opts) {
   const { twilio, sdk } = await loadDeps();
@@ -82,7 +82,7 @@ export async function runLive(scenario, opts) {
 
   const omni = new OmniClient({
     apiKey: opts.apiKey,
-    agentId: opts.agentId,
+    sessionLabel: opts.sessionLabel,
     baseURL: opts.baseURL,
     rate: omniRate,
     voice: opts.voice,
@@ -98,8 +98,8 @@ export async function runLive(scenario, opts) {
       if (tr.final && role !== "user" && role !== "caller" && tr.text) turnCtx.finals.push(tr.text);
     },
     onEvent: (evt) => {
-      const type = typeof evt.type === "string" ? evt.type : "";
-      if (type === "tool_call" || type === "function_call" || type === "tool") {
+      const event = typeof evt.event === "string" ? evt.event : "";
+      if (event === "tool_call") {
         const name = evt.name ?? evt.tool ?? evt.function?.name;
         if (name) turnCtx.tools.push({ name, args: evt.arguments ?? evt.args ?? null });
       }
@@ -177,7 +177,7 @@ export async function runLive(scenario, opts) {
 
   return {
     scenarioId: scenario.id,
-    agentId: opts.agentId,
+    sessionLabel: opts.sessionLabel,
     mode: mode === "voice" ? "live-voice" : "live-text",
     source: opts.baseURL ?? "api.pyai.com",
     recordedAt: new Date().toISOString(),

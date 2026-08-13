@@ -4,7 +4,7 @@
 The ONLY structural change from an OpenAI integration is the client below: set
 `base_url` to PyAI and use your PyAI key. The two `client.audio.*` calls are the
 same ones you already wrote against OpenAI; only the model names differ
-(pyai-voice / pyai-hear instead of tts-1 / whisper-1).
+(pyai-speak / pyai-hear instead of tts-1 / whisper-1).
 
 Self-contained: with just a key it synthesizes a line, writes hello.mp3, then
 transcribes that file back.
@@ -32,7 +32,7 @@ text = "The fastest migration is the one where you change a single line."
 
 # Speak (TTS): identical to OpenAI's client.audio.speech.create, model renamed.
 speech = client.audio.speech.create(
-    model="pyai-voice",  # was: "tts-1" / "gpt-4o-mini-tts"
+    model="pyai-speak",  # the intentional "tts-1" alias also remains accepted
     voice=voice,
     input=text,
     response_format="mp3",

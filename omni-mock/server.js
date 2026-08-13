@@ -4,9 +4,9 @@
 // day you swap in a real key:
 //
 //   server → client binary frames are tagged by their first byte:
-//     0x01 = agent audio (PCM16)   0x02 = transcript (JSON)   0x03 = control/event JSON
+//     0x01 = agent audio (PCM16)   0x02 = transcript body   0x03 = control/event JSON
 //   client → server: control frames (configure/dtmf) are 0x03-prefixed JSON;
-//   caller audio is PCM16 (raw, or 0x01-tagged, both accepted here).
+//   caller audio is 0x01-prefixed PCM16.
 //
 // Point your real Omni client at it:
 //   wss://api.pyai.com/v1/omni  →  ws://localhost:8787/v1/omni
@@ -42,21 +42,24 @@ function tone(rate, ms = 900, freq = 440) {
 }
 
 const sendEvent = (ws, obj) => ws.readyState === ws.OPEN && ws.send(frame(TAG.CONTROL, obj)); // 0x03
-const sendTranscript = (ws, obj) => ws.readyState === ws.OPEN && ws.send(frame(TAG.TRANSCRIPT, obj)); // 0x02
+const sendTranscript = (ws, obj) =>
+  ws.readyState === ws.OPEN && ws.send(frame(TAG.TRANSCRIPT, { event: "transcript", ...obj })); // 0x02
 
 wss.on("connection", (ws, req) => {
   const { pathname, query } = parse(req.url ?? "", true);
   const format = query.format || "pcm16";
   const rate = Number(query.rate) || 24000;
-  const label = query.session_label || query.agent_id || null;
+  const label = query.session_label || null;
 
   console.log(`\n[conn] ${pathname}  format=${format} rate=${rate}${label ? ` session_label=${label}` : ""}`);
-  if (pathname !== "/v1/omni" && pathname !== "/v2/omni/chat")
-    console.warn(`[warn] path "${pathname}", the real endpoint is wss://api.pyai.com/v1/omni`);
+  if (pathname !== "/v1/omni") {
+    ws.close(1008, "canonical_path_required");
+    return;
+  }
 
   // Handshake (0x03 control frames).
   sendEvent(ws, { event: "hello", protocol: 2, audio_in: `${format}@${rate}`, audio_out: `${format}@${rate}`, server: "omni-mock" });
-  sendEvent(ws, { event: "session_started", agent_id: label, audio_in: format, audio_out: format });
+  sendEvent(ws, { event: "session_started", session_label: label, audio_in: format, audio_out: format });
 
   let speaking = false;
   let playTimer = null;
@@ -133,18 +136,14 @@ wss.on("connection", (ws, req) => {
       return;
     }
     if (!isBinary) {
-      // Legacy text control frame, tolerated, but nudge toward 0x03.
-      try {
-        const msg = JSON.parse(buf.toString());
-        console.warn('[warn] control sent as a TEXT frame; the engine expects a 0x03-prefixed binary frame');
-        handleControl(msg);
-      } catch {
-        /* ignore */
-      }
+      console.warn("[warn] ignored text frame; Omni requires binary type tags");
       return;
     }
-    // Otherwise: caller audio, PCM16, raw or 0x01-tagged.
-    onCallerAudio();
+    if (buf[0] === TAG.AUDIO) {
+      onCallerAudio();
+      return;
+    }
+    console.warn(`[warn] ignored unknown client binary tag 0x${(buf[0] ?? 0).toString(16).padStart(2, "0")}`);
   });
 
   ws.on("close", () => {

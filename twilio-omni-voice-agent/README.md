@@ -4,7 +4,7 @@ A real phone number that talks to a [PyAI Omni](https://pyai.com/models/omni)
 agent, built on [`@pyai/twilio`](../../sdk/twilio). The whole bridge is one line:
 
 ```js
-OmniAgent.bridge(twilioWS, { apiKey, agentId, voice, persona, knowledge });
+OmniAgent.bridge(twilioWS, { apiKey, sessionLabel, voice, persona, knowledge });
 ```
 
 `@pyai/twilio` handles mu-law↔PCM16 transcoding, resampling, the Omni handshake,

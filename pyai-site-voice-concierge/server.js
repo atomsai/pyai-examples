@@ -34,9 +34,8 @@ import { PERSONA, GREETING } from "./src/persona.js";
 
 const {
   PYAI_API_KEY,
-  // Optional opaque tag echoed to our kb_endpoint. PYAI_AGENT_ID is the legacy
-  // alias; prefer PYAI_SESSION_LABEL.
-  PYAI_SESSION_LABEL = process.env.PYAI_AGENT_ID ?? "pyai-site-concierge",
+  // Optional opaque tag echoed to our kb_endpoint.
+  PYAI_SESSION_LABEL = "pyai-site-concierge",
   PYAI_VOICE,
   PYAI_BASE_URL = "https://api.pyai.com",
   PORT = "8787",
@@ -123,23 +122,15 @@ app.post("/session", async (request, reply) => {
       return reply.code(502).send({ error: "mint_failed" });
     }
     const session = await res.json();
-    // The Omni engine derives the session's agent from the gateway-stamped
-    // `x-pyai-agent` header, which the gateway sets from the connect URL's
-    // `session_label`. The mint returns a label-less URL, so attach it here:
-    // without a label the engine takes its keystore fallback path (and if that
-    // keystore is unconfigured upstream, the socket closes 4401 immediately).
-    const sep = session.url.includes("?") ? "&" : "?";
-    const omniUrl = `${session.url}${sep}session_label=${encodeURIComponent(PYAI_SESSION_LABEL)}`;
+    const omniUrl = new URL(session.url);
+    omniUrl.searchParams.set("session_label", PYAI_SESSION_LABEL);
     // Hand the browser everything it needs to connect + configure itself.
     return {
       token: session.token,
-      url: omniUrl,
+      url: omniUrl.toString(),
       expires_at: session.expires_at,
       configure: {
-        // The Omni engine dispatches control frames on `event` (it ignores a
-        // frame whose `event` it doesn't recognize), so a configure MUST carry
-        // `event: "configure"`. `type` is kept for back-compat / other tooling.
-        event: "configure",
+        // Client control frames are keyed on `type`; server controls use `event`.
         type: "configure",
         ...(PYAI_VOICE ? { voice_id: PYAI_VOICE } : {}),
         persona: PERSONA,
@@ -168,11 +159,9 @@ app.post("/kb", async (request, reply) => {
   }
   const body = request.body ?? {};
   const query = typeof body.query === "string" ? body.query : "";
-  // The engine echoes whatever connect-URL tag we used. Accept the new
-  // session_label and the legacy agent_id; fall back to our configured label.
+  // The engine echoes the canonical connect-URL tag.
   const sessionLabel =
     typeof body.session_label === "string" ? body.session_label
-    : typeof body.agent_id === "string" ? body.agent_id
     : PYAI_SESSION_LABEL;
 
   const results = retrieve(query, 3);
@@ -197,7 +186,7 @@ app.get("/voice", { websocket: true }, (browser, request) => {
   }
   // Cost guard: cap concurrent live sessions this broker holds open.
   if (liveSessions >= maxSessions) {
-    sendEvent(browser, { type: "error", code: "busy", message: "All lines are busy, try again in a moment." });
+    sendEvent(browser, { event: "error", code: "busy", message: "All lines are busy, try again in a moment." });
     browser.close(1013, "max_sessions");
     return;
   }
@@ -215,7 +204,7 @@ app.get("/voice", { websocket: true }, (browser, request) => {
     kbToken: groundingOn ? KB_TOKEN : undefined,
     rate: 24000,
 
-    onReady: () => sendEvent(browser, { type: "ready", grounding: groundingOn }),
+    onReady: () => sendEvent(browser, { event: "ready", grounding: groundingOn }),
     // Agent speech: forward the raw PCM16 bytes to the browser as a binary frame.
     onAudio: (pcm) => {
       if (browser.readyState === browser.OPEN) browser.send(pcm);
@@ -223,12 +212,12 @@ app.get("/voice", { websocket: true }, (browser, request) => {
     // Surface transcripts / turn / barge_in events to the browser UI verbatim.
     onEvent: (evt) => sendEvent(browser, evt),
     onClose: (code, reason) => {
-      sendEvent(browser, { type: "session_end", code, reason });
+      sendEvent(browser, { event: "session_end", code, reason });
       if (browser.readyState === browser.OPEN) browser.close(1000, "omni_closed");
     },
     onError: (err) => {
       app.log.error({ err: err?.message }, "omni session error");
-      sendEvent(browser, { type: "error", code: "omni_error", message: "Voice service error." });
+      sendEvent(browser, { event: "error", code: "omni_error", message: "Voice service error." });
     },
   });
 

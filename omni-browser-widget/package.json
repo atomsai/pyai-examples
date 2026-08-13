@@ -2,14 +2,10 @@
   "name": "pyai-example-omni-browser-widget",
   "private": true,
   "type": "module",
-  "description": "Drop-in embeddable browser voice widget for PyAI Omni, one <script> tag + a tiny zero-dependency token-broker server.",
+  "description": "Hosted PyAI Omni browser widget v7 with a static local showcase server.",
   "scripts": {
     "start": "node --env-file=.env server.js",
-    "test": "npm run test:widget-v3 && npm run test:widget-v4 && npm run test:widget-v5 && npm run test:widget-v6 && npm run test:widget-v7 && npm run test:transport",
-    "test:widget-v3": "node --test test/widget-v3.test.mjs",
-    "test:widget-v4": "node --test test/widget-v4.test.mjs",
-    "test:widget-v5": "node --test test/widget-v5.test.mjs",
-    "test:widget-v6": "node --test test/widget-v6.test.mjs",
+    "test": "npm run test:widget-v7 && npm run test:transport",
     "test:widget-v7": "node --test test/widget-v7.test.mjs",
     "test:transport": "node --test ../browser-omni-transport.test.mjs"
   },

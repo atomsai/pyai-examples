@@ -236,7 +236,7 @@ export function evaluate(scenario, run, opts = {}) {
 
   return {
     scenarioId: scenario.id,
-    agentId: run.agentId ?? scenario.agent_id ?? null,
+    sessionLabel: run.sessionLabel ?? scenario.session_label ?? null,
     persona: scenario.persona ?? null,
     mode: run.mode ?? "offline",
     source: run.source ?? null,

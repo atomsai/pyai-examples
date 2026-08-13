@@ -1,7 +1,7 @@
 {
   "fixture": "appointment-booking.offline",
   "scenario": "appointment-booking",
-  "agent_id": "clinic-front-desk",
+  "session_label": "clinic-front-desk",
   "mode": "live-voice",
   "recorded_at": "2026-06-16T12:00:00Z",
   "note": "A recorded synthetic-caller session: caller text, the Hear-stream hypothesis of the synthesized caller audio (for WER), the Omni agent transcript, TTFB + turn latency, a tool call, and a barge-in. Hand-authored to PASS and to exercise every scorer; replace by recording a real --live run.",

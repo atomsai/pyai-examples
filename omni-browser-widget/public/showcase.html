@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>PyAI widget v3 showcase</title>
+    <title>PyAI widget v7 showcase</title>
     <style>
       :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #17171c; background: #f5f5f8; }
       * { box-sizing: border-box; }
@@ -27,82 +27,21 @@
   </head>
   <body>
     <main>
-      <h1>One runtime.<br />Every launch point.</h1>
+      <h1>Hosted widget v7.<br />One canonical runtime.</h1>
       <p class="lede">
-        Each preview below loads the same immutable, dependency-free v3 asset.
-        The launcher, action, position, theme, and density come only from safe
-        <code>data-*</code> configuration.
+        Presentation and agent behavior come from the published widget record.
+        The embed supplies only its opaque public id.
       </p>
-
-      <section class="grid" aria-label="Fixed launcher variants">
-        <article class="sample">
-          <header><h2>Orb · voice · bottom-right</h2><p>Compact mic launcher with the shared call panel.</p></header>
-          <iframe
-            title="Orb voice widget preview"
-            srcdoc='<!doctype html><html><head><meta name="viewport" content="width=device-width"><style>body{margin:0;min-height:100vh;background:linear-gradient(145deg,#f4f1ff,#eef7ff);font:14px system-ui;color:#555}p{padding:18px;margin:0}</style></head><body><p>Voice action</p><script src="/widget/v3/pyai-widget.js" data-widget="showcase_orb" data-token-url="/token" data-variant="orb" data-position="bottom-right" data-accent="#6741d9" data-density="compact"></script></body></html>'>
-          </iframe>
-        </article>
-
-        <article class="sample">
-          <header><h2>Pill · URL · bottom-left</h2><p>External HTTPS action; no token endpoint required.</p></header>
-          <iframe
-            title="Pill URL widget preview"
-            srcdoc='<!doctype html><html><head><meta name="viewport" content="width=device-width"><style>body{margin:0;min-height:100vh;background:linear-gradient(145deg,#eefbf5,#eef7ff);font:14px system-ui;color:#555}p{padding:18px;margin:0}</style></head><body><p>URL action</p><script src="/widget/v3/pyai-widget.js" data-widget="showcase_url" data-variant="pill" data-position="bottom-left" data-label="Read the docs" data-action="url" data-url="https://docs.pyai.com" data-action-target="new" data-accent="#087f5b"></script></body></html>'>
-          </iframe>
-        </article>
-
-        <article class="sample">
-          <header><h2>Card · telephone · referral</h2><p>Native dialer action with visible referred branding.</p></header>
-          <iframe
-            title="Card telephone widget preview"
-            srcdoc='<!doctype html><html><head><meta name="viewport" content="width=device-width"><style>body{margin:0;min-height:100vh;background:#17171c;font:14px system-ui;color:#bbb}p{padding:18px;margin:0}</style></head><body><p>Telephone action</p><script src="/widget/v3/pyai-widget.js" data-widget="showcase_tel" data-variant="card" data-position="bottom-right" data-title="Call the front desk" data-subtitle="Open your phone dialer" data-label="Call" data-action="tel" data-tel="+1 415 555 0123" data-theme="dark" data-density="compact" data-accent="#ffd43b" data-branding="show" data-referral="ref_demo8Q2"></script></body></html>'>
-          </iframe>
-        </article>
-      </section>
-
       <section class="wide">
-        <header><h2>Inline event · branding hidden</h2><p>Rendered into a target element with the branding element fully omitted.</p></header>
+        <header><h2>Local hosted-runtime smoke</h2><p>Replace the placeholder with a published development widget id.</p></header>
         <div class="inline-row">
-          <div id="inline-widget"></div>
-          <span>Use an event action to connect the launcher to your own application state.</span>
-        </div>
-        <div id="event-output" role="status">Waiting for <code>pyai:widget:action</code>…</div>
-      </section>
-
-      <section class="wide">
-        <header><h2>Headless custom button</h2><p>The customer owns the button; the widget owns the accessible voice panel and transport.</p></header>
-        <div class="inline-row">
-          <button class="custom-button" type="button" data-pyai-widget-open="showcase_headless">Open voice assistant</button>
-          <span>The same instance is also available through <code>window.PyAIWidget.open("showcase_headless")</code>.</span>
+          <code>&lt;script src="/widget/v7/pyai-widget.js" data-widget="wdgt_…" async&gt;&lt;/script&gt;</code>
         </div>
       </section>
     </main>
-
-    <script>
-      window.addEventListener("pyai:widget:action", function (event) {
-        if (event.detail.widgetId !== "showcase_event") return;
-        document.getElementById("event-output").textContent = JSON.stringify(event.detail);
-      });
-    </script>
-    <script
-      src="/widget/v3/pyai-widget.js"
-      data-widget="showcase_event"
-      data-variant="inline"
-      data-target="#inline-widget"
-      data-label="Show pricing"
-      data-action="event"
-      data-event-value="pricing"
-      data-branding="hide"
-      data-theme="light"
-      data-accent="#1864ab">
-    </script>
-    <script
-      src="/widget/v3/pyai-widget.js"
-      data-widget="showcase_headless"
-      data-token-url="/token"
-      data-headless="true"
-      data-title="Website assistant"
-      data-theme="auto">
-    </script>
+    <script src="/widget/v7/pyai-widget.js"
+      data-widget="wdgt_12345678901234567890123456789012"
+      data-api-origin="http://localhost:3000"
+      async></script>
   </body>
 </html>

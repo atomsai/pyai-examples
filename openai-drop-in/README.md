@@ -15,7 +15,7 @@ shapes, run against PyAI's [Speak](https://pyai.com/models/speak) and
 
 That's it. The rest of this example is the *same* `audio.speech.create` and
 `audio.transcriptions.create` calls you already have, just renamed to PyAI's
-models (`pyai-voice`, `pyai-hear`). Everything else is byte-for-byte your OpenAI
+models (`pyai-speak`, `pyai-hear`). Everything else is byte-for-byte your OpenAI
 code.
 
 ```
@@ -31,7 +31,7 @@ code.
 | SDK | `openai` | `openai` (unchanged) |
 | Base URL | `https://api.openai.com/v1` | `https://api.pyai.com/v1` |
 | API key | `OPENAI_API_KEY` | `PYAI_API_KEY` (`pyai_test_…` is fine) |
-| TTS model | `tts-1` / `gpt-4o-mini-tts` | `pyai-voice` |
+| TTS model | `tts-1` / `tts-1-hd` | `pyai-speak` (the `tts-1` aliases also work) |
 | STT model | `whisper-1` | `pyai-hear` |
 | Voices | `alloy`, `echo`, `fable`, `onyx`, `nova`, `shimmer` | **same names accepted** (mapped to PyAI stock voices), plus `GET /v1/voices` |
 | Method calls | `audio.speech.create`, `audio.transcriptions.create` | identical |

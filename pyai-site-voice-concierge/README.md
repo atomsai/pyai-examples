@@ -60,7 +60,7 @@ You **cannot** put a usable *long-lived* Omni credential in a public web page:
 - A `pyai_live_` key in the browser has full project scope and would be scraped
   within minutes, never ship a live key to a web page.
 - PyAI **publishable tokens** (the browser-safe TTS kind) are scope-locked to
-  `voice:synthesize`, realtime/`omni:session` is **never** granted to them.
+  `speak:synthesize`, realtime/`omni:session` is **never** granted to them.
 
 The fix is the public/private split done right for realtime: your server holds
 the secret key and **mints an ephemeral session token** (`POST /v1/omni/sessions`)
@@ -72,8 +72,8 @@ The broker remains available for when you want to sit in the media path.
 ## Do I need to "create" an Omni agent first? No.
 
 The session is authorized by your key's **org**, there is nothing to create.
-The optional `session_label` (alias: the deprecated `agent_id`) is just an
-**opaque tag**: PyAI keeps zero per-agent state and runs no registry. We pass
+The optional `session_label` is just an **opaque tag**: PyAI keeps zero
+per-session profile state and runs no registry. We pass
 `pyai-site-concierge` so we can recognize the session in our `kb_endpoint`, but
 you can omit it entirely. The agent's behavior (voice, persona, knowledge) is
 supplied **per session** in the `configure` frame, see `src/omni-session.js`.
@@ -120,7 +120,7 @@ persona, but with no live per-turn retrieval.
 | Var | Required | Purpose |
 |---|---|---|
 | `PYAI_API_KEY` | yes | `pyai_live_`/`pyai_test_` key with `omni:session`. **Server-side only.** |
-| `PYAI_SESSION_LABEL` | no | Optional opaque session tag (echoed to `/kb`). Default `pyai-site-concierge`. Legacy alias: `PYAI_AGENT_ID`. |
+| `PYAI_SESSION_LABEL` | no | Optional opaque session tag (echoed to `/kb`). Default `pyai-site-concierge`. |
 | `PYAI_VOICE` | no | A `voice_id` from `GET /v1/voices`. Omit for the default voice. |
 | `PYAI_BASE_URL` | no | Override the API base (testing). Default `https://api.pyai.com`. |
 | `PORT` | no | This server's port. Default `8787`. |
