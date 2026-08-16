@@ -124,9 +124,10 @@ effectively mandatory in regulated industries:**
 - **Trace, compliance & QA on every call.** Verify disclosures/consent, detect
   prohibited language, and keep an auditable per-call QA scorecard. Scopes:
   `trace:configure`, `trace:read`.
-- **Recap, conversations into usable form.** Summaries, dispositions, extracted
-  fields, and CRM sync, so each call leaves behind a structured record your
-  systems can act on. Scopes: `recap:configure`, `recap:read`.
+- **Recap, conversations into usable form.** A typed `recap.call` (summary,
+  action items, next steps, fields) so each call leaves a record your systems
+  can act on. Sandbox keys include `recap:configure` + `recap:read` and mint
+  with Recap enabled. Start from `recap-call-intelligence`.
 
 ---
 

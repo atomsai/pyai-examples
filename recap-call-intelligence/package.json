@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Conversation intelligence with PyAI Hear batch jobs: diarized transcript → talk-ratio + keywords + summary. REST only.",
+  "description": "Turn a conversation into a typed recap.call (summary, action items, next steps). REST only.",
   "scripts": {
     "start": "node --env-file=.env index.mjs"
   },

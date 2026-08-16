@@ -31,8 +31,10 @@ What a sandbox key gives you:
 
 - **Works on the first call.** It skips the credit gate, so it never returns
   `402`, it's bounded instead by a daily usage cap and low concurrency.
-- **Scopes:** enough to drive STT, TTS, realtime, and AMD, `hear:transcribe`, `hear:stream`, `transcribe:jobs`, `speak:synthesize`,
-  `omni:session`, `amd:detect`, `amd:configure`, `amd:read`.
+- **Scopes:** enough to drive STT, TTS, realtime, AMD, and Recap:
+  `hear:transcribe`, `hear:stream`, `transcribe:jobs`, `speak:synthesize`,
+  `omni:session`, `amd:detect`, `amd:configure`, `amd:read`, `cast:render`,
+  `recap:configure`, `recap:read`. Recap is enabled on the minted org.
 - **Auto-expires** (~7 days) and is per-source-IP rate-limited (a network at its
   cap gets `429 sandbox_limit_reached`, that's anti-abuse, not a bug).
 - **Each call mints a brand-new isolated org.** Call it twice to get two
@@ -71,7 +73,8 @@ claude mcp add pyai -- npx -y @pyai/mcp      # Claude Code
 
 Tools: `create_sandbox_key`, `get_started`, `whoami`, `list_models`,
 `list_voices`, `synthesize_speech`, `create_transcription_job`,
-`get_transcription_job`, `configure_amd`, `list_amd_calls`, `get_amd_call`.
+`get_transcription_job`, `configure_amd`, `list_amd_calls`, `get_amd_call`,
+`enable_recap`, `create_recap`, `get_recap`, `list_recap_calls`.
 Working setup + a zero-dep stdio client: [`mcp-quickstart`](./mcp-quickstart).
 
 ---
@@ -181,7 +184,7 @@ so each call leaves behind a record your business systems can act on.
 - **Use it for:** call summaries + action items, disposition tagging, structured
   data extraction, CRM/webhook delivery.
 - **Start from:** [`recap-call-intelligence`](./recap-call-intelligence)
-  (batch-transcribe → talk-ratio + keywords + summary).
+  (enable Recap → utterances or Hear `call_id` → typed `recap.record.v1`).
 
 ---
 
