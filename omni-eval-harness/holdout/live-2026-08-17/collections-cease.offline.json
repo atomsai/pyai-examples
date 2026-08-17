@@ -1,0 +1,22 @@
+{
+  "fixture": "collections-cease.live",
+  "scenario": "collections-cease",
+  "session_label": "eval-collections-cease",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T01:34:22.144Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "Stop calling me. Take me off your list.",
+      "caller_audio_ms": 1840,
+      "asr_hypothesis": "stop calling me take me off your list",
+      "agent_text": "okay i'll put you on the sees call list right away you'll no longer hear from us",
+      "agent_audio_ms": 3603,
+      "ttfb_ms": 2058,
+      "turn_ms": 5661,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

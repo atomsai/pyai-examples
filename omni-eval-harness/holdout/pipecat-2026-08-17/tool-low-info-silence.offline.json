@@ -1,0 +1,22 @@
+{
+  "fixture": "tool-low-info-silence.pipecat",
+  "scenario": "tool-low-info-silence",
+  "session_label": "eval-tool-low-info-silence",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T03:23:06Z",
+  "note": "Layer D Pipecat starter recording. Do not tune Omni prompts or guards on this.",
+  "turns": [
+    {
+      "caller_says": "...",
+      "caller_audio_ms": 1200,
+      "asr_hypothesis": null,
+      "agent_text": "",
+      "agent_audio_ms": null,
+      "ttfb_ms": null,
+      "turn_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

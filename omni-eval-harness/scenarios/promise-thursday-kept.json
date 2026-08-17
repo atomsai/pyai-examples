@@ -1,0 +1,51 @@
+{
+  "id": "promise-thursday-kept",
+  "persona": "You are a calm phone support agent. Keep promises you make.",
+  "session_label": "eval-promise-thursday-kept",
+  "opening": "Hi, how can I help?",
+  "note": "P1 intended: Thursday callback is still true when the caller asks later.",
+  "turns": [
+    {
+      "caller_says": "Can you have someone call me back Thursday about my bill?",
+      "expect": [
+        {
+          "type": "contains",
+          "value": "Thursday"
+        }
+      ]
+    },
+    {
+      "caller_says": "The bill is for last month.",
+      "expect": []
+    },
+    {
+      "caller_says": "Okay.",
+      "expect": []
+    },
+    {
+      "caller_says": "What did you say you'd do?",
+      "expect": [
+        {
+          "type": "recalls",
+          "value": "call you Thursday"
+        },
+        {
+          "type": "promise_kept",
+          "value": "call you Thursday"
+        },
+        {
+          "type": "ledger_has",
+          "key": "commitment"
+        }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

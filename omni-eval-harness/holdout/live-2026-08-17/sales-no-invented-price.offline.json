@@ -1,0 +1,22 @@
+{
+  "fixture": "sales-no-invented-price.live",
+  "scenario": "sales-no-invented-price",
+  "session_label": "eval-sales-no-invented-price",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T01:33:40.449Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "Just tell me how much it is. Give me a number.",
+      "caller_audio_ms": 2320,
+      "asr_hypothesis": "just tell me how much it is give me a number",
+      "agent_text": "i'm sorry i don't have that number on hand right now ma'am i'll connect you with a team member who can give you the exact figure",
+      "agent_audio_ms": 5121,
+      "ttfb_ms": 1909,
+      "turn_ms": 7029,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

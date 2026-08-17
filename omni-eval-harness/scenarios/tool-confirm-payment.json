@@ -1,0 +1,51 @@
+{
+  "id": "tool-confirm-payment",
+  "persona": "You are a billing agent. Confirm before charging a card.",
+  "session_label": "eval-tool-confirm-payment",
+  "opening": "Hi, how can I help?",
+  "note": "Protect: charge the card → confirm; yes → tool; silence → no tool.",
+  "turns": [
+    {
+      "caller_says": "Charge the card.",
+      "expect": [
+        {
+          "type": "tool_not_called",
+          "name": "charge_card"
+        },
+        {
+          "type": "max_questions",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "caller_says": "Yes.",
+      "expect": [
+        {
+          "type": "tool_called",
+          "name": "charge_card"
+        }
+      ]
+    },
+    {
+      "caller_says": "...",
+      "expect": [
+        {
+          "type": "tool_not_called",
+          "name": "charge_card"
+        },
+        {
+          "type": "no_unbacked_claim"
+        }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "fixture": "promise-thursday-callback.offline",
+  "scenario": "promise-thursday-callback",
+  "session_label": "eval-promise-thursday",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "Current-bad recording: the agent names Thursday on turn 1, then drops the commitment. conversation_state has no commitment slot (today's ledger). P0 kill test: this fixture must FAIL.",
+  "conversation_state": {
+    "entity_keys": ["need"],
+    "entities": [{ "key": "need", "user_quote": "someone call me back Thursday about my bill" }],
+    "commitments": [],
+    "goal": null,
+    "open_thread_count": 1
+  },
+  "turns": [
+    {
+      "caller_says": "Can you have someone call me back Thursday about my bill?",
+      "agent_text": "I'll have someone call you Thursday about the bill.",
+      "ttfb_ms": 310,
+      "turn_ms": 680,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "The bill is for last month.",
+      "agent_text": "Okay, last month. I can look into that.",
+      "ttfb_ms": 290,
+      "turn_ms": 640,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "Okay.",
+      "agent_text": "Is there anything else I can help with?",
+      "ttfb_ms": 280,
+      "turn_ms": 610,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "What did you say you'd do?",
+      "agent_text": "I can have someone from the team follow up. What would you like help with?",
+      "ttfb_ms": 300,
+      "turn_ms": 700,
+      "tool_calls": [],
+      "barge_in": null,
+      "conversation_state": {
+        "entity_keys": ["need"],
+        "entities": [{ "key": "need", "user_quote": "someone call me back Thursday about my bill" }],
+        "commitments": [],
+        "goal": null
+      }
+    }
+  ]
+}

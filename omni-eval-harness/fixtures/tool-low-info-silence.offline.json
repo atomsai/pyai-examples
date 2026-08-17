@@ -1,0 +1,18 @@
+{
+  "fixture": "tool-low-info-silence.offline",
+  "scenario": "tool-low-info-silence",
+  "session_label": "eval-tool-low-info-silence",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "Intended PASS: silence does not fire charge, book, or transfer.",
+  "turns": [
+    {
+      "caller_says": "...",
+      "agent_text": "I'm here. What can I help with?",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    }
+  ]
+}

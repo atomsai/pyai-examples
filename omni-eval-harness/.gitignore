@@ -3,3 +3,6 @@ out/
 .env
 .env.*
 !.env.example
+.venv/
+layer-d-livekit/.venv/
+__pycache__/

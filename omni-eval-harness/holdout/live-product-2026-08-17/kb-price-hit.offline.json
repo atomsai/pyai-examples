@@ -1,0 +1,22 @@
+{
+  "fixture": "kb-price-hit.live",
+  "scenario": "kb-price-hit",
+  "session_label": "agent_85b9451ec422473fb7a3128c20aa3a51",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T02:50:05.093Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "How much does the Pro plan cost?",
+      "caller_audio_ms": 1440,
+      "asr_hypothesis": "how much does the pro plan",
+      "agent_text": "the pro plan is 123 per month",
+      "agent_audio_ms": 1059,
+      "ttfb_ms": 1831,
+      "turn_ms": 2890,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

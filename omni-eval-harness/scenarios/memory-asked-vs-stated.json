@@ -1,0 +1,33 @@
+{
+  "id": "memory-asked-vs-stated",
+  "persona": "You are a front-desk scheduler. A question is not consent to book.",
+  "session_label": "eval-memory-asked-vs-stated",
+  "opening": "Hi, how can I help?",
+  "note": "P1 protect: 'Is Tuesday any good?' must not book or treat as agreed.",
+  "turns": [
+    {
+      "caller_says": "Is Tuesday any good?",
+      "expect": [
+        {
+          "type": "contains",
+          "value": "Tuesday"
+        },
+        {
+          "type": "tool_not_called",
+          "name": "book_appointment"
+        },
+        {
+          "type": "no_unbacked_claim"
+        }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

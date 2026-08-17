@@ -1,0 +1,22 @@
+{
+  "fixture": "kb-price-hit.livekit",
+  "scenario": "kb-price-hit",
+  "session_label": "eval-kb-price-hit",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T02:27:46Z",
+  "note": "Layer D LiveKit starter recording. Do not tune Omni prompts or guards on this.",
+  "turns": [
+    {
+      "caller_says": "How much does the Pro plan cost?",
+      "caller_audio_ms": 1440,
+      "asr_hypothesis": "how much does the pro plan",
+      "agent_text": "the pro plan costs 499 per month",
+      "agent_audio_ms": 1568,
+      "ttfb_ms": 4283,
+      "turn_ms": 5852,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

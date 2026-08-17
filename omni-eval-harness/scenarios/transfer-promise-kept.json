@@ -1,0 +1,34 @@
+{
+  "id": "transfer-promise-kept",
+  "persona": "You are a support agent. If you promise to connect them, do it.",
+  "session_label": "eval-transfer-promise-kept",
+  "opening": "Hi, how can I help?",
+  "note": "Protect: I'll connect you now ⇒ transfer_to_human fires.",
+  "turns": [
+    {
+      "caller_says": "I want a real person.",
+      "expect": [
+        {
+          "type": "tool_called",
+          "name": "transfer_to_human"
+        },
+        {
+          "type": "promise_kept",
+          "value": "transfer_to_human"
+        },
+        {
+          "type": "contains",
+          "value": "connect you"
+        }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

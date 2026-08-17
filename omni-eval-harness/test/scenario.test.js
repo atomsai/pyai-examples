@@ -35,6 +35,30 @@ test("validateScenario rejects an unknown assertion type", () => {
   );
 });
 
+test("validateScenario accepts humanness assertions", () => {
+  const s = {
+    id: "h",
+    turns: [
+      {
+        caller_says: "hi",
+        expect: [
+          { type: "recalls", value: "Thursday" },
+          { type: "ledger_has", key: "commitment" },
+          { type: "kb_miss_honest" },
+        ],
+      },
+    ],
+  };
+  assert.equal(validateScenario(s).id, "h");
+});
+
+test("validateScenario rejects a recalls without value", () => {
+  assert.throws(
+    () => validateScenario({ ...valid, turns: [{ caller_says: "hi", expect: [{ type: "recalls" }] }] }),
+    /requires a string `value`/,
+  );
+});
+
 test("validateScenario rejects a latency_budget with no budget", () => {
   assert.throws(
     () => validateScenario({ ...valid, turns: [{ caller_says: "hi", expect: [{ type: "latency_budget" }] }] }),

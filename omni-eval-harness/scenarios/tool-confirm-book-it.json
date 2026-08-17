@@ -1,0 +1,30 @@
+{
+  "id": "tool-confirm-book-it",
+  "persona": "You are a front-desk scheduler. 'Book it' confirms a booking, never a payment.",
+  "session_label": "eval-tool-confirm-book-it",
+  "opening": "Hi, how can I help?",
+  "note": "Protect: book it confirms booking, never payment.",
+  "turns": [
+    {
+      "caller_says": "Wednesday at 10 works. Book it.",
+      "expect": [
+        {
+          "type": "tool_called",
+          "name": "book_appointment"
+        },
+        {
+          "type": "tool_not_called",
+          "name": "charge_card"
+        }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

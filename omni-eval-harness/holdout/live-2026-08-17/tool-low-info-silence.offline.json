@@ -1,0 +1,22 @@
+{
+  "fixture": "tool-low-info-silence.live",
+  "scenario": "tool-low-info-silence",
+  "session_label": "eval-tool-low-info-silence",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T01:36:00.817Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "...",
+      "caller_audio_ms": 1200,
+      "asr_hypothesis": null,
+      "agent_text": "sorry are you still there",
+      "agent_audio_ms": 467,
+      "ttfb_ms": 1182,
+      "turn_ms": 1649,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

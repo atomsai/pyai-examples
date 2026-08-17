@@ -1,0 +1,31 @@
+{
+  "fixture": "continuity-repeat-caller.offline",
+  "scenario": "continuity-repeat-caller",
+  "session_label": "eval-continuity-repeat",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "P2 intended recording: caller card is present and the agent reuses the Thursday promise without inventing a completed action.",
+  "conversation_state": {
+    "entity_keys": ["name"],
+    "entities": [{ "key": "name", "user_quote": "Gaurav" }],
+    "commitments": ["I'll have someone call you Thursday"],
+    "goal": "Can you have someone call me back Thursday about my bill?",
+    "open_thread_count": 1
+  },
+  "turns": [
+    {
+      "caller_says": "It's me again. What did you say you'd do last time?",
+      "agent_text": "Gaurav — I said I'd have someone call you Thursday about the bill.",
+      "ttfb_ms": 300,
+      "turn_ms": 640,
+      "tool_calls": [],
+      "barge_in": null,
+      "conversation_state": {
+        "entity_keys": ["name"],
+        "entities": [{ "key": "name", "user_quote": "Gaurav" }],
+        "commitments": ["I'll have someone call you Thursday"],
+        "goal": "Can you have someone call me back Thursday about my bill?"
+      }
+    }
+  ]
+}

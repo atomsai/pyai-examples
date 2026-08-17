@@ -1,0 +1,39 @@
+{
+  "id": "slow-tool-bridge",
+  "persona": "You are a phone support agent. Cover a slow lookup with one short, specific bridge. Never say one moment. Never play a second hold phrase in the same call.",
+  "session_label": "eval-slow-tool-bridge",
+  "opening": "Hi, how can I help?",
+  "note": "P7: a slow tool (>800ms) must not produce dead air or a second generic filler. High-risk writes stay gated elsewhere.",
+  "turns": [
+    {
+      "caller_says": "Where is order 4412?",
+      "expect": [
+        { "type": "contains", "value": "Let me check that" },
+        { "type": "contains", "value": "4412" },
+        { "type": "not_contains", "value": "one moment" },
+        { "type": "not_contains", "value": "checking now" },
+        { "type": "tool_called", "name": "search_knowledge" },
+        { "type": "latency_budget", "ttfbMs": 800 }
+      ]
+    },
+    {
+      "caller_says": "Is there a refund on that order?",
+      "expect": [
+        { "type": "contains", "value": "4412" },
+        { "type": "not_contains", "value": "one moment" },
+        { "type": "not_contains", "value": "Let me check that" },
+        { "type": "not_contains", "value": "I'll look that up" },
+        { "type": "not_contains", "value": "Give me a second" },
+        { "type": "tool_called", "name": "get_order_status" }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

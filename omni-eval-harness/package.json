@@ -11,6 +11,10 @@
     "start": "node src/run.js",
     "offline": "node src/run.js",
     "live": "node --env-file=.env src/run.js --live",
+    "live-pack": "node --env-file=.env src/live-pack.js",
+    "live-product": "node --env-file=.env src/live-product.js",
+    "score-holdout": "node src/score-holdout.js",
+    "bakeoff": "node src/bakeoff-cli.js",
     "test": "node --test 'test/**/*.test.js'"
   },
   "license": "MIT",

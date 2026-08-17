@@ -67,6 +67,7 @@ export function renderMarkdown(sc) {
     if (t.werPct != null) bits.push(`WER ${t.werPct}%`);
     if (t.toolCalls.length) bits.push(`tools: ${t.toolCalls.map((c) => c.name).join(", ")}`);
     if (t.bargeIn?.attempted) bits.push(`barge: ${t.bargeIn.recovered ? "recovered" : "NOT recovered"}`);
+    if (t.kb) bits.push(`kb ${t.kb}`);
     lines.push(`- ${bits.join(" · ")}`);
     if (t.assertions.length) {
       lines.push("- assertions:");

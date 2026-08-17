@@ -1,0 +1,22 @@
+{
+  "fixture": "reflect-specific.livekit",
+  "scenario": "reflect-specific",
+  "session_label": "eval-reflect-specific",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T02:24:13Z",
+  "note": "Layer D LiveKit starter recording. Do not tune Omni prompts or guards on this.",
+  "turns": [
+    {
+      "caller_says": "I've been chasing a callback for a week and nobody has called me back.",
+      "caller_audio_ms": 3200,
+      "asr_hypothesis": "i've been chasing a callback for a week and nobody has called me back",
+      "agent_text": "it sounds like you've been waiting a week for a callback and still haven't received one i'll look into the status of your callback request right away and raise a priority ticket with the scheduling team so they can reach out to you as soon as possible in the meantime could you please provide the reference number you were given when you requested the callback or the phone number you used that will help us locate your request quickly if you don't have a reference number handy let me know the approximate date and time you've called",
+      "agent_audio_ms": 28719,
+      "ttfb_ms": 3696,
+      "turn_ms": 32415,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

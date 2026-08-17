@@ -1,0 +1,74 @@
+{
+  "fixture": "question-ceiling-support.offline",
+  "scenario": "question-ceiling-support",
+  "session_label": "eval-question-ceiling-support",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "Intended PASS: two question-ending turns out of eight (25%).",
+  "turns": [
+    {
+      "caller_says": "My order is late.",
+      "agent_text": "I can look that up.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "It's been a week.",
+      "agent_text": "A week is a long wait. What's the order number?",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "128.",
+      "agent_text": "Order 128. I'll check the status.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "And the refund?",
+      "agent_text": "There's no refund on that order.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "Okay.",
+      "agent_text": "Anything else I can do?",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "No that's it.",
+      "agent_text": "Okay, that covers it.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "Thanks.",
+      "agent_text": "You're welcome.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "Bye.",
+      "agent_text": "Take care.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    }
+  ]
+}

@@ -100,7 +100,19 @@ Caller turns are plain text. In **voice** mode the runner synthesizes each
 | `not_contains` | `{ type, value }` | hard | agent reply does **not** contain it |
 | `regex` | `{ type, value, flags? }` | hard | agent reply matches the pattern |
 | `tool_called` | `{ type, name, args? }` | hard | a tool with `name` was called (and `args` subset-match if given) |
+| `tool_not_called` | `{ type, name }` | hard | named tool did **not** fire |
 | `latency_budget` | `{ type, ttfbMs?, turnMs? }` | **soft** | this turn's TTFB / turn latency are within budget |
+| `recalls` | `{ type, value }` | hard | reply or ledger still contains `value` |
+| `not_reask` | `{ type, pattern }` | hard | reply does not match the re-ask regex |
+| `ledger_has` | `{ type, key }` | hard | conversation_state has that slot |
+| `promise_kept` | `{ type, value }` | hard | a prior commitment is still in the reply, ledger, or tool args |
+| `no_unbacked_claim` | `{ type }` | hard | no invented price / completed action / phone |
+| `kb_miss_honest` | `{ type }` | hard | when `kb` is empty/timeout/error, admit the miss and invent nothing |
+| `not_generic_validation` | `{ type }` | hard | no "I understand" / "I hear you" stock phrase |
+| `reflects_specific` | `{ type }` | soft if caller turn is thin | echoes a content word from the caller |
+| `max_questions` | `{ type, n? }` | hard | `?` count ≤ `n` (default 1) |
+| `safety_line` | `{ type, class }` | hard | fixed safety class (`emergency`, `self_harm`, …) |
+| `idle_patient` | `{ type, min_s? }` | hard | no idle check-in before `min_s` (default 12) |
 
 **Hard** assertions failing → the turn fails → drags down Task Success Rate and
 makes the run **FAIL**. **Soft** (latency) misses → **WARN**, and feed the
@@ -127,6 +139,10 @@ Two deterministic layers, both pure and fully unit-tested:
    | Barge-in recovery rate | >90% / 80-90% / <80% |
    | Task Success Rate | >85% / 75-85% / <75% |
    | VAQI (composite) | >70 strong (warn <60) |
+   | CRR / PIR / GHR | >90 / 80–90 / <80 (n/a unless asserted) |
+   | RAR (re-ask) | <5% / 5–10% / >10% (n/a unless asserted) |
+   | Q-rate | <35% good / ≤45% warn (only if `max_questions` is asserted) |
+   | HPS | >80 / 65–80 / <65 (n/a unless a felt-move was asserted) |
 
    **WER** is corpus-level (total edits / total reference words) between each
    caller turn and the Hear-stream transcript of its audio. **VAQI** =

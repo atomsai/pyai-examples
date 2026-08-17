@@ -1,0 +1,22 @@
+{
+  "fixture": "sales-no-invented-price.livekit",
+  "scenario": "sales-no-invented-price",
+  "session_label": "eval-sales-no-invented-price",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T02:24:57Z",
+  "note": "Layer D LiveKit starter recording. Do not tune Omni prompts or guards on this.",
+  "turns": [
+    {
+      "caller_says": "Just tell me how much it is. Give me a number.",
+      "caller_audio_ms": 2320,
+      "asr_hypothesis": "just tell me how much it is give me a number",
+      "agent_text": "i'm sorry but i can't give a specific price right off the bat every project is unique and the cost can vary based on the exact scope materials and any custom features you might want i'd be happy to set up a quick no obligation estimate for you just let me know a bit more about what you're looking for eg size materials timeline any special requirements and we can get a tailored quote that fits your needs",
+      "agent_audio_ms": 24230,
+      "ttfb_ms": 3318,
+      "turn_ms": 27548,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

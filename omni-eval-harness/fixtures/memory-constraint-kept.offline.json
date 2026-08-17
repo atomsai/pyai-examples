@@ -1,0 +1,45 @@
+{
+  "fixture": "memory-constraint-kept.offline",
+  "scenario": "memory-constraint-kept",
+  "session_label": "eval-memory-constraint-kept",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "P1 intended PASS counterpart to the P0 current-bad memory-constraint fixture.",
+  "turns": [
+    {
+      "caller_says": "I can only do after four because of pickup.",
+      "agent_text": "Got it, after four because of pickup.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "A cleaning is fine.",
+      "agent_text": "A cleaning after four. I'll look at those slots.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "What times work for me?",
+      "agent_text": "After four we have 4:30 or 5:15.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null,
+      "conversation_state": {
+        "entity_keys": [
+          "constraint"
+        ],
+        "entities": [
+          {
+            "key": "constraint",
+            "user_quote": "after four because of pickup"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "id": "barge-partial-context",
+  "persona": "You are a phone support agent. If you are interrupted, do not pretend the caller heard the rest.",
+  "session_label": "eval-barge-partial-context",
+  "opening": "Hi, how can I help?",
+  "note": "P6: barge mid-reply. History/ledger must not contain the unplayed tail (Thursday booking).",
+  "turns": [
+    {
+      "caller_says": "can you look that up",
+      "expect": [
+        { "type": "not_contains", "value": "Thursday" },
+        { "type": "not_contains", "value": "booked" },
+        { "type": "no_unbacked_claim" }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

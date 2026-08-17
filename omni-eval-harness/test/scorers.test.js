@@ -5,6 +5,7 @@ import { wer, aggregateWer, normalize, normalizedIncludes, editDistance } from "
 import { METRICS, classify, gateLine, gatePass, bandVerdict } from "../src/metrics.js";
 import { scoreAssertion, percentile, computeVaqi, evaluate } from "../src/scorers.js";
 import { heuristicJudge, expectedKeywordsFor } from "../src/judge.js";
+import { scoreHumannessAssertion, computeHumannessAggregates } from "../src/humanness.js";
 
 // --- text / WER -------------------------------------------------------------
 
@@ -124,6 +125,107 @@ test("tool_called with subset arg match", () => {
     false,
   );
   assert.equal(scoreAssertion({ type: "tool_called", name: "cancel" }, turn()).ok, false);
+});
+
+test("humanness: recalls reply or ledger", () => {
+  assert.equal(
+    scoreHumannessAssertion({ type: "recalls", value: "Thursday" }, { agentText: "I'll call Thursday." }).ok,
+    true,
+  );
+  assert.equal(
+    scoreHumannessAssertion(
+      { type: "recalls", value: "Thursday" },
+      { agentText: "I'll follow up.", conversationState: { commitments: [{ text: "call Thursday" }] } },
+    ).ok,
+    true,
+  );
+  assert.equal(
+    scoreHumannessAssertion({ type: "recalls", value: "Thursday" }, { agentText: "I'll follow up." }).ok,
+    false,
+  );
+});
+
+test("humanness: not_reask / ledger_has / promise_kept", () => {
+  assert.equal(
+    scoreHumannessAssertion({ type: "not_reask", pattern: "what time works" }, { agentText: "After four is fine." }).ok,
+    true,
+  );
+  assert.equal(
+    scoreHumannessAssertion({ type: "not_reask", pattern: "what time works" }, { agentText: "What time works for you?" }).ok,
+    false,
+  );
+  assert.equal(
+    scoreHumannessAssertion(
+      { type: "ledger_has", key: "constraint" },
+      { conversationState: { entityKeys: ["constraint"] } },
+    ).ok,
+    true,
+  );
+  assert.equal(
+    scoreHumannessAssertion({ type: "ledger_has", key: "commitment" }, { conversationState: { commitments: [] } }).ok,
+    false,
+  );
+  assert.equal(
+    scoreHumannessAssertion({ type: "promise_kept", value: "Thursday" }, { agentText: "as I said, Thursday" }).ok,
+    true,
+  );
+  assert.equal(
+    scoreHumannessAssertion(
+      { type: "promise_kept", value: "Thursday" },
+      {
+        agentText: "I'll follow up.",
+        conversationState: { entities: [{ key: "time", userQuote: "Thursday" }], commitments: [] },
+      },
+    ).ok,
+    false,
+  );
+});
+
+test("humanness: honesty and reflection", () => {
+  assert.equal(
+    scoreHumannessAssertion(
+      { type: "no_unbacked_claim" },
+      { agentText: "The Pro plan is one hundred and twenty dollars a month." },
+    ).ok,
+    false,
+  );
+  assert.equal(
+    scoreHumannessAssertion({ type: "no_unbacked_claim" }, { agentText: "I don't have that price to hand." }).ok,
+    true,
+  );
+  assert.equal(
+    scoreHumannessAssertion(
+      { type: "kb_miss_honest" },
+      { agentText: "I don't have that information. I can have someone check.", kb: "empty" },
+    ).ok,
+    true,
+  );
+  assert.equal(
+    scoreHumannessAssertion(
+      { type: "kb_miss_honest" },
+      { agentText: "The Pro plan is one hundred and twenty dollars a month.", kb: "empty" },
+    ).ok,
+    false,
+  );
+  assert.equal(
+    scoreHumannessAssertion({ type: "not_generic_validation" }, { agentText: "I understand how frustrating that is." }).ok,
+    false,
+  );
+  const reflected = scoreHumannessAssertion(
+    { type: "reflects_specific" },
+    { callerText: "chasing a callback for a week", agentText: "A week chasing a callback is exhausting." },
+  );
+  assert.equal(reflected.ok, true);
+  assert.equal(scoreAssertion({ type: "tool_not_called", name: "payment" }, turn()).ok, true);
+  assert.equal(scoreAssertion({ type: "max_questions", n: 1 }, { agentText: "Which day?" }).ok, true);
+  assert.equal(scoreAssertion({ type: "max_questions", n: 0 }, { agentText: "Which day?" }).ok, false);
+});
+
+test("humanness aggregates are n/a when the scenario never asserted them", () => {
+  const empty = computeHumannessAggregates([{ assertions: [{ type: "contains", ok: true }] }], []);
+  assert.equal(empty.crr, null);
+  assert.equal(empty.pir, null);
+  assert.equal(empty.hps, null);
 });
 
 test("latency_budget is soft and gates ttfb and/or turn", () => {

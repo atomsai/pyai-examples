@@ -1,0 +1,21 @@
+{
+  "fixture": "barge-partial-context.offline",
+  "scenario": "barge-partial-context",
+  "session_label": "eval-barge-partial-context",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "P6 intended: barge after the first clause. Spoken prefix only; unplayed Thursday booking is gone.",
+  "turns": [
+    {
+      "caller_says": "can you look that up",
+      "agent_text": "I can look that up.",
+      "ttfb_ms": 260,
+      "turn_ms": 480,
+      "tool_calls": [],
+      "barge_in": { "attempted": true, "recovered": true },
+      "conversation_state": {
+        "commitments": []
+      }
+    }
+  ]
+}

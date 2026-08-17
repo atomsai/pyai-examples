@@ -1,0 +1,72 @@
+{
+  "fixture": "memory-order-id-late.offline",
+  "scenario": "memory-order-id-late",
+  "session_label": "eval-memory-order-id-late",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "P1 intended PASS: late recall of order 128 after filler turns.",
+  "conversation_state": {
+    "entity_keys": [
+      "order_id"
+    ],
+    "entities": [
+      {
+        "key": "order_id",
+        "user_quote": "128"
+      }
+    ]
+  },
+  "turns": [
+    {
+      "caller_says": "My order is 128.",
+      "agent_text": "Got it, order 128.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "The box was supposed to be here Friday.",
+      "agent_text": "Friday — I'll keep that in mind.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "I already tried the website.",
+      "agent_text": "Okay, I'll look from this side.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "And nobody emailed me.",
+      "agent_text": "No email either. I'll check the file.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "So where is that order?",
+      "agent_text": "Order 128 shipped yesterday and is out for delivery.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null,
+      "conversation_state": {
+        "entity_keys": [
+          "order_id"
+        ],
+        "entities": [
+          {
+            "key": "order_id",
+            "user_quote": "128"
+          }
+        ]
+      }
+    }
+  ]
+}

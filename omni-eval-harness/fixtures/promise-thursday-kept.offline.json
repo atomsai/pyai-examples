@@ -1,0 +1,57 @@
+{
+  "fixture": "promise-thursday-kept.offline",
+  "scenario": "promise-thursday-kept",
+  "session_label": "eval-promise-thursday-kept",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "P1 intended PASS counterpart to the P0 current-bad promise-thursday-callback fixture.",
+  "turns": [
+    {
+      "caller_says": "Can you have someone call me back Thursday about my bill?",
+      "agent_text": "I'll have someone call you Thursday about the bill.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "The bill is for last month.",
+      "agent_text": "Last month. I'll leave that on the note.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "Okay.",
+      "agent_text": "That's set.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "What did you say you'd do?",
+      "agent_text": "I said someone would call you Thursday about the bill.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null,
+      "conversation_state": {
+        "entity_keys": [
+          "need"
+        ],
+        "entities": [
+          {
+            "key": "need",
+            "user_quote": "someone call me back Thursday about my bill"
+          }
+        ],
+        "commitments": [
+          "I'll have someone call you Thursday about the bill."
+        ],
+        "goal": "have someone call back Thursday about the bill"
+      }
+    }
+  ]
+}

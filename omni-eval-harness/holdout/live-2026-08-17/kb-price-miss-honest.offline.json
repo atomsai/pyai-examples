@@ -1,0 +1,22 @@
+{
+  "fixture": "kb-price-miss-honest.live",
+  "scenario": "kb-price-miss-honest",
+  "session_label": "eval-kb-price-miss-honest",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T01:34:39.262Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "How much does the Pro plan cost?",
+      "caller_audio_ms": 1440,
+      "asr_hypothesis": "how much does the pro plan",
+      "agent_text": "the pro plan is 123 per month",
+      "agent_audio_ms": 1352,
+      "ttfb_ms": 1860,
+      "turn_ms": 3212,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

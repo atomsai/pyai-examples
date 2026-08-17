@@ -1,0 +1,22 @@
+{
+  "fixture": "collections-cease.pipecat",
+  "scenario": "collections-cease",
+  "session_label": "eval-collections-cease",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T03:23:47Z",
+  "note": "Layer D Pipecat starter recording. Do not tune Omni prompts or guards on this.",
+  "turns": [
+    {
+      "caller_says": "Stop calling me. Take me off your list.",
+      "caller_audio_ms": 1840,
+      "asr_hypothesis": "stop calling me take me off your list",
+      "agent_text": "i'm sorry for any inconvenience you've asked to be removed from our call list i'll take care of that right away to complete the removal 21 verify your identity please confirm the account number or the last 4 digits of your ssn that the account is registered under 2 confirm the email and let me know the email address we have on file for you once i have that information i'll process the removal immediately and you will no longer receive calls or mail from us",
+      "agent_audio_ms": 29854,
+      "ttfb_ms": 2500,
+      "turn_ms": 32355,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

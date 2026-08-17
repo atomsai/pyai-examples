@@ -1,0 +1,18 @@
+{
+  "fixture": "collections-cease.offline",
+  "scenario": "collections-cease",
+  "session_label": "eval-collections-cease",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "Intended PASS: cease line, no payment tool, no extra collect question.",
+  "turns": [
+    {
+      "caller_says": "Stop calling me. Take me off your list.",
+      "agent_text": "Understood — I'm noting your request that we stop contacting you, and I'll make sure that's actioned. I won't keep you on the call. If you ever do want to talk through options, you're welcome to reach out to us. Take care.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    }
+  ]
+}

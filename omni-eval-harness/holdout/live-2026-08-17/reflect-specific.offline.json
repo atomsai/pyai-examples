@@ -1,0 +1,22 @@
+{
+  "fixture": "reflect-specific.live",
+  "scenario": "reflect-specific",
+  "session_label": "eval-reflect-specific",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T01:33:21.772Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "I've been chasing a callback for a week and nobody has called me back.",
+      "caller_audio_ms": 3200,
+      "asr_hypothesis": "i've been chasing a callback for a week and nobody has called me back",
+      "agent_text": "sounds frustrating i hear you've been trying to get through all week right let me connect you to someone who can sort this out right away",
+      "agent_audio_ms": 4560,
+      "ttfb_ms": 2537,
+      "turn_ms": 7098,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

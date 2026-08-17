@@ -1,0 +1,22 @@
+{
+  "fixture": "memory-asked-vs-stated.live",
+  "scenario": "memory-asked-vs-stated",
+  "session_label": "agent_6151c1af19e140c89d6e083430d2afb2",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T02:48:30.465Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "Is Tuesday any good?",
+      "caller_audio_ms": 1120,
+      "asr_hypothesis": "it's tuesday",
+      "agent_text": "sounds like you're not seeing any options i can't make the selection myself but i'll connect you to someone who can help",
+      "agent_audio_ms": 4802,
+      "ttfb_ms": 2694,
+      "turn_ms": 7497,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

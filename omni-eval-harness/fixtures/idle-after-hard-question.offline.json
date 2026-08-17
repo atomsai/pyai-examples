@@ -1,0 +1,19 @@
+{
+  "fixture": "idle-after-hard-question.offline",
+  "scenario": "idle-after-hard-question",
+  "session_label": "eval-idle-after-hard-question",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "P6 intended: after a hard beat the agent leaves space. No idle check-in inside 12s.",
+  "turns": [
+    {
+      "caller_says": "yeah whatever I need a minute to look at this",
+      "agent_text": "Take the minute. I'll be here when you're ready.",
+      "ttfb_ms": 280,
+      "turn_ms": 610,
+      "idle_prompt_s": null,
+      "tool_calls": [],
+      "barge_in": null
+    }
+  ]
+}

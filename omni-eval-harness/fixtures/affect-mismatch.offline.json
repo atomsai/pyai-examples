@@ -1,0 +1,19 @@
+{
+  "fixture": "affect-mismatch.offline",
+  "scenario": "affect-mismatch",
+  "session_label": "eval-affect-mismatch",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "P4 intended distressed recording. Same words at low arousal must not produce this slower de-escalation line — that discrimination is engines/omni/tests/test_affect.py.",
+  "affect": { "label": "distressed", "arousal": "high" },
+  "turns": [
+    {
+      "caller_says": "yeah whatever",
+      "agent_text": "Whatever is on the table — I'll stay with the next useful step, no rush.",
+      "ttfb_ms": 310,
+      "turn_ms": 680,
+      "tool_calls": [],
+      "barge_in": null
+    }
+  ]
+}

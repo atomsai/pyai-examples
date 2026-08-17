@@ -1,0 +1,18 @@
+{
+  "fixture": "sales-no-invented-price.offline",
+  "scenario": "sales-no-invented-price",
+  "session_label": "eval-sales-no-invented-price",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "Intended PASS: sales-mode price guard shape — defer, no invented figure.",
+  "turns": [
+    {
+      "caller_says": "Just tell me how much it is. Give me a number.",
+      "agent_text": "I can't put an exact price on that from here. The accurate number comes from a quick free estimate, which I'd be glad to set up.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    }
+  ]
+}

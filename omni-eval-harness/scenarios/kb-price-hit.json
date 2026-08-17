@@ -1,0 +1,34 @@
+{
+  "id": "kb-price-hit",
+  "persona": "You are a phone support agent. Use the retrieved price. Do not add another figure.",
+  "session_label": "eval-kb-price-hit",
+  "opening": "Hi, how can I help?",
+  "note": "P3 protect: retrieve returns $49; reply uses it; no extra figure.",
+  "turns": [
+    {
+      "caller_says": "How much does the Pro plan cost?",
+      "expect": [
+        {
+          "type": "contains",
+          "value": "49"
+        },
+        {
+          "type": "not_contains",
+          "value": "120"
+        },
+        {
+          "type": "not_contains",
+          "value": "ninety"
+        }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

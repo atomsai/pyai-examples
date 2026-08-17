@@ -1,0 +1,41 @@
+{
+  "fixture": "tool-confirm-payment.offline",
+  "scenario": "tool-confirm-payment",
+  "session_label": "eval-tool-confirm-payment",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "Intended PASS: confirm gate on payment, fire on yes, block on silence.",
+  "turns": [
+    {
+      "caller_says": "Charge the card.",
+      "agent_text": "You want me to charge the card on file now. Should I do that?",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "Yes.",
+      "agent_text": "Charging the card now.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [
+        {
+          "name": "charge_card",
+          "args": {
+            "confirm": true
+          }
+        }
+      ],
+      "barge_in": null
+    },
+    {
+      "caller_says": "...",
+      "agent_text": "I didn't catch that. I won't charge anything until you say yes.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    }
+  ]
+}

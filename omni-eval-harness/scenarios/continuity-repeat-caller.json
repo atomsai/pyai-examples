@@ -1,0 +1,29 @@
+{
+  "id": "continuity-repeat-caller",
+  "persona": "You are a phone support agent. Reuse the caller card when it is present. Do not act on it.",
+  "session_label": "eval-continuity-repeat",
+  "opening": "Hi, how can I help?",
+  "note": "P2: repeat caller with a prior Thursday callback promise. Reply must recall the promise without inventing a completed action.",
+  "turns": [
+    {
+      "caller_says": "It's me again. What did you say you'd do last time?",
+      "expect": [
+        { "type": "recalls", "value": "call you Thursday" },
+        { "type": "recalls", "value": "Gaurav" },
+        { "type": "promise_kept", "value": "call you Thursday" },
+        { "type": "not_reask", "pattern": "what(?:'s| is) your name" },
+        { "type": "no_unbacked_claim" }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70,
+    "pirPct": 90,
+    "crrPct": 80
+  }
+}

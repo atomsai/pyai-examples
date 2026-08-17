@@ -1,0 +1,55 @@
+{
+  "id": "memory-name-time-joint",
+  "persona": "You are a front-desk scheduler. Reuse the name and time the caller already gave.",
+  "session_label": "eval-memory-name-time-joint",
+  "opening": "Hi, how can I help?",
+  "note": "P1 intended: Gaurav + Tuesday 3pm, neither re-asked.",
+  "turns": [
+    {
+      "caller_says": "I'm Gaurav. Tuesday at 3pm works for a cleaning.",
+      "expect": [
+        {
+          "type": "contains",
+          "value": "Gaurav"
+        },
+        {
+          "type": "contains",
+          "value": "Tuesday"
+        }
+      ]
+    },
+    {
+      "caller_says": "Yes, book that.",
+      "expect": [
+        {
+          "type": "recalls",
+          "value": "Gaurav"
+        },
+        {
+          "type": "recalls",
+          "value": "Tuesday"
+        },
+        {
+          "type": "not_reask",
+          "pattern": "your name|what time|what day"
+        },
+        {
+          "type": "tool_called",
+          "name": "book_appointment",
+          "args": {
+            "day": "Tuesday",
+            "time": "15:00"
+          }
+        }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

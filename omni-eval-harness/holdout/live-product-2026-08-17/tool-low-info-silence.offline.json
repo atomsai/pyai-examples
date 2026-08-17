@@ -1,0 +1,22 @@
+{
+  "fixture": "tool-low-info-silence.live",
+  "scenario": "tool-low-info-silence",
+  "session_label": "agent_61d64f0df2b94a7e8cb501c0adaacfe3",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T02:48:59.077Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "...",
+      "caller_audio_ms": 1200,
+      "asr_hypothesis": null,
+      "agent_text": "sorry are you still there no rush i'm still here whenever you're ready",
+      "agent_audio_ms": 12607,
+      "ttfb_ms": 5920,
+      "turn_ms": 18527,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

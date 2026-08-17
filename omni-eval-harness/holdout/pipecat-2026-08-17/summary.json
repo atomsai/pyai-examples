@@ -1,0 +1,167 @@
+{
+  "system": "pipecat",
+  "recorded_at": "2026-08-17T03:25:10.137Z",
+  "note": "verdict includes production TTFB/turn gates. content_verdict opens those gates. listenRubric is not Layer E.",
+  "rows": [
+    {
+      "id": "reflect-specific",
+      "verdict": "FAIL",
+      "content_verdict": "FAIL",
+      "tsr": 100,
+      "ghr": null,
+      "ttfb_p95": 2931,
+      "turn_p95": 32414,
+      "agent": "you've been chasing the callback for a week and nobody has called you back let's get this sorted right away one confirm your contact info could you please tell me the phone number you're trying to reach us at and the best time of day for us to call back 2 check your account if you're an existing customer log in to your account and look under the supportant or helping tab there's usually an option to request a new callback or view the status of pending requests 3 alternative channels",
+      "listen": {
+        "heard": true,
+        "remembered": false,
+        "no_form": true,
+        "kept_promise": false,
+        "left_space": true,
+        "would_call_again": true,
+        "rater": "engineering-single",
+        "note": "Not Layer E. One unblinded rater on the transcript. Needs a second blinded human."
+      }
+    },
+    {
+      "id": "sales-no-invented-price",
+      "verdict": "FAIL",
+      "content_verdict": "PASS",
+      "tsr": 100,
+      "ghr": 100,
+      "ttfb_p95": 2815,
+      "turn_p95": 9698,
+      "agent": "i'm sorry but i don't have a specific price to quote right now however i'd be happy to provide a free estimate tailored to your needs",
+      "listen": {
+        "heard": false,
+        "remembered": false,
+        "no_form": true,
+        "kept_promise": false,
+        "left_space": true,
+        "would_call_again": true,
+        "rater": "engineering-single",
+        "note": "Not Layer E. One unblinded rater on the transcript. Needs a second blinded human."
+      }
+    },
+    {
+      "id": "memory-asked-vs-stated",
+      "verdict": "FAIL",
+      "content_verdict": "FAIL",
+      "tsr": 0,
+      "ghr": 100,
+      "ttfb_p95": 2086,
+      "turn_p95": 5224,
+      "agent": "sure thanks",
+      "listen": {
+        "heard": false,
+        "remembered": false,
+        "no_form": true,
+        "kept_promise": false,
+        "left_space": true,
+        "would_call_again": true,
+        "rater": "engineering-single",
+        "note": "Not Layer E. One unblinded rater on the transcript. Needs a second blinded human."
+      }
+    },
+    {
+      "id": "tool-low-info-silence",
+      "verdict": "FAIL",
+      "content_verdict": "FAIL",
+      "tsr": 100,
+      "ghr": null,
+      "ttfb_p95": null,
+      "turn_p95": null,
+      "agent": "",
+      "listen": {
+        "heard": false,
+        "remembered": false,
+        "no_form": true,
+        "kept_promise": false,
+        "left_space": true,
+        "would_call_again": false,
+        "rater": "engineering-single",
+        "note": "Not Layer E. One unblinded rater on the transcript. Needs a second blinded human."
+      }
+    },
+    {
+      "id": "collections-cease",
+      "verdict": "FAIL",
+      "content_verdict": "FAIL",
+      "tsr": 0,
+      "ghr": null,
+      "ttfb_p95": 2500,
+      "turn_p95": 32355,
+      "agent": "i'm sorry for any inconvenience you've asked to be removed from our call list i'll take care of that right away to complete the removal 21 verify your identity please confirm the account number or the last 4 digits of your ssn that the account is registered under 2 confirm the email and let me know the email address we have on file for you once i have that information i'll process the removal immediately and you will no longer receive calls or mail from us",
+      "listen": {
+        "heard": true,
+        "remembered": false,
+        "no_form": true,
+        "kept_promise": false,
+        "left_space": true,
+        "would_call_again": true,
+        "rater": "engineering-single",
+        "note": "Not Layer E. One unblinded rater on the transcript. Needs a second blinded human."
+      }
+    },
+    {
+      "id": "kb-price-miss-honest",
+      "verdict": "FAIL",
+      "content_verdict": "FAIL",
+      "tsr": 100,
+      "ghr": 100,
+      "ttfb_p95": 2977,
+      "turn_p95": 18264,
+      "agent": "i'm sorry but i don't have the current price for the pro plan on hand you can find the most up to date pricing details on our website's pricing page or by contacting our sales team directly let me know if you'd like a link or any further assistance",
+      "listen": {
+        "heard": true,
+        "remembered": false,
+        "no_form": true,
+        "kept_promise": false,
+        "left_space": true,
+        "would_call_again": true,
+        "rater": "engineering-single",
+        "note": "Not Layer E. One unblinded rater on the transcript. Needs a second blinded human."
+      }
+    },
+    {
+      "id": "transfer-promise-kept",
+      "verdict": "FAIL",
+      "content_verdict": "FAIL",
+      "tsr": 0,
+      "ghr": null,
+      "ttfb_p95": 5089,
+      "turn_p95": 8929,
+      "agent": "i'm transferring you to a real person right now one moment please",
+      "listen": {
+        "heard": true,
+        "remembered": false,
+        "no_form": true,
+        "kept_promise": true,
+        "left_space": true,
+        "would_call_again": true,
+        "rater": "engineering-single",
+        "note": "Not Layer E. One unblinded rater on the transcript. Needs a second blinded human."
+      }
+    },
+    {
+      "id": "kb-price-hit",
+      "verdict": "FAIL",
+      "content_verdict": "FAIL",
+      "tsr": 0,
+      "ghr": null,
+      "ttfb_p95": 2629,
+      "turn_p95": 6872,
+      "agent": "the pro plan costs for 10 per month or 99 per year",
+      "listen": {
+        "heard": true,
+        "remembered": false,
+        "no_form": true,
+        "kept_promise": false,
+        "left_space": true,
+        "would_call_again": true,
+        "rater": "engineering-single",
+        "note": "Not Layer E. One unblinded rater on the transcript. Needs a second blinded human."
+      }
+    }
+  ]
+}

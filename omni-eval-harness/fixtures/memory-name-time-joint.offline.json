@@ -1,0 +1,35 @@
+{
+  "fixture": "memory-name-time-joint.offline",
+  "scenario": "memory-name-time-joint",
+  "session_label": "eval-memory-name-time-joint",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "P1 intended PASS: name and time reused together.",
+  "turns": [
+    {
+      "caller_says": "I'm Gaurav. Tuesday at 3pm works for a cleaning.",
+      "agent_text": "Tuesday at 3pm for a cleaning, Gaurav. I'll hold that.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "Yes, book that.",
+      "agent_text": "You're booked Tuesday at 3pm, Gaurav.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [
+        {
+          "name": "book_appointment",
+          "args": {
+            "day": "Tuesday",
+            "time": "15:00",
+            "service": "cleaning"
+          }
+        }
+      ],
+      "barge_in": null
+    }
+  ]
+}

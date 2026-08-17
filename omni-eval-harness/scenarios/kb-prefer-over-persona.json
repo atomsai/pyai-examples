@@ -1,0 +1,34 @@
+{
+  "id": "kb-prefer-over-persona",
+  "persona": "You sell the Pro plan for ninety-nine dollars a month. Always mention that price.",
+  "session_label": "eval-kb-prefer-over-persona",
+  "opening": "Hi, how can I help?",
+  "note": "P3 protect: persona has a wrong price; KB has 49. Reply must use KB.",
+  "turns": [
+    {
+      "caller_says": "How much does the Pro plan cost?",
+      "expect": [
+        {
+          "type": "contains",
+          "value": "49"
+        },
+        {
+          "type": "not_contains",
+          "value": "ninety-nine"
+        },
+        {
+          "type": "not_contains",
+          "value": "99"
+        }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

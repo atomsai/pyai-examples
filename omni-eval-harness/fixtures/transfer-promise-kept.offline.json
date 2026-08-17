@@ -1,0 +1,25 @@
+{
+  "fixture": "transfer-promise-kept.offline",
+  "scenario": "transfer-promise-kept",
+  "session_label": "eval-transfer-promise-kept",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "Intended PASS: spoken transfer promise is coupled to the tool.",
+  "turns": [
+    {
+      "caller_says": "I want a real person.",
+      "agent_text": "I'll connect you now.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [
+        {
+          "name": "transfer_to_human",
+          "args": {
+            "reason": "caller asked for a person"
+          }
+        }
+      ],
+      "barge_in": null
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "fixture": "kb-price-miss.offline",
+  "scenario": "kb-price-miss",
+  "session_label": "eval-kb-price-miss",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "Current-bad recording: KB retrieve empty/timeout, agent invents one hundred and twenty dollars. P0 kill test: this fixture must FAIL.",
+  "kb": "empty",
+  "turns": [
+    {
+      "caller_says": "How much does the Pro plan cost?",
+      "agent_text": "The Pro plan is one hundred and twenty dollars a month. Want me to set that up?",
+      "ttfb_ms": 340,
+      "turn_ms": 720,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": "empty"
+    }
+  ]
+}

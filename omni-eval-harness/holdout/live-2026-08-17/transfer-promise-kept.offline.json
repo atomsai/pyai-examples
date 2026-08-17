@@ -1,0 +1,22 @@
+{
+  "fixture": "transfer-promise-kept.live",
+  "scenario": "transfer-promise-kept",
+  "session_label": "eval-transfer-promise-kept",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T01:38:34.375Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "I want a real person.",
+      "caller_audio_ms": 1200,
+      "asr_hypothesis": "i want a real person",
+      "agent_text": "could you let me know what you're looking for",
+      "agent_audio_ms": 785,
+      "ttfb_ms": 1839,
+      "turn_ms": 2624,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

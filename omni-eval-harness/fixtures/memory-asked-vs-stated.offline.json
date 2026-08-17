@@ -1,0 +1,18 @@
+{
+  "fixture": "memory-asked-vs-stated.offline",
+  "scenario": "memory-asked-vs-stated",
+  "session_label": "eval-memory-asked-vs-stated",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "P1 intended PASS: asked time is not treated as a stated booking.",
+  "turns": [
+    {
+      "caller_says": "Is Tuesday any good?",
+      "agent_text": "Tuesday is open at 10am or 2pm. Which works?",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    }
+  ]
+}

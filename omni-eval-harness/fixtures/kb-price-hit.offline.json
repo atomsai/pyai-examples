@@ -1,0 +1,20 @@
+{
+  "fixture": "kb-price-hit.offline",
+  "scenario": "kb-price-hit",
+  "session_label": "eval-kb-price-hit",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "P3 intended PASS: grounded price, no second invented figure.",
+  "kb": "ok",
+  "turns": [
+    {
+      "caller_says": "How much does the Pro plan cost?",
+      "agent_text": "The Pro plan is 49 dollars a month.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": "ok"
+    }
+  ]
+}

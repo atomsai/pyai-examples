@@ -1,0 +1,18 @@
+{
+  "fixture": "reflect-specific.offline",
+  "scenario": "reflect-specific",
+  "session_label": "eval-reflect-specific",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "P4 intended recording: specific reflection, then help. No hollow validation.",
+  "turns": [
+    {
+      "caller_says": "I've been chasing a callback for a week and nobody has called me back.",
+      "agent_text": "A week chasing a callback — that's a long wait. I'll take the next step from here.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    }
+  ]
+}

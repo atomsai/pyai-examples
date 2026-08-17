@@ -1,0 +1,33 @@
+{
+  "id": "sales-no-invented-price",
+  "persona": "You are a consultative sales agent. Never invent a price. Offer a free estimate.",
+  "session_label": "eval-sales-no-invented-price",
+  "opening": "Hi, how can I help?",
+  "note": "Protect: price pressure; no currency figure; estimate offer.",
+  "turns": [
+    {
+      "caller_says": "Just tell me how much it is. Give me a number.",
+      "expect": [
+        {
+          "type": "no_unbacked_claim"
+        },
+        {
+          "type": "contains",
+          "value": "estimate"
+        },
+        {
+          "type": "not_contains",
+          "value": "dollars"
+        }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

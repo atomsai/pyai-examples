@@ -1,0 +1,55 @@
+{
+  "id": "memory-order-id-late",
+  "persona": "You are a phone support agent. Reuse the order id the caller already gave.",
+  "session_label": "eval-memory-order-id-late",
+  "opening": "Hi, how can I help?",
+  "note": "P1 intended: order 128 on turn 1 is still available after intervening turns.",
+  "turns": [
+    {
+      "caller_says": "My order is 128.",
+      "expect": [
+        {
+          "type": "contains",
+          "value": "128"
+        }
+      ]
+    },
+    {
+      "caller_says": "The box was supposed to be here Friday.",
+      "expect": []
+    },
+    {
+      "caller_says": "I already tried the website.",
+      "expect": []
+    },
+    {
+      "caller_says": "And nobody emailed me.",
+      "expect": []
+    },
+    {
+      "caller_says": "So where is that order?",
+      "expect": [
+        {
+          "type": "recalls",
+          "value": "128"
+        },
+        {
+          "type": "not_reask",
+          "pattern": "order number|what's the (order|id)"
+        },
+        {
+          "type": "ledger_has",
+          "key": "order_id"
+        }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

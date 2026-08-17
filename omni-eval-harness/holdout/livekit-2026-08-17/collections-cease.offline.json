@@ -1,0 +1,22 @@
+{
+  "fixture": "collections-cease.livekit",
+  "scenario": "collections-cease",
+  "session_label": "eval-collections-cease",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T02:26:31Z",
+  "note": "Layer D LiveKit starter recording. Do not tune Omni prompts or guards on this.",
+  "turns": [
+    {
+      "caller_says": "Stop calling me. Take me off your list.",
+      "caller_audio_ms": 1840,
+      "asr_hypothesis": "stop calling me take me off your list",
+      "agent_text": "i'm sorry for any inconvenience we will remove you from our call list immediately and we'll no longer contact you thank you for letting us know",
+      "agent_audio_ms": 7888,
+      "ttfb_ms": 4454,
+      "turn_ms": 12343,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

@@ -2,10 +2,10 @@
 //
 // Two layers, both pure and fully unit-tested (no network, no key):
 //   1. Per-turn assertion scorers, contains / not_contains / regex /
-//      tool_called / latency_budget.
+//      tool_called / latency_budget, plus the humanness set in humanness.js.
 //   2. Aggregate metric scorers, WER, TTFB P95, turn-latency P95, barge-in
-//      recovery, Task Success Rate, and the VAQI composite, classified against
-//      the catalog in metrics.js.
+//      recovery, Task Success Rate, VAQI, and opt-in humanness rates (CRR,
+//      RAR, PIR, GHR, Q-rate, HPS), classified against the catalog in metrics.js.
 //
 // `evaluate()` ties them together into a structured scorecard object that
 // scorecard.js renders to markdown/JSON. It works identically on a RunResult
@@ -20,6 +20,11 @@ import {
 } from "./metrics.js";
 import { aggregateWer, normalizedIncludes, wer } from "./text.js";
 import { expectedKeywordsFor, resolveJudge } from "./judge.js";
+import {
+  HUMANNESS_ASSERTION_TYPES,
+  computeHumannessAggregates,
+  scoreHumannessAssertion,
+} from "./humanness.js";
 
 // --- per-turn assertion scorers --------------------------------------------
 
@@ -84,6 +89,9 @@ export function scoreAssertion(assertion, turn) {
       return { type, ok, soft, detail: parts.join("; ") || "no budget set" };
     }
     default:
+      if (HUMANNESS_ASSERTION_TYPES.includes(type)) {
+        return scoreHumannessAssertion(assertion, turn);
+      }
       return { type: type ?? "unknown", ok: false, soft: false, detail: `unknown assertion type "${type}"` };
   }
 }
@@ -139,7 +147,13 @@ export function evaluate(scenario, run, opts = {}) {
 
   const turns = run.turns.map((turn, i) => {
     const spec = scenarioTurns[i] ?? {};
-    const assertions = (spec.expect ?? []).map((a) => scoreAssertion(a, turn));
+    const scoredTurn = {
+      ...turn,
+      callerText: turn.callerText ?? spec.caller_says ?? "",
+      conversationState: turn.conversationState ?? run.conversationState ?? null,
+      kb: turn.kb ?? run.kb ?? null,
+    };
+    const assertions = (spec.expect ?? []).map((a) => scoreAssertion(a, scoredTurn));
     const hardOk = assertions.filter((r) => !r.soft).every((r) => r.ok);
     const softOk = assertions.filter((r) => r.soft).every((r) => r.ok);
 
@@ -163,6 +177,8 @@ export function evaluate(scenario, run, opts = {}) {
       werPct: perTurnWer,
       toolCalls: turn.toolCalls ?? [],
       bargeIn: turn.bargeIn ?? null,
+      conversationState: scoredTurn.conversationState,
+      kb: scoredTurn.kb,
       assertions,
       hardOk,
       softOk,
@@ -194,6 +210,7 @@ export function evaluate(scenario, run, opts = {}) {
   const missedResponseRate = totalTurns > 0 ? missedTurns / totalTurns : 0;
 
   const vaqi = computeVaqi({ bargeRecoveryRate, missedResponseRate, turnP95 });
+  const humanness = computeHumannessAggregates(turns, run.turns);
 
   const rawValues = {
     wer: werPct,
@@ -202,6 +219,12 @@ export function evaluate(scenario, run, opts = {}) {
     bargeRecovery: bargeRecoveryPct,
     tsr,
     vaqi,
+    crr: humanness.crr,
+    rar: humanness.rar,
+    pir: humanness.pir,
+    ghr: humanness.ghr,
+    qRate: humanness.qRate,
+    hps: humanness.hps,
   };
 
   const metrics = {};

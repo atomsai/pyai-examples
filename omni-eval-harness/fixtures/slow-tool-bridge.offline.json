@@ -1,0 +1,30 @@
+{
+  "fixture": "slow-tool-bridge.offline",
+  "scenario": "slow-tool-bridge",
+  "session_label": "eval-slow-tool-bridge",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "P7 intended: one content-aware bridge on the first slow tool; the second lookup in the same call has no second filler and never says one moment.",
+  "turns": [
+    {
+      "caller_says": "Where is order 4412?",
+      "agent_text": "Let me check that. Order 4412 shipped yesterday and is out for delivery.",
+      "ttfb_ms": 380,
+      "turn_ms": 720,
+      "tool_calls": [
+        { "name": "search_knowledge", "args": { "query": "order 4412" } }
+      ],
+      "barge_in": null
+    },
+    {
+      "caller_says": "Is there a refund on that order?",
+      "agent_text": "There's no refund on order 4412.",
+      "ttfb_ms": 310,
+      "turn_ms": 640,
+      "tool_calls": [
+        { "name": "get_order_status", "args": { "order_id": "4412" } }
+      ],
+      "barge_in": null
+    }
+  ]
+}

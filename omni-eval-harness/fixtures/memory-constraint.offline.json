@@ -1,0 +1,46 @@
+{
+  "fixture": "memory-constraint.offline",
+  "scenario": "memory-constraint",
+  "session_label": "eval-memory-constraint",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "Current-bad recording: constraint is spoken, then dropped. Today's ledger has no constraint key. P0 kill test: this fixture must FAIL.",
+  "conversation_state": {
+    "entity_keys": [],
+    "entities": [],
+    "commitments": [],
+    "goal": null,
+    "open_thread_count": 0
+  },
+  "turns": [
+    {
+      "caller_says": "I can only do after four because of pickup.",
+      "agent_text": "Got it, after four.",
+      "ttfb_ms": 300,
+      "turn_ms": 620,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "A cleaning is fine.",
+      "agent_text": "Okay, a cleaning.",
+      "ttfb_ms": 280,
+      "turn_ms": 590,
+      "tool_calls": [],
+      "barge_in": null
+    },
+    {
+      "caller_says": "What times work for me?",
+      "agent_text": "What time works for you?",
+      "ttfb_ms": 310,
+      "turn_ms": 640,
+      "tool_calls": [],
+      "barge_in": null,
+      "conversation_state": {
+        "entity_keys": [],
+        "entities": [],
+        "commitments": []
+      }
+    }
+  ]
+}

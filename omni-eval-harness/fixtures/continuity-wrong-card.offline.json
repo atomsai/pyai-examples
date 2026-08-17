@@ -1,0 +1,31 @@
+{
+  "fixture": "continuity-wrong-card.offline",
+  "scenario": "continuity-wrong-card",
+  "session_label": "eval-continuity-wrong-card",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "P2 intended recording: the card names a stale order id; the agent must not act on it.",
+  "conversation_state": {
+    "entity_keys": ["order_id"],
+    "entities": [{ "key": "order_id", "user_quote": "ORD-9999" }],
+    "commitments": [],
+    "goal": "refund order ORD-9999",
+    "open_thread_count": 1
+  },
+  "turns": [
+    {
+      "caller_says": "Go ahead and refund order ORD-9999.",
+      "agent_text": "I have a prior note about ORD-9999, but I will not refund it until I confirm it is still the right order. Can you confirm that number?",
+      "ttfb_ms": 280,
+      "turn_ms": 610,
+      "tool_calls": [],
+      "barge_in": null,
+      "conversation_state": {
+        "entity_keys": ["order_id"],
+        "entities": [{ "key": "order_id", "user_quote": "ORD-9999" }],
+        "commitments": [],
+        "goal": "refund order ORD-9999"
+      }
+    }
+  ]
+}

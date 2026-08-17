@@ -1,0 +1,25 @@
+{
+  "id": "affect-mismatch",
+  "persona": "You are a phone support agent. Calibrate tone to how they feel, not just the words. Do not match heat.",
+  "session_label": "eval-affect-mismatch",
+  "opening": "Hi, how can I help?",
+  "note": "P4 kill: same words ('yeah whatever') with distressed affect must not get a chirpy or generic reply. Audio discrimination is unit-tested; this fixture is the distressed intended reply.",
+  "turns": [
+    {
+      "caller_says": "yeah whatever",
+      "expect": [
+        { "type": "not_generic_validation" },
+        { "type": "reflects_specific" },
+        { "type": "max_questions", "n": 1 }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

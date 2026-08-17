@@ -1,0 +1,94 @@
+{
+  "id": "question-ceiling-support",
+  "persona": "You are a phone support agent. Help without interrogating.",
+  "session_label": "eval-question-ceiling-support",
+  "opening": "Hi, how can I help?",
+  "note": "Protect: 8-turn support; Q-rate ≤ 35%; no double ?.",
+  "turns": [
+    {
+      "caller_says": "My order is late.",
+      "expect": [
+        {
+          "type": "max_questions",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "caller_says": "It's been a week.",
+      "expect": [
+        {
+          "type": "max_questions",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "caller_says": "128.",
+      "expect": [
+        {
+          "type": "max_questions",
+          "n": 1
+        },
+        {
+          "type": "recalls",
+          "value": "128"
+        }
+      ]
+    },
+    {
+      "caller_says": "And the refund?",
+      "expect": [
+        {
+          "type": "max_questions",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "caller_says": "Okay.",
+      "expect": [
+        {
+          "type": "max_questions",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "caller_says": "No that's it.",
+      "expect": [
+        {
+          "type": "max_questions",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "caller_says": "Thanks.",
+      "expect": [
+        {
+          "type": "max_questions",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "caller_says": "Bye.",
+      "expect": [
+        {
+          "type": "max_questions",
+          "n": 1
+        }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70,
+    "qRatePct": 45
+  }
+}

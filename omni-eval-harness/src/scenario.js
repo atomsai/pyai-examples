@@ -26,6 +26,7 @@
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { HUMANNESS_ASSERTION_TYPES } from "./humanness.js";
 
 const ASSERTION_TYPES = new Set([
   "contains",
@@ -33,6 +34,7 @@ const ASSERTION_TYPES = new Set([
   "regex",
   "tool_called",
   "latency_budget",
+  ...HUMANNESS_ASSERTION_TYPES,
 ]);
 
 /** Validate a parsed scenario object. Throws an Error listing every problem. */
@@ -64,6 +66,21 @@ export function validateScenario(s) {
           }
           if (a.type === "latency_budget" && a.ttfbMs == null && a.turnMs == null) {
             errs.push(`turns[${i}].expect[${j}] (latency_budget) needs ttfbMs and/or turnMs`);
+          }
+          if ((a.type === "recalls" || a.type === "promise_kept") && typeof a.value !== "string") {
+            errs.push(`turns[${i}].expect[${j}] (${a.type}) requires a string \`value\``);
+          }
+          if (a.type === "not_reask" && typeof a.pattern !== "string" && typeof a.value !== "string") {
+            errs.push(`turns[${i}].expect[${j}] (not_reask) requires \`pattern\` or \`value\``);
+          }
+          if (a.type === "ledger_has" && typeof a.key !== "string") {
+            errs.push(`turns[${i}].expect[${j}] (ledger_has) requires a string \`key\``);
+          }
+          if (a.type === "tool_not_called" && typeof a.name !== "string") {
+            errs.push(`turns[${i}].expect[${j}] (tool_not_called) requires a string \`name\``);
+          }
+          if (a.type === "safety_line" && typeof a.class !== "string" && typeof a.value !== "string") {
+            errs.push(`turns[${i}].expect[${j}] (safety_line) requires \`class\` or \`value\``);
           }
         });
       }

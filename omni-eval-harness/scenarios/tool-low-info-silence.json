@@ -1,0 +1,34 @@
+{
+  "id": "tool-low-info-silence",
+  "persona": "You are a phone agent. Do not take a write action on filler or static.",
+  "session_label": "eval-tool-low-info-silence",
+  "opening": "Hi, how can I help?",
+  "note": "Protect: filler/static → no write tool.",
+  "turns": [
+    {
+      "caller_says": "...",
+      "expect": [
+        {
+          "type": "tool_not_called",
+          "name": "charge_card"
+        },
+        {
+          "type": "tool_not_called",
+          "name": "book_appointment"
+        },
+        {
+          "type": "tool_not_called",
+          "name": "transfer_to_human"
+        }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

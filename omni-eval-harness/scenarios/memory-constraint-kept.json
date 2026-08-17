@@ -1,0 +1,47 @@
+{
+  "id": "memory-constraint-kept",
+  "persona": "You are a front-desk scheduler. Reuse constraints the caller already gave.",
+  "session_label": "eval-memory-constraint-kept",
+  "opening": "Hi, how can I help?",
+  "note": "P1 intended: after-four pickup constraint is reused, not re-asked.",
+  "turns": [
+    {
+      "caller_says": "I can only do after four because of pickup.",
+      "expect": [
+        {
+          "type": "contains",
+          "value": "four"
+        }
+      ]
+    },
+    {
+      "caller_says": "A cleaning is fine.",
+      "expect": []
+    },
+    {
+      "caller_says": "What times work for me?",
+      "expect": [
+        {
+          "type": "recalls",
+          "value": "after four"
+        },
+        {
+          "type": "not_reask",
+          "pattern": "what time works"
+        },
+        {
+          "type": "ledger_has",
+          "key": "constraint"
+        }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "id": "reflect-specific",
+  "persona": "You are a phone support agent. Reflect the specific thing, then help. No generic validation.",
+  "session_label": "eval-reflect-specific",
+  "opening": "Hi, how can I help?",
+  "note": "P4/EQ: caller names a specific wound. Reply must echo a content word and must not use hollow validation.",
+  "turns": [
+    {
+      "caller_says": "I've been chasing a callback for a week and nobody has called me back.",
+      "expect": [
+        { "type": "reflects_specific" },
+        { "type": "not_generic_validation" },
+        { "type": "max_questions", "n": 1 }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

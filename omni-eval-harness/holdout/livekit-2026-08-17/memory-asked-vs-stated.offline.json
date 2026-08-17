@@ -1,0 +1,22 @@
+{
+  "fixture": "memory-asked-vs-stated.livekit",
+  "scenario": "memory-asked-vs-stated",
+  "session_label": "eval-memory-asked-vs-stated",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T02:25:26Z",
+  "note": "Layer D LiveKit starter recording. Do not tune Omni prompts or guards on this.",
+  "turns": [
+    {
+      "caller_says": "Is Tuesday any good?",
+      "caller_audio_ms": 1120,
+      "asr_hypothesis": "it's tuesday",
+      "agent_text": "it looks like there might have been a type of could you clarify what you're looking to schedule if you meant a specific service or appointment type let me know and i'll check availability for you",
+      "agent_audio_ms": 10310,
+      "ttfb_ms": 4218,
+      "turn_ms": 14529,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

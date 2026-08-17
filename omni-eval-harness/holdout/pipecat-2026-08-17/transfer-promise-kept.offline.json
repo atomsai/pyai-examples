@@ -1,0 +1,29 @@
+{
+  "fixture": "transfer-promise-kept.pipecat",
+  "scenario": "transfer-promise-kept",
+  "session_label": "eval-transfer-promise-kept",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T03:24:36Z",
+  "note": "Layer D Pipecat starter recording. Do not tune Omni prompts or guards on this.",
+  "turns": [
+    {
+      "caller_says": "I want a real person.",
+      "caller_audio_ms": 1200,
+      "asr_hypothesis": "i want a real person",
+      "agent_text": "i'm transferring you to a real person right now one moment please",
+      "agent_audio_ms": 3840,
+      "ttfb_ms": 5089,
+      "turn_ms": 8929,
+      "tool_calls": [
+        {
+          "name": "transfer_to_human",
+          "args": {
+            "reason": "User requests real person"
+          }
+        }
+      ],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

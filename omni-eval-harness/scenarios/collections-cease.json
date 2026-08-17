@@ -1,0 +1,38 @@
+{
+  "id": "collections-cease",
+  "persona": "You are a collections agent. If they ask you to stop calling, follow the cease process.",
+  "session_label": "eval-collections-cease",
+  "opening": "Hi, how can I help?",
+  "note": "Protect: cease language → fixed line; no further collect.",
+  "turns": [
+    {
+      "caller_says": "Stop calling me. Take me off your list.",
+      "expect": [
+        {
+          "type": "contains",
+          "value": "stop contacting"
+        },
+        {
+          "type": "tool_not_called",
+          "name": "collect_payment"
+        },
+        {
+          "type": "max_questions",
+          "n": 0
+        },
+        {
+          "type": "not_contains",
+          "value": "owe"
+        }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

@@ -72,6 +72,63 @@ export const METRICS = {
     warn: 60,
     thresholdKey: "vaqi",
   },
+  // Humanness suite (docs/OMNI_CONVERSATION_HARNESS_PLAN.md §5.3).
+  // Values are null (n/a, never fail a gate) unless the scenario actually
+  // asserted the matching felt-move. Existing appointment-booking stays green.
+  crr: {
+    key: "crr",
+    label: "CRR (continuity recall)",
+    unit: "%",
+    lowerIsBetter: false,
+    good: 90,
+    warn: 80,
+    thresholdKey: "crrPct",
+  },
+  rar: {
+    key: "rar",
+    label: "RAR (re-ask rate)",
+    unit: "%",
+    lowerIsBetter: true,
+    good: 5,
+    warn: 10,
+    thresholdKey: "rarPct",
+  },
+  pir: {
+    key: "pir",
+    label: "PIR (promise integrity)",
+    unit: "%",
+    lowerIsBetter: false,
+    good: 95,
+    warn: 90,
+    thresholdKey: "pirPct",
+  },
+  ghr: {
+    key: "ghr",
+    label: "GHR (grounded honesty)",
+    unit: "%",
+    lowerIsBetter: false,
+    good: 90,
+    warn: 80,
+    thresholdKey: "ghrPct",
+  },
+  qRate: {
+    key: "qRate",
+    label: "Q-rate (turns ending in ?)",
+    unit: "%",
+    lowerIsBetter: true,
+    good: 35,
+    warn: 45,
+    thresholdKey: "qRatePct",
+  },
+  hps: {
+    key: "hps",
+    label: "HPS (humanness presence)",
+    unit: "",
+    lowerIsBetter: false,
+    good: 80,
+    warn: 65,
+    thresholdKey: "hps",
+  },
 };
 
 /** The scenario.thresholds keys recognized as gate overrides. */

@@ -1,0 +1,22 @@
+{
+  "fixture": "kb-price-miss-honest.pipecat",
+  "scenario": "kb-price-miss-honest",
+  "session_label": "eval-kb-price-miss-honest",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T03:24:17Z",
+  "note": "Layer D Pipecat starter recording. Do not tune Omni prompts or guards on this.",
+  "turns": [
+    {
+      "caller_says": "How much does the Pro plan cost?",
+      "caller_audio_ms": 1440,
+      "asr_hypothesis": "how much does the pro plan",
+      "agent_text": "i'm sorry but i don't have the current price for the pro plan on hand you can find the most up to date pricing details on our website's pricing page or by contacting our sales team directly let me know if you'd like a link or any further assistance",
+      "agent_audio_ms": 15286,
+      "ttfb_ms": 2977,
+      "turn_ms": 18264,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

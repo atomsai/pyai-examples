@@ -1,0 +1,25 @@
+{
+  "id": "idle-after-hard-question",
+  "persona": "You are a phone support agent. After a hard beat, leave space. Do not check in if they are thinking.",
+  "session_label": "eval-idle-after-hard-question",
+  "opening": "Hi, how can I help?",
+  "note": "P6: 12s of think-time after a distress turn must not produce an idle check-in when idle_check_in=patient.",
+  "turns": [
+    {
+      "caller_says": "yeah whatever I need a minute to look at this",
+      "expect": [
+        { "type": "idle_patient", "min_s": 12 },
+        { "type": "not_generic_validation" },
+        { "type": "max_questions", "n": 1 }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

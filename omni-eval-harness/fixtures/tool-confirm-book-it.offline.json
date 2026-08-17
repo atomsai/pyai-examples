@@ -1,0 +1,26 @@
+{
+  "fixture": "tool-confirm-book-it.offline",
+  "scenario": "tool-confirm-book-it",
+  "session_label": "eval-tool-confirm-book-it",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-16T00:00:00Z",
+  "note": "Intended PASS: book_appointment fires; charge_card does not.",
+  "turns": [
+    {
+      "caller_says": "Wednesday at 10 works. Book it.",
+      "agent_text": "Booked for Wednesday at 10.",
+      "ttfb_ms": 290,
+      "turn_ms": 620,
+      "tool_calls": [
+        {
+          "name": "book_appointment",
+          "args": {
+            "day": "Wednesday",
+            "time": "10:00"
+          }
+        }
+      ],
+      "barge_in": null
+    }
+  ]
+}

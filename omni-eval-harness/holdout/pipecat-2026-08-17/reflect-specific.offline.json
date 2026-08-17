@@ -1,0 +1,22 @@
+{
+  "fixture": "reflect-specific.pipecat",
+  "scenario": "reflect-specific",
+  "session_label": "eval-reflect-specific",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T03:21:56Z",
+  "note": "Layer D Pipecat starter recording. Do not tune Omni prompts or guards on this.",
+  "turns": [
+    {
+      "caller_says": "I've been chasing a callback for a week and nobody has called me back.",
+      "caller_audio_ms": 3200,
+      "asr_hypothesis": "i've been chasing a callback for a week and nobody has called me back",
+      "agent_text": "you've been chasing the callback for a week and nobody has called you back let's get this sorted right away one confirm your contact info could you please tell me the phone number you're trying to reach us at and the best time of day for us to call back 2 check your account if you're an existing customer log in to your account and look under the supportant or helping tab there's usually an option to request a new callback or view the status of pending requests 3 alternative channels",
+      "agent_audio_ms": 29482,
+      "ttfb_ms": 2931,
+      "turn_ms": 32414,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}
