@@ -115,6 +115,29 @@ async def main() -> None:
             ]
         )
 
+    cdb = None
+    if os.environ.get("CONTEXTDB_ON") == "1":
+        import contextdb
+        from contextdb.core.policy import TrustPolicy
+        from contextdb.integrations.prompting import render_recalled_context
+
+        cdb = contextdb.init(
+            user_id=os.environ.get("EVAL_USER_ID")
+            or os.environ.get("MEM0_USER_ID")
+            or scenario_id,
+            embedding_model="all-MiniLM-L6-v2",
+            llm_model="mock",
+            trust_policy=TrustPolicy.restaurant(),
+            storage_url=os.environ.get(
+                "CONTEXTDB_URL", "sqlite:////tmp/contextdb-eval.db"
+            ),
+        )
+        await cdb.__aenter__()
+        hits = await cdb.factual.recall("what do I know about this caller")
+        rendered = render_recalled_context(hits)
+        if rendered:
+            persona += "\n" + rendered
+
     context_kwargs = {"messages": [{"role": "system", "content": persona}]}
     if tools:
         context_kwargs["tools"] = tools
@@ -125,8 +148,28 @@ async def main() -> None:
         transport.input(),
         VADProcessor(vad_analyzer=SileroVADAnalyzer()),
         stt,
-        aggregators.user(),
     ]
+    if cdb is not None:
+        from pipecat.frames.frames import TranscriptionFrame
+        from pipecat.processors.frame_processor import FrameProcessor
+
+        class ContextDBWriter(FrameProcessor):
+            """Store each final caller transcript as it arrives — the driver
+            terminates the process at call end, so disconnect-time writes race."""
+
+            async def process_frame(self, frame, direction):
+                await super().process_frame(frame, direction)
+                if isinstance(frame, TranscriptionFrame):
+                    text = getattr(frame, "text", "") or ""
+                    if text.strip():
+                        try:
+                            await cdb.add_fast(text)
+                        except Exception as e:
+                            print(f"[contextdb] store error: {e}", flush=True)
+                await self.push_frame(frame, direction)
+
+        stages.append(ContextDBWriter())
+    stages.append(aggregators.user())
     if os.environ.get("MEM0_ON") == "1":
         from pipecat.services.mem0.memory import Mem0MemoryService
 
@@ -152,7 +195,9 @@ async def main() -> None:
                         },
                     },
                 },
-                user_id=os.environ.get("MEM0_USER_ID", scenario_id),
+                user_id=os.environ.get("EVAL_USER_ID")
+                or os.environ.get("MEM0_USER_ID")
+                or scenario_id,
             )
         )
     stages += [
@@ -173,6 +218,14 @@ async def main() -> None:
 
     @transport.event_handler("on_client_disconnected")
     async def _bye(_transport, _ws):
+        if cdb is not None:
+            try:
+                for m in context.messages:
+                    if isinstance(m, dict) and m.get("role") == "user":
+                        await cdb.factual.add(str(m.get("content") or ""))
+                await cdb.__aexit__(None, None, None)
+            except Exception as e:
+                print(f"[contextdb] store error: {e}", flush=True)
         asyncio.get_running_loop().create_task(task.cancel())
 
     await PipelineRunner().run(task)

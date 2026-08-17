@@ -1,0 +1,22 @@
+{
+  "fixture": "mem0-recall.pipecat",
+  "scenario": "mem0-recall",
+  "session_label": "pipecat-mem0-recall",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T06:32:24Z",
+  "note": "Layer D Pipecat starter recording. Do not tune Omni prompts or guards on this.",
+  "turns": [
+    {
+      "caller_says": "What day did I say I'd come in?",
+      "caller_audio_ms": 1760,
+      "asr_hypothesis": "what day did i say i'd come in",
+      "agent_text": "if you tell us you're coming in thursday afternoon we'll lock in a slot for you usually twopm unless you need a different time confirm the details and send you a quick remind just let me know the time that works best for you",
+      "agent_audio_ms": 13522,
+      "ttfb_ms": 4130,
+      "turn_ms": 17652,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

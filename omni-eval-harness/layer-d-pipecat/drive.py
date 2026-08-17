@@ -134,8 +134,8 @@ async def run_scenario(scenario: dict, voice: str, client: httpx.AsyncClient) ->
     bot_env = dict(os.environ)
     bot_env["GROQ_MODEL"] = os.environ.get("PIPECAT_GROQ_MODEL", "openai/gpt-oss-20b")
     bot_env["EVAL_PERSONA"] = scenario.get("persona") or ""
-    if os.environ.get("MEM0_ON") == "1":
-        bot_env["MEM0_USER_ID"] = os.environ.get("MEM0_USER_ID") or sid
+    if os.environ.get("MEM0_ON") == "1" or os.environ.get("CONTEXTDB_ON") == "1":
+        bot_env["EVAL_USER_ID"] = os.environ.get("EVAL_USER_ID") or sid
     bot = subprocess.Popen(
         [str(HERE / ".venv" / "bin" / "python"), str(HERE / "bot.py"), sid],
         stdout=subprocess.PIPE,
@@ -319,8 +319,8 @@ def to_fixture(run: dict, scenario_id: str) -> dict:
 
 
 async def run_mem0_pair(voice: str, client: httpx.AsyncClient) -> dict:
-    """Seed a fact in one call, recall it in a second call (same Mem0 user)."""
-    os.environ["MEM0_USER_ID"] = "eval-gaurav"
+    """Seed a fact in one call, recall it in a second call (same memory user)."""
+    os.environ["EVAL_USER_ID"] = "eval-gaurav"
     seed = {
         "id": "mem0-seed",
         "persona": "You are a front-desk scheduler. Be warm and brief.",
@@ -353,16 +353,20 @@ async def main() -> None:
     rows = []
     async with httpx.AsyncClient() as client:
         if ids == ["mem0-pair"]:
+            arm = "contextdb" if os.environ.get("CONTEXTDB_ON") == "1" else "mem0"
             run = await run_mem0_pair(voice, client)
             fixture = to_fixture(run, "mem0-recall")
-            pair_dir = ROOT / "out" / "pipecat-mem0"
+            pair_dir = ROOT / "out" / f"pipecat-{arm}"
             pair_dir.mkdir(parents=True, exist_ok=True)
             (pair_dir / "mem0-recall.offline.json").write_text(
                 json.dumps(fixture, indent=2) + "\n", encoding="utf-8"
             )
             reply = fixture["turns"][0]["agent_text"] if fixture["turns"] else ""
-            print(f"[pipecat-mem0] recall reply={reply!r}", flush=True)
-            print(f"[pipecat-mem0] recalls Thursday: {'thursday' in reply.lower()}", flush=True)
+            print(f"[pipecat-{arm}] recall reply={reply!r}", flush=True)
+            print(
+                f"[pipecat-{arm}] recalls Thursday: {'thursday' in reply.lower()}",
+                flush=True,
+            )
             return
         for sid in ids:
             path = ROOT / "scenarios" / f"{sid}.json"

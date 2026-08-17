@@ -3,5 +3,10 @@ python-dotenv>=1.0.0
 aiohttp>=3.9.0
 httpx>=0.27.0
 websockets>=12.0
+# ContextDB: install from git at the trust-model pin, not PyPI (the wheel lags
+# main). Per the ContextDB team brief, do not treat PyPI as current.
+pycontextdb @ git+https://github.com/atomsai/contextdb.git@41c8714
+mem0ai>=0.1.0
+sentence-transformers>=3.0.0
 # Install the in-repo plugin and SDK from the monorepo root:
 #   pip install -e ../../../integrations/pipecat-pyai -e ../../../sdk/python
