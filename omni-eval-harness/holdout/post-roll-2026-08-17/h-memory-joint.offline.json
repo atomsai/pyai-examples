@@ -1,0 +1,38 @@
+{
+  "fixture": "h-memory-joint.live",
+  "scenario": "h-memory-joint",
+  "session_label": "agent_a50d606ac41349099565da244d343b7b",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T08:05:47.996Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "It's Daniel, and I'd like Thursday afternoon if you have it.",
+      "caller_audio_ms": 3120,
+      "asr_hypothesis": "it's daniel and i'd like thursday afternoon if you have it",
+      "agent_text": "thursday afternoon i can't complete that myself on the call but i can pass it to the team to action and confirm back to you",
+      "agent_audio_ms": 6599,
+      "ttfb_ms": 2087,
+      "turn_ms": 8687,
+      "eou_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    },
+    {
+      "caller_says": "What day did I ask for?",
+      "caller_audio_ms": 1360,
+      "asr_hypothesis": "what day did i ask for",
+      "agent_text": "you asked for thursday",
+      "agent_audio_ms": 422,
+      "ttfb_ms": 1695,
+      "turn_ms": 2117,
+      "eou_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

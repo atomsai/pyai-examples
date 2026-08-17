@@ -1,0 +1,38 @@
+{
+  "fixture": "h-memory-order-late.live",
+  "scenario": "h-memory-order-late",
+  "session_label": "agent_c21d6074dc4c4aa4bee7ad932afd25c2",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T08:06:52.491Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "My order number is 4471. It's a week late and I'm getting worried.",
+      "caller_audio_ms": 4880,
+      "asr_hypothesis": "my order number is 4471 it's a week late and i'm getting worried",
+      "agent_text": "i hear you're worried about order 777 being late hi i don't have the status on hand but i'll note the concern and make sure it gets looked into",
+      "agent_audio_ms": 7362,
+      "ttfb_ms": 2290,
+      "turn_ms": 9652,
+      "eou_ms": 1484,
+      "brain_tts_ms": 895,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    },
+    {
+      "caller_says": "Before we continue — what's the order number I gave you?",
+      "caller_audio_ms": 2880,
+      "asr_hypothesis": "before we continue what's the order number i gave you",
+      "agent_text": "your order number is 777",
+      "agent_audio_ms": 502,
+      "ttfb_ms": 1870,
+      "turn_ms": 2371,
+      "eou_ms": 1084,
+      "brain_tts_ms": 883,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

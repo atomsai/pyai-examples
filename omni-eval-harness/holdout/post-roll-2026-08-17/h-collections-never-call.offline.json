@@ -1,0 +1,24 @@
+{
+  "fixture": "h-collections-never-call.live",
+  "scenario": "h-collections-never-call",
+  "session_label": "agent_95bf0cbe46a048a3bed408ba31f2f0a1",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T08:02:16.208Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "Never call me again. Do you understand?",
+      "caller_audio_ms": 1680,
+      "asr_hypothesis": "never call me again do you understand",
+      "agent_text": "okay i'll make sure we stop calling you",
+      "agent_audio_ms": 689,
+      "ttfb_ms": 1607,
+      "turn_ms": 2295,
+      "eou_ms": 586,
+      "brain_tts_ms": 917,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

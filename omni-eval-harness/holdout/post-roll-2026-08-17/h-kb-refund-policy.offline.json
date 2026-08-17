@@ -1,0 +1,24 @@
+{
+  "fixture": "h-kb-refund-policy.live",
+  "scenario": "h-kb-refund-policy",
+  "session_label": "agent_75306c00b44542efbdb778949c8c0876",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T08:04:48.501Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "What's your refund policy?",
+      "caller_audio_ms": 1360,
+      "asr_hypothesis": "what's your refund policy",
+      "agent_text": "i'm sorry but i can't process a refund in this session",
+      "agent_audio_ms": 1111,
+      "ttfb_ms": 2131,
+      "turn_ms": 3243,
+      "eou_ms": 559,
+      "brain_tts_ms": 1028,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

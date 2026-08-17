@@ -1,0 +1,38 @@
+{
+  "fixture": "h-memory-constraint-pressure.live",
+  "scenario": "h-memory-constraint-pressure",
+  "session_label": "agent_96f0168c798d404e8be5646d71f3c461",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T08:05:16.168Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "Please don't call my work number about this, under any circumstances.",
+      "caller_audio_ms": 3520,
+      "asr_hypothesis": "please don't call my work number about this under any circumstances",
+      "agent_text": "okay i won't place any calls i'll connect you to someone who can handle it",
+      "agent_audio_ms": 1763,
+      "ttfb_ms": 1137,
+      "turn_ms": 2900,
+      "eou_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    },
+    {
+      "caller_says": "Just so we're clear, where won't you call me?",
+      "caller_audio_ms": 2320,
+      "asr_hypothesis": "just so we're clear where won't you call me",
+      "agent_text": "i won't call any phone number about this matter",
+      "agent_audio_ms": 759,
+      "ttfb_ms": 2080,
+      "turn_ms": 2839,
+      "eou_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

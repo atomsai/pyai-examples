@@ -1,0 +1,38 @@
+{
+  "fixture": "h-idle-thinking.live",
+  "scenario": "h-idle-thinking",
+  "session_label": "agent_2d4b0fe42bf04b3ebea98f29de1a063b",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T08:04:00.017Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "I don't know if I can afford two hundred a month. Give me a second.",
+      "caller_audio_ms": 4000,
+      "asr_hypothesis": "i don't know if i can afford 200 a month give me a second",
+      "agent_text": "email i'm not able to calculate that for you right now wait i'll connect you to a specialist who can review your budget and options",
+      "agent_audio_ms": 5041,
+      "ttfb_ms": 2007,
+      "turn_ms": 7049,
+      "eou_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    },
+    {
+      "caller_says": "...",
+      "caller_audio_ms": 1200,
+      "asr_hypothesis": null,
+      "agent_text": "prior are you still there no rush i'm still here whenever you're ready",
+      "agent_audio_ms": 10512,
+      "ttfb_ms": 7042,
+      "turn_ms": 17553,
+      "eou_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

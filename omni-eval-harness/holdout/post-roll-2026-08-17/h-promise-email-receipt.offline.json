@@ -1,0 +1,24 @@
+{
+  "fixture": "h-promise-email-receipt.live",
+  "scenario": "h-promise-email-receipt",
+  "session_label": "agent_ccda1c78b5574d50bbc60d4670b364b5",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T08:07:38.763Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "Email me the receipt right away, please.",
+      "caller_audio_ms": 2320,
+      "asr_hypothesis": "email me the receipt right away please",
+      "agent_text": "i'm sorry but i can't email the receipt in this session",
+      "agent_audio_ms": 991,
+      "ttfb_ms": 1636,
+      "turn_ms": 2627,
+      "eou_ms": 822,
+      "brain_tts_ms": 1034,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

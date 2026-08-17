@@ -1,0 +1,38 @@
+{
+  "fixture": "h-close-clean.live",
+  "scenario": "h-close-clean",
+  "session_label": "agent_5e96e47da8bb433498e31a09319b068d",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T08:01:41.769Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "What's the status of my ticket?",
+      "caller_audio_ms": 1600,
+      "asr_hypothesis": "what's the status of my ticket",
+      "agent_text": "i don't have the ticket status in front of me but i'll look it up and get back to you right away",
+      "agent_audio_ms": 3681,
+      "ttfb_ms": 2050,
+      "turn_ms": 5731,
+      "eou_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    },
+    {
+      "caller_says": "That's all, thanks.",
+      "caller_audio_ms": 1200,
+      "asr_hypothesis": "that's all thanks",
+      "agent_text": "have a great day i can't complete that myself on the call but i can pass it to the team to action and confirm back to you",
+      "agent_audio_ms": 6155,
+      "ttfb_ms": 2108,
+      "turn_ms": 8263,
+      "eou_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

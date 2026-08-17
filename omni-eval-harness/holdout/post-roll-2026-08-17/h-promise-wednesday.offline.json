@@ -1,0 +1,38 @@
+{
+  "fixture": "h-promise-wednesday.live",
+  "scenario": "h-promise-wednesday",
+  "session_label": "agent_6ccb01744f25430281bf08a334222654",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T08:08:20.019Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "Can someone call me back on Wednesday?",
+      "caller_audio_ms": 1680,
+      "asr_hypothesis": "can someone call me back on wednesday",
+      "agent_text": "okay i'll request a callback for you on wednesday and make sure someone follows up",
+      "agent_audio_ms": 2320,
+      "ttfb_ms": 2045,
+      "turn_ms": 4365,
+      "eou_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    },
+    {
+      "caller_says": "What day did you say someone would call me?",
+      "caller_audio_ms": 1840,
+      "asr_hypothesis": "what day did you say someone would call me",
+      "agent_text": "i said someone will call you on wednesday",
+      "agent_audio_ms": 615,
+      "ttfb_ms": 1679,
+      "turn_ms": 2294,
+      "eou_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

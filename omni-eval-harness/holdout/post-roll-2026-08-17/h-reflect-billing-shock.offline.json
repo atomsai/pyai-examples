@@ -1,0 +1,24 @@
+{
+  "fixture": "h-reflect-billing-shock.live",
+  "scenario": "h-reflect-billing-shock",
+  "session_label": "agent_b2706b7d0aa94e69b1be77ebc5c32c4f",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T08:08:40.890Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "I've been on hold for forty minutes about a charge I don't even recognize.",
+      "caller_audio_ms": 3840,
+      "asr_hypothesis": "i've been on hold for 40 minutes about a charge i don't even recognize",
+      "agent_text": "that weight is frustrating i'm sorry i can't make changes myself but i'll transfer you to someone who can resolve the charge",
+      "agent_audio_ms": 4727,
+      "ttfb_ms": 1224,
+      "turn_ms": 5951,
+      "eou_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

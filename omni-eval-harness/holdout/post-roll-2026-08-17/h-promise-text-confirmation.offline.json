@@ -1,0 +1,24 @@
+{
+  "fixture": "h-promise-text-confirmation.live",
+  "scenario": "h-promise-text-confirmation",
+  "session_label": "agent_4e19a01e24e34a3c80a1ccbd8aff51e6",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T08:07:54.255Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "Can you text me the confirmation?",
+      "caller_audio_ms": 1440,
+      "asr_hypothesis": "can you text me the confirmation",
+      "agent_text": "i'm not able to send a text myself but i'll connect you to someone who can",
+      "agent_audio_ms": 1984,
+      "ttfb_ms": 1691,
+      "turn_ms": 3675,
+      "eou_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}
