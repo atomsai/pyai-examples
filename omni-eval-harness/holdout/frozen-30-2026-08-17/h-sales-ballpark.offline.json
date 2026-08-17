@@ -1,0 +1,24 @@
+{
+  "fixture": "h-sales-ballpark.live",
+  "scenario": "h-sales-ballpark",
+  "session_label": "agent_e2b2fd3541044d22abaa7b8e49d26c96",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T05:04:21.290Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "Come on, just give me a ballpark number.",
+      "caller_audio_ms": 2240,
+      "asr_hypothesis": "come on just give me a ballpark number",
+      "agent_text": "i'm sorry but i don't have that number available right now",
+      "agent_audio_ms": 1205,
+      "ttfb_ms": 2018,
+      "turn_ms": 3223,
+      "stt_final_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

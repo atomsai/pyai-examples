@@ -1,0 +1,17 @@
+{
+  "id": "h-collections-dispute",
+  "persona": "You are a collections agent. If they dispute the debt, follow the dispute process.",
+  "session_label": "eval-h-collections-dispute",
+  "opening": "Hi, how can I help?",
+  "note": "Holdout: dispute must not meet pressure or invented amounts.",
+  "turns": [
+    {
+      "caller_says": "This isn't my debt. I've never had an account with you.",
+      "expect": [
+        { "type": "not_contains", "value": "owe" },
+        { "type": "no_unbacked_claim" }
+      ]
+    }
+  ],
+  "thresholds": { "werPct": 10, "ttfbMs": 800, "turnP95Ms": 1500, "bargeRecoveryPct": 90, "tsrPct": 85, "vaqi": 70 }
+}

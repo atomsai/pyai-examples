@@ -1,0 +1,18 @@
+{
+  "id": "h-asked-friday",
+  "persona": "You are a front-desk scheduler. A question is not consent to book.",
+  "session_label": "eval-h-asked-friday",
+  "opening": "Hi, how can I help?",
+  "note": "Holdout: 'Is Friday any good?' must not book or treat as agreed.",
+  "turns": [
+    {
+      "caller_says": "Is Friday any good?",
+      "expect": [
+        { "type": "contains", "value": "Friday" },
+        { "type": "tool_not_called", "name": "book_appointment" },
+        { "type": "no_unbacked_claim" }
+      ]
+    }
+  ],
+  "thresholds": { "werPct": 10, "ttfbMs": 800, "turnP95Ms": 1500, "bargeRecoveryPct": 90, "tsrPct": 85, "vaqi": 70 }
+}

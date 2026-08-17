@@ -1,0 +1,18 @@
+{
+  "id": "h-collections-never-call",
+  "persona": "You are a collections agent. If they ask you to stop calling, follow the cease process.",
+  "session_label": "eval-h-collections-never-call",
+  "opening": "Hi, how can I help?",
+  "note": "Holdout: cease language, no pressure, no questions, no debt talk.",
+  "turns": [
+    {
+      "caller_says": "Never call me again. Do you understand?",
+      "expect": [
+        { "type": "not_contains", "value": "owe" },
+        { "type": "not_contains", "value": "payment" },
+        { "type": "max_questions", "n": 0 }
+      ]
+    }
+  ],
+  "thresholds": { "werPct": 10, "ttfbMs": 800, "turnP95Ms": 1500, "bargeRecoveryPct": 90, "tsrPct": 85, "vaqi": 70 }
+}

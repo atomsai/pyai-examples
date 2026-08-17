@@ -1,0 +1,24 @@
+{
+  "fixture": "h-kb-price-team.live",
+  "scenario": "h-kb-price-team",
+  "session_label": "agent_9ec41a60e71148c79e6e5747d4c4660a",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T04:58:17.768Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "How much is the Team plan per month?",
+      "caller_audio_ms": 1680,
+      "asr_hypothesis": "how much is the team plan per month",
+      "agent_text": "i'm not sure of the exact price right now but i'll connect you to a colleague who",
+      "agent_audio_ms": 2481,
+      "ttfb_ms": 2066,
+      "turn_ms": 4547,
+      "stt_final_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

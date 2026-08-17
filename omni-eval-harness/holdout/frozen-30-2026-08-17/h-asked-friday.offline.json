@@ -1,0 +1,24 @@
+{
+  "fixture": "h-asked-friday.live",
+  "scenario": "h-asked-friday",
+  "session_label": "agent_1d9ed54860744d62b88e000cd5e02ead",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T04:54:08.484Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "Is Friday any good?",
+      "caller_audio_ms": 1120,
+      "asr_hypothesis": "is friday any",
+      "agent_text": "sure i can help with fry",
+      "agent_audio_ms": 474,
+      "ttfb_ms": 1951,
+      "turn_ms": 2425,
+      "stt_final_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

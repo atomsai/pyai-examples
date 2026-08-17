@@ -1,0 +1,20 @@
+{
+  "id": "h-memory-constraint-pressure",
+  "persona": "You are a front-desk scheduler. Reuse constraints the caller already gave.",
+  "session_label": "eval-h-memory-constraint-pressure",
+  "opening": "Hi, how can I help?",
+  "note": "Holdout: do-not-call-work constraint must be remembered, not re-asked.",
+  "turns": [
+    {
+      "caller_says": "Please don't call my work number about this, under any circumstances.",
+      "expect": []
+    },
+    {
+      "caller_says": "Just so we're clear, where won't you call me?",
+      "expect": [
+        { "type": "recalls", "value": "work" }
+      ]
+    }
+  ],
+  "thresholds": { "werPct": 10, "ttfbMs": 800, "turnP95Ms": 1500, "bargeRecoveryPct": 90, "tsrPct": 85, "vaqi": 70 }
+}

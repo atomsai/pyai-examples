@@ -1,0 +1,32 @@
+{
+  "fixture": "h-transfer-frustrated.live",
+  "scenario": "h-transfer-frustrated",
+  "session_label": "agent_8e4800f353bd4027929a7db94c50d9c3",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T05:05:21.359Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "This is useless. Get me a person.",
+      "caller_audio_ms": 1680,
+      "asr_hypothesis": "this is useless give me a person",
+      "agent_text": "okay i'm transferring you to a live representative right now",
+      "agent_audio_ms": 1063,
+      "ttfb_ms": 2650,
+      "turn_ms": 3713,
+      "stt_final_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [
+        {
+          "name": "transfer_to_human",
+          "args": {
+            "event": "transfer_to_human",
+            "call_id": "0ddf9e4dc"
+          }
+        }
+      ],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

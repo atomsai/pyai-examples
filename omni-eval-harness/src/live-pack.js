@@ -41,6 +41,8 @@ export function runResultToFixture(run, scenarioId) {
       agent_audio_ms: t.agentAudioMs ?? t.agent_audio_ms ?? null,
       ttfb_ms: t.ttfbMs ?? t.ttfb_ms ?? null,
       turn_ms: t.turnMs ?? t.turn_ms ?? null,
+      eou_ms: t.sttFinalMs ?? t.eou_ms ?? null,
+      brain_tts_ms: t.brainTtsMs ?? t.brain_tts_ms ?? null,
       tool_calls: t.toolCalls ?? t.tool_calls ?? [],
       barge_in: t.bargeIn ?? t.barge_in ?? null,
       kb: t.kb ?? null,

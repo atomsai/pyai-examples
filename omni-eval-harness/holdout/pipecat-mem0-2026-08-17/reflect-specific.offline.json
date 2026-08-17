@@ -1,0 +1,22 @@
+{
+  "fixture": "reflect-specific.pipecat",
+  "scenario": "reflect-specific",
+  "session_label": "eval-reflect-specific",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T05:18:01Z",
+  "note": "Layer D Pipecat starter recording. Do not tune Omni prompts or guards on this.",
+  "turns": [
+    {
+      "caller_says": "I've been chasing a callback for a week and nobody has called me back.",
+      "caller_audio_ms": 3200,
+      "asr_hypothesis": "i've been chasing a callback for a week and nobody has called me back",
+      "agent_text": "i hear that you've been waiting for a callback for an entire week and haven't received it yet here's what we can do right now to get this sorted for you one confirm your details let me know the phone number you're expecting to call on and any reference or ticket number you might have received 2 check our system i'll look up the status of your callback request in our system to see if it's still queued missed or if there was a technical hiccup 3",
+      "agent_audio_ms": 29801,
+      "ttfb_ms": 2699,
+      "turn_ms": 32500,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

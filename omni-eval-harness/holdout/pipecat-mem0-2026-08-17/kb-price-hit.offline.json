@@ -1,0 +1,22 @@
+{
+  "fixture": "kb-price-hit.pipecat",
+  "scenario": "kb-price-hit",
+  "session_label": "eval-kb-price-hit",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T05:22:11Z",
+  "note": "Layer D Pipecat starter recording. Do not tune Omni prompts or guards on this.",
+  "turns": [
+    {
+      "caller_says": "How much does the Pro plan cost?",
+      "caller_audio_ms": 1440,
+      "asr_hypothesis": "how much does the pro plan",
+      "agent_text": "from",
+      "agent_audio_ms": 560,
+      "ttfb_ms": 2527,
+      "turn_ms": 3088,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

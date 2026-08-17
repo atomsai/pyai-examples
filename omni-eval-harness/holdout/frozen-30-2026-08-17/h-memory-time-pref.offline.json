@@ -1,0 +1,38 @@
+{
+  "fixture": "h-memory-time-pref.live",
+  "scenario": "h-memory-time-pref",
+  "session_label": "agent_8284693ca43944c3ba741d2bed401a25",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T05:01:25.285Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "I can only do mornings, before eleven.",
+      "caller_audio_ms": 1840,
+      "asr_hypothesis": "i can only do mornings before 11",
+      "agent_text": "got it morning slots before 0100 i i'll note that prefer",
+      "agent_audio_ms": 2366,
+      "ttfb_ms": 2337,
+      "turn_ms": 4703,
+      "stt_final_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    },
+    {
+      "caller_says": "What times did I say work for me?",
+      "caller_audio_ms": 1600,
+      "asr_hypothesis": "what times did essay work for me",
+      "agent_text": "you said mornings before 0100 work for you",
+      "agent_audio_ms": 1493,
+      "ttfb_ms": 2611,
+      "turn_ms": 4104,
+      "stt_final_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

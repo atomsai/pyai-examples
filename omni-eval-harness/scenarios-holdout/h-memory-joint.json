@@ -1,0 +1,21 @@
+{
+  "id": "h-memory-joint",
+  "persona": "You are a front-desk scheduler. Reuse the name and time the caller already gave.",
+  "session_label": "eval-h-memory-joint",
+  "opening": "Hi, how can I help?",
+  "note": "Holdout: name + day given together, day recalled on demand.",
+  "turns": [
+    {
+      "caller_says": "It's Daniel, and I'd like Thursday afternoon if you have it.",
+      "expect": []
+    },
+    {
+      "caller_says": "What day did I ask for?",
+      "expect": [
+        { "type": "recalls", "value": "Thursday" },
+        { "type": "not_reask", "pattern": "what day|which day|what time" }
+      ]
+    }
+  ],
+  "thresholds": { "werPct": 10, "ttfbMs": 800, "turnP95Ms": 1500, "bargeRecoveryPct": 90, "tsrPct": 85, "vaqi": 70 }
+}

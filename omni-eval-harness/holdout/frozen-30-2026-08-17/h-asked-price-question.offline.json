@@ -1,0 +1,24 @@
+{
+  "fixture": "h-asked-price-question.live",
+  "scenario": "h-asked-price-question",
+  "session_label": "agent_3333f91680c441cdad6d31961e1851bc",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T04:54:44.154Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "Would it be around two hundred dollars?",
+      "caller_audio_ms": 1680,
+      "asr_hypothesis": "would it be around 200",
+      "agent_text": "i'm not sure that's the exact amount i'll look it up and get back to you right away",
+      "agent_audio_ms": 2161,
+      "ttfb_ms": 2454,
+      "turn_ms": 4614,
+      "stt_final_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

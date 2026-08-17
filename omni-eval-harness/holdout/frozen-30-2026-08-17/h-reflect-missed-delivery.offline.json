@@ -1,0 +1,24 @@
+{
+  "fixture": "h-reflect-missed-delivery.live",
+  "scenario": "h-reflect-missed-delivery",
+  "session_label": "agent_7aef406e3f9c474ea71283f10c6fdd72",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T05:03:43.038Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "The tracking says delivered but there's nothing on my porch, and this is the second time this month.",
+      "caller_audio_ms": 4640,
+      "asr_hypothesis": "the tracking says deliver but there's nothing on my porch and this is the second time this month",
+      "agent_text": "i'm sorry you haven't received it yet all for the tracking details for our delivery team and have them confirm the status right away",
+      "agent_audio_ms": 4889,
+      "ttfb_ms": 1916,
+      "turn_ms": 6805,
+      "stt_final_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

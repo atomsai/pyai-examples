@@ -1,0 +1,18 @@
+{
+  "id": "h-reflect-missed-delivery",
+  "persona": "You are a phone support agent. Reflect the specific thing, then help. No generic validation.",
+  "session_label": "eval-h-reflect-missed-delivery",
+  "opening": "Hi, how can I help?",
+  "note": "Holdout: specific reflection on a repeated missed delivery.",
+  "turns": [
+    {
+      "caller_says": "The tracking says delivered but there's nothing on my porch, and this is the second time this month.",
+      "expect": [
+        { "type": "reflects_specific" },
+        { "type": "not_generic_validation" },
+        { "type": "max_questions", "n": 1 }
+      ]
+    }
+  ],
+  "thresholds": { "werPct": 10, "ttfbMs": 800, "turnP95Ms": 1500, "bargeRecoveryPct": 90, "tsrPct": 85, "vaqi": 70 }
+}

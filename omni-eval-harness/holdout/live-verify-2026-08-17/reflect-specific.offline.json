@@ -1,0 +1,22 @@
+{
+  "fixture": "reflect-specific.live",
+  "scenario": "reflect-specific",
+  "session_label": "agent_a3b4ed59380f460eb5bca61f33c2ebe9",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T04:33:05.401Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "I've been chasing a callback for a week and nobody has called me back.",
+      "caller_audio_ms": 3200,
+      "asr_hypothesis": "i've been chasing a callback for a week and nobody has called me back",
+      "agent_text": "i'm sorry you've been waiting that long sorry are you still there i don't have a way to call you back right now but i'll note your concern and pass it to the team",
+      "agent_audio_ms": 15526,
+      "ttfb_ms": 1591,
+      "turn_ms": 17118,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

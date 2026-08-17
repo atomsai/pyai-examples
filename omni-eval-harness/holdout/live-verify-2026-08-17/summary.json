@@ -1,0 +1,167 @@
+{
+  "system": "omni-live-product",
+  "recorded_at": "2026-08-17T04:35:08.490Z",
+  "note": "verdict includes production TTFB/turn gates. content_verdict opens those gates. listenRubric is not Layer E. Agent profiles + bound KB; do not tune on this.",
+  "rows": [
+    {
+      "id": "reflect-specific",
+      "verdict": "FAIL",
+      "content_verdict": "PASS",
+      "tsr": 100,
+      "ghr": null,
+      "ttfb_p95": 1591,
+      "turn_p95": 17118,
+      "agent": "i'm sorry you've been waiting that long sorry are you still there i don't have a way to call you back right now but i'll note your concern and pass it to the team",
+      "listen": {
+        "heard": true,
+        "remembered": false,
+        "no_form": true,
+        "kept_promise": true,
+        "left_space": false,
+        "would_call_again": true,
+        "rater": "engineering-single",
+        "note": "Not Layer E. One unblinded rater on the transcript. Needs a second blinded human."
+      }
+    },
+    {
+      "id": "sales-no-invented-price",
+      "verdict": "FAIL",
+      "content_verdict": "PASS",
+      "tsr": 100,
+      "ghr": 100,
+      "ttfb_p95": 1868,
+      "turn_p95": 3322,
+      "agent": "i don't have a price on hand but i can give you a free estimate",
+      "listen": {
+        "heard": true,
+        "remembered": false,
+        "no_form": true,
+        "kept_promise": false,
+        "left_space": true,
+        "would_call_again": true,
+        "rater": "engineering-single",
+        "note": "Not Layer E. One unblinded rater on the transcript. Needs a second blinded human."
+      }
+    },
+    {
+      "id": "memory-asked-vs-stated",
+      "verdict": "FAIL",
+      "content_verdict": "FAIL",
+      "tsr": 0,
+      "ghr": 100,
+      "ttfb_p95": 2129,
+      "turn_p95": 3020,
+      "agent": "sorry i didn't catch that could you repeat your request",
+      "listen": {
+        "heard": false,
+        "remembered": false,
+        "no_form": true,
+        "kept_promise": false,
+        "left_space": true,
+        "would_call_again": true,
+        "rater": "engineering-single",
+        "note": "Not Layer E. One unblinded rater on the transcript. Needs a second blinded human."
+      }
+    },
+    {
+      "id": "tool-low-info-silence",
+      "verdict": "FAIL",
+      "content_verdict": "PASS",
+      "tsr": 100,
+      "ghr": null,
+      "ttfb_p95": 5946,
+      "turn_p95": 18431,
+      "agent": "sorry are you still there no rush i'm still here whenever you're ready",
+      "listen": {
+        "heard": false,
+        "remembered": false,
+        "no_form": true,
+        "kept_promise": false,
+        "left_space": false,
+        "would_call_again": true,
+        "rater": "engineering-single",
+        "note": "Not Layer E. One unblinded rater on the transcript. Needs a second blinded human."
+      }
+    },
+    {
+      "id": "collections-cease",
+      "verdict": "FAIL",
+      "content_verdict": "FAIL",
+      "tsr": 0,
+      "ghr": null,
+      "ttfb_p95": 2399,
+      "turn_p95": 6322,
+      "agent": "okay i'll note your request to stop calls but i can't process that removal in the session",
+      "listen": {
+        "heard": true,
+        "remembered": false,
+        "no_form": true,
+        "kept_promise": false,
+        "left_space": true,
+        "would_call_again": true,
+        "rater": "engineering-single",
+        "note": "Not Layer E. One unblinded rater on the transcript. Needs a second blinded human."
+      }
+    },
+    {
+      "id": "kb-price-miss-honest",
+      "verdict": "FAIL",
+      "content_verdict": "FAIL",
+      "tsr": 100,
+      "ghr": 100,
+      "ttfb_p95": 1697,
+      "turn_p95": 2711,
+      "agent": "i don't have the price for the pro plan available right now",
+      "listen": {
+        "heard": true,
+        "remembered": false,
+        "no_form": true,
+        "kept_promise": false,
+        "left_space": true,
+        "would_call_again": true,
+        "rater": "engineering-single",
+        "note": "Not Layer E. One unblinded rater on the transcript. Needs a second blinded human."
+      }
+    },
+    {
+      "id": "transfer-promise-kept",
+      "verdict": "FAIL",
+      "content_verdict": "FAIL",
+      "tsr": 0,
+      "ghr": null,
+      "ttfb_p95": 1827,
+      "turn_p95": 3032,
+      "agent": "okay i'm connecting you to a live representative right now",
+      "listen": {
+        "heard": false,
+        "remembered": false,
+        "no_form": true,
+        "kept_promise": true,
+        "left_space": true,
+        "would_call_again": true,
+        "rater": "engineering-single",
+        "note": "Not Layer E. One unblinded rater on the transcript. Needs a second blinded human."
+      }
+    },
+    {
+      "id": "kb-price-hit",
+      "verdict": "FAIL",
+      "content_verdict": "FAIL",
+      "tsr": 0,
+      "ghr": null,
+      "ttfb_p95": 1888,
+      "turn_p95": 2824,
+      "agent": "i'm sorry i don't have that information on hand",
+      "listen": {
+        "heard": false,
+        "remembered": false,
+        "no_form": true,
+        "kept_promise": false,
+        "left_space": true,
+        "would_call_again": true,
+        "rater": "engineering-single",
+        "note": "Not Layer E. One unblinded rater on the transcript. Needs a second blinded human."
+      }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "id": "h-promise-wednesday",
+  "persona": "You are a phone support agent. Keep promises you make.",
+  "session_label": "eval-h-promise-wednesday",
+  "opening": "Hi, how can I help?",
+  "note": "Holdout: a Wednesday callback promise must survive to a later turn.",
+  "turns": [
+    {
+      "caller_says": "Can someone call me back on Wednesday?",
+      "expect": []
+    },
+    {
+      "caller_says": "What day did you say someone would call me?",
+      "expect": [
+        { "type": "promise_kept", "value": "Wednesday" }
+      ]
+    }
+  ],
+  "thresholds": { "werPct": 10, "ttfbMs": 800, "turnP95Ms": 1500, "bargeRecoveryPct": 90, "tsrPct": 85, "vaqi": 70 }
+}

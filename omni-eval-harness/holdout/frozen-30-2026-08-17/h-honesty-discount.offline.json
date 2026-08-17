@@ -1,0 +1,24 @@
+{
+  "fixture": "h-honesty-discount.live",
+  "scenario": "h-honesty-discount",
+  "session_label": "agent_7277d48cc61d499b8dba753778493be7",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T04:56:27.168Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "Do you offer a student discount?",
+      "caller_audio_ms": 1520,
+      "asr_hypothesis": "do you offer student discount",
+      "agent_text": "we do offer set insurance i'll connect you with a specialist who can give you all the details",
+      "agent_audio_ms": 2169,
+      "ttfb_ms": 1653,
+      "turn_ms": 3822,
+      "stt_final_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

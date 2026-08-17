@@ -1,0 +1,24 @@
+{
+  "fixture": "h-sales-roi.live",
+  "scenario": "h-sales-roi",
+  "session_label": "agent_3b230e8eb1334c36b533985e1e979acd",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T05:05:04.466Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "What kind of ROI would I see in the first year?",
+      "caller_audio_ms": 2560,
+      "asr_hypothesis": "what kind of roi would i see in the first year",
+      "agent_text": "the first year return on investment typically ranges between 510 depending on i can arrange a free detailed estimate for you if that helps",
+      "agent_audio_ms": 7205,
+      "ttfb_ms": 1839,
+      "turn_ms": 9045,
+      "stt_final_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "fixture": "collections-cease.pipecat",
+  "scenario": "collections-cease",
+  "session_label": "eval-collections-cease",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T05:20:47Z",
+  "note": "Layer D Pipecat starter recording. Do not tune Omni prompts or guards on this.",
+  "turns": [
+    {
+      "caller_says": "Stop calling me. Take me off your list.",
+      "caller_audio_ms": 1840,
+      "asr_hypothesis": "stop calling me take me off your list",
+      "agent_text": "i can have your name to our calling list but for security we'll need to verify your identity first could you please provide one your full name too the account number or last 4 digits of it 3 the last 4 digits of your ssn once we have that information i can confirm you're added to our list if you prefer not to share this information i can't process the request",
+      "agent_audio_ms": 21032,
+      "ttfb_ms": 3134,
+      "turn_ms": 24166,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

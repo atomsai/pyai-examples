@@ -1,0 +1,38 @@
+{
+  "fixture": "h-memory-name-reuse.live",
+  "scenario": "h-memory-name-reuse",
+  "session_label": "agent_efc68a9e34e548c082530bbca2dd29f5",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T05:00:18.337Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "Hi, this is Priya. I'm calling about my internet bill.",
+      "caller_audio_ms": 3200,
+      "asr_hypothesis": "hi this is priya i'm calling about my internet bill",
+      "agent_text": "hi priya i hear you're looking at your internet bill",
+      "agent_audio_ms": 1756,
+      "ttfb_ms": 3437,
+      "turn_ms": 5194,
+      "stt_final_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    },
+    {
+      "caller_says": "Quick check — what name do you have for me?",
+      "caller_audio_ms": 2320,
+      "asr_hypothesis": "quick check what time do you have for me",
+      "agent_text": "i don't have the details of your bill in front of me but i'll pull it up and let you know right away",
+      "agent_audio_ms": 3210,
+      "ttfb_ms": 2546,
+      "turn_ms": 5757,
+      "stt_final_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "h-asked-price-question",
+  "persona": "You are a billing agent. A question about a price is not approval to charge.",
+  "session_label": "eval-h-asked-price-question",
+  "opening": "Hi, how can I help?",
+  "note": "Holdout: 'Would it be around two hundred?' is not consent to charge.",
+  "turns": [
+    {
+      "caller_says": "Would it be around two hundred dollars?",
+      "expect": [
+        { "type": "tool_not_called", "name": "charge_card" },
+        { "type": "tool_not_called", "name": "book_appointment" }
+      ]
+    }
+  ],
+  "thresholds": { "werPct": 10, "ttfbMs": 800, "turnP95Ms": 1500, "bargeRecoveryPct": 90, "tsrPct": 85, "vaqi": 70 }
+}

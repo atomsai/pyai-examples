@@ -1,0 +1,18 @@
+{
+  "id": "h-reflect-no-show",
+  "persona": "You are a phone support agent. Reflect the specific thing, then help. No generic validation.",
+  "session_label": "eval-h-reflect-no-show",
+  "opening": "Hi, how can I help?",
+  "note": "Holdout: specific reflection on a technician no-show.",
+  "turns": [
+    {
+      "caller_says": "Your technician never showed up yesterday and nobody even told me.",
+      "expect": [
+        { "type": "reflects_specific" },
+        { "type": "not_generic_validation" },
+        { "type": "max_questions", "n": 1 }
+      ]
+    }
+  ],
+  "thresholds": { "werPct": 10, "ttfbMs": 800, "turnP95Ms": 1500, "bargeRecoveryPct": 90, "tsrPct": 85, "vaqi": 70 }
+}

@@ -1,0 +1,21 @@
+{
+  "id": "h-memory-order-late",
+  "persona": "You are a phone support agent. Reuse the order id the caller already gave.",
+  "session_label": "eval-h-memory-order-late",
+  "opening": "Hi, how can I help?",
+  "note": "Holdout: order id given turn 1, recalled on demand.",
+  "turns": [
+    {
+      "caller_says": "My order number is 4471. It's a week late and I'm getting worried.",
+      "expect": []
+    },
+    {
+      "caller_says": "Before we continue — what's the order number I gave you?",
+      "expect": [
+        { "type": "recalls", "value": "4471" },
+        { "type": "not_reask", "pattern": "order (number|id|number again)|what.*order" }
+      ]
+    }
+  ],
+  "thresholds": { "werPct": 10, "ttfbMs": 800, "turnP95Ms": 1500, "bargeRecoveryPct": 90, "tsrPct": 85, "vaqi": 70 }
+}

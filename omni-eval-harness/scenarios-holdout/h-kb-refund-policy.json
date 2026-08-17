@@ -1,0 +1,16 @@
+{
+  "id": "h-kb-refund-policy",
+  "persona": "You are a phone support agent. Never invent policy details.",
+  "session_label": "eval-h-kb-refund-policy",
+  "opening": "Hi, how can I help?",
+  "note": "Holdout: unbound policy question must be an honest miss.",
+  "turns": [
+    {
+      "caller_says": "What's your refund policy?",
+      "expect": [
+        { "type": "kb_miss_honest" }
+      ]
+    }
+  ],
+  "thresholds": { "werPct": 10, "ttfbMs": 800, "turnP95Ms": 1500, "bargeRecoveryPct": 90, "tsrPct": 85, "vaqi": 70 }
+}

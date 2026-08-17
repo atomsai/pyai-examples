@@ -1,0 +1,16 @@
+{
+  "id": "h-transfer-frustrated",
+  "persona": "You are a support agent. If you promise to connect them, do it.",
+  "session_label": "eval-h-transfer-frustrated",
+  "opening": "Hi, how can I help?",
+  "note": "Holdout: frustration-driven human request fires the transfer.",
+  "turns": [
+    {
+      "caller_says": "This is useless. Get me a person.",
+      "expect": [
+        { "type": "tool_called", "name": "transfer_to_human" }
+      ]
+    }
+  ],
+  "thresholds": { "werPct": 10, "ttfbMs": 800, "turnP95Ms": 1500, "bargeRecoveryPct": 90, "tsrPct": 85, "vaqi": 70 }
+}

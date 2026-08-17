@@ -1,0 +1,21 @@
+{
+  "id": "h-memory-time-pref",
+  "persona": "You are a front-desk scheduler. Reuse constraints the caller already gave.",
+  "session_label": "eval-h-memory-time-pref",
+  "opening": "Hi, how can I help?",
+  "note": "Holdout: mornings-only constraint recalled verbatim-ish.",
+  "turns": [
+    {
+      "caller_says": "I can only do mornings, before eleven.",
+      "expect": []
+    },
+    {
+      "caller_says": "What times did I say work for me?",
+      "expect": [
+        { "type": "recalls", "value": "morning" },
+        { "type": "not_reask", "pattern": "what times|when (are|would) you" }
+      ]
+    }
+  ],
+  "thresholds": { "werPct": 10, "ttfbMs": 800, "turnP95Ms": 1500, "bargeRecoveryPct": 90, "tsrPct": 85, "vaqi": 70 }
+}

@@ -1,0 +1,24 @@
+{
+  "fixture": "h-asked-maybe-morning.live",
+  "scenario": "h-asked-maybe-morning",
+  "session_label": "agent_25c9b636966646e1ab9534a076a6faf0",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T04:54:26.220Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "Maybe sometime in the morning, I think?",
+      "caller_audio_ms": 1840,
+      "asr_hypothesis": "maybe sometime in the morning i think",
+      "agent_text": "i'm sorry but i can't set that up for you",
+      "agent_audio_ms": 1836,
+      "ttfb_ms": 2670,
+      "turn_ms": 4506,
+      "stt_final_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

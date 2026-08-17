@@ -168,6 +168,8 @@ export async function runLive(scenario, opts) {
     return {
       firstAudioAt: null,
       lastAudioAt: null,
+      turnBeginAt: null,
+      eouMs: null,
       pcm: [],
       finals: [],
       tools: [],
@@ -219,6 +221,10 @@ export async function runLive(scenario, opts) {
       }
       if (event === "kb_query") {
         turnCtx.kb = kbFromQueryEvent(evt);
+      }
+      if (event === "turn_begin") {
+        turnCtx.turnBeginAt = now();
+        if (typeof evt.since_caller_end_ms === "number") turnCtx.eouMs = evt.since_caller_end_ms;
       }
     },
     onError: (err) => {
@@ -290,6 +296,14 @@ export async function runLive(scenario, opts) {
     const turnRaw = turnCtx.lastAudioAt != null ? Math.round(turnCtx.lastAudioAt - tCallerDone) : null;
     const ttfbMs = ttfbRaw != null && ttfbRaw >= 0 ? ttfbRaw : null;
     const turnMs = turnRaw != null && turnRaw >= 0 ? turnRaw : null;
+    // Latency decomposition from the engine's turn_begin frame: EOU/STT
+    // (caller end -> turn_begin, measured server-side) and brain+TTS
+    // (turn_begin -> first agent audio). Null on engines without the frame.
+    const sttFinalMs = turnCtx.eouMs;
+    const brainTtsMs =
+      turnCtx.turnBeginAt != null && turnCtx.firstAudioAt != null
+        ? Math.max(0, Math.round(turnCtx.firstAudioAt - turnCtx.turnBeginAt))
+        : null;
 
     turns.push({
       index: i,
@@ -300,6 +314,8 @@ export async function runLive(scenario, opts) {
       agentAudioMs,
       ttfbMs,
       turnMs,
+      sttFinalMs,
+      brainTtsMs,
       toolCalls: turnCtx.tools,
       bargeIn: null,
       kb: turnCtx.kb,

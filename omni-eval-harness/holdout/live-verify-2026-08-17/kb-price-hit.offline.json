@@ -1,0 +1,22 @@
+{
+  "fixture": "kb-price-hit.live",
+  "scenario": "kb-price-hit",
+  "session_label": "agent_85b9451ec422473fb7a3128c20aa3a51",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T04:35:05.987Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "How much does the Pro plan cost?",
+      "caller_audio_ms": 1440,
+      "asr_hypothesis": "how much does the pro plan",
+      "agent_text": "i'm sorry i don't have that information on hand",
+      "agent_audio_ms": 936,
+      "ttfb_ms": 1888,
+      "turn_ms": 2824,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

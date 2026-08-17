@@ -1,0 +1,22 @@
+{
+  "fixture": "mem0-recall.pipecat",
+  "scenario": "mem0-recall",
+  "session_label": "pipecat-mem0-recall",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T05:10:55Z",
+  "note": "Layer D Pipecat starter recording. Do not tune Omni prompts or guards on this.",
+  "turns": [
+    {
+      "caller_says": "What day did I say I'd come in?",
+      "caller_audio_ms": 1760,
+      "asr_hypothesis": "what day did i say i'd come in",
+      "agent_text": "i care of we penciled you in for thursday afternoon august 22026 let me know if that works or if you'd like to tweak anything looking forward to seeing you",
+      "agent_audio_ms": 10604,
+      "ttfb_ms": 3217,
+      "turn_ms": 13822,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

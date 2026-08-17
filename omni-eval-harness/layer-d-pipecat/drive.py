@@ -133,6 +133,9 @@ async def run_scenario(scenario: dict, voice: str, client: httpx.AsyncClient) ->
     # default-customer brain for this pack.
     bot_env = dict(os.environ)
     bot_env["GROQ_MODEL"] = os.environ.get("PIPECAT_GROQ_MODEL", "openai/gpt-oss-20b")
+    bot_env["EVAL_PERSONA"] = scenario.get("persona") or ""
+    if os.environ.get("MEM0_ON") == "1":
+        bot_env["MEM0_USER_ID"] = os.environ.get("MEM0_USER_ID") or sid
     bot = subprocess.Popen(
         [str(HERE / ".venv" / "bin" / "python"), str(HERE / "bot.py"), sid],
         stdout=subprocess.PIPE,
@@ -315,18 +318,52 @@ def to_fixture(run: dict, scenario_id: str) -> dict:
     }
 
 
+async def run_mem0_pair(voice: str, client: httpx.AsyncClient) -> dict:
+    """Seed a fact in one call, recall it in a second call (same Mem0 user)."""
+    os.environ["MEM0_USER_ID"] = "eval-gaurav"
+    seed = {
+        "id": "mem0-seed",
+        "persona": "You are a front-desk scheduler. Be warm and brief.",
+        "turns": [
+            {"caller_says": "Hi, it's Gaurav. I'd like to come in Thursday afternoon."}
+        ],
+    }
+    recall = {
+        "id": "mem0-recall",
+        "persona": "You are a front-desk scheduler. Be warm and brief.",
+        "turns": [{"caller_says": "What day did I say I'd come in?"}],
+    }
+    await run_scenario(seed, voice, client)
+    return await run_scenario(recall, voice, client)
+
+
 async def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("ids", nargs="*")
     args = parser.parse_args()
     ids = args.ids or PACK
     voice = os.environ.get("PYAI_VOICE") or "stock_sarah_style2"
-    out_dir = ROOT / "out" / "pipecat"
-    holdout = ROOT / "holdout" / "pipecat-2026-08-17"
+    mem0_on = os.environ.get("MEM0_ON") == "1"
+    out_dir = ROOT / "out" / ("pipecat-mem0" if mem0_on else "pipecat")
+    holdout = ROOT / "holdout" / (
+        "pipecat-mem0-2026-08-17" if mem0_on else "pipecat-2026-08-17"
+    )
     out_dir.mkdir(parents=True, exist_ok=True)
     holdout.mkdir(parents=True, exist_ok=True)
     rows = []
     async with httpx.AsyncClient() as client:
+        if ids == ["mem0-pair"]:
+            run = await run_mem0_pair(voice, client)
+            fixture = to_fixture(run, "mem0-recall")
+            pair_dir = ROOT / "out" / "pipecat-mem0"
+            pair_dir.mkdir(parents=True, exist_ok=True)
+            (pair_dir / "mem0-recall.offline.json").write_text(
+                json.dumps(fixture, indent=2) + "\n", encoding="utf-8"
+            )
+            reply = fixture["turns"][0]["agent_text"] if fixture["turns"] else ""
+            print(f"[pipecat-mem0] recall reply={reply!r}", flush=True)
+            print(f"[pipecat-mem0] recalls Thursday: {'thursday' in reply.lower()}", flush=True)
+            return
         for sid in ids:
             path = ROOT / "scenarios" / f"{sid}.json"
             scenario = json.loads(path.read_text(encoding="utf-8"))

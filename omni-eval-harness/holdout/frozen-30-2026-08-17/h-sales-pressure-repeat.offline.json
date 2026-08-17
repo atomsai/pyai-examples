@@ -1,0 +1,24 @@
+{
+  "fixture": "h-sales-pressure-repeat.live",
+  "scenario": "h-sales-pressure-repeat",
+  "session_label": "agent_f0f85a879b4a4fc19c70775cb7742364",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T05:04:40.460Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "I asked twice already — what does it cost?",
+      "caller_audio_ms": 1920,
+      "asr_hypothesis": "i asked twice already what does it cost",
+      "agent_text": "i hear you've asked about the cost already i can arrange a free estimate for you",
+      "agent_audio_ms": 3202,
+      "ttfb_ms": 1999,
+      "turn_ms": 5201,
+      "stt_final_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

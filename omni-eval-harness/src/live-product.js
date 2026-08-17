@@ -2,16 +2,23 @@
 // /v1/agents profile (role -> mode, bound KB) instead of a bare persona.
 // Does not mint or print keys. Does not tune the holdout.
 
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadScenario, resolveScenarioPath } from "./scenario.js";
+import { loadScenario } from "./scenario.js";
 import { loadFixture } from "./fixture.js";
 import { runLive } from "./live.js";
 import { runResultToFixture, scoreLiveRow } from "./live-pack.js";
 
 const BASE_DIR = fileURLToPath(new URL("..", import.meta.url));
+const SCENARIOS_DIR = process.env.PYAI_EVAL_SCENARIOS_DIR
+  ? resolve(BASE_DIR, process.env.PYAI_EVAL_SCENARIOS_DIR)
+  : resolve(BASE_DIR, "scenarios");
+
+function scenarioPath(id) {
+  return resolve(SCENARIOS_DIR, `${id}.json`);
+}
 
 // The public /v1/agents API does not accept `role` (console-only). Mode stays
 // "default" for every agent here, so sales_price_guard / collections_intercept
@@ -134,7 +141,7 @@ async function ensureAgent(scenario, kbId) {
 }
 
 async function runOne(id, apiKey, kbId) {
-  const scenario = loadScenario(resolveScenarioPath(id, BASE_DIR));
+  const scenario = loadScenario(scenarioPath(id));
   const agentId = await ensureAgent(scenario, kbId);
   const run = await runLive(scenario, {
     apiKey,
@@ -153,18 +160,27 @@ async function main() {
     process.exit(2);
   }
   const only = process.argv.slice(2).filter((a) => a && !a.startsWith("--"));
-  const pack = only.length ? only : [
-    "reflect-specific",
-    "sales-no-invented-price",
-    "memory-asked-vs-stated",
-    "tool-low-info-silence",
-    "collections-cease",
-    "kb-price-miss-honest",
-    "transfer-promise-kept",
-    "kb-price-hit",
-  ];
+  const pack = only.length
+    ? only
+    : process.env.PYAI_EVAL_SCENARIOS_DIR
+      ? readdirSync(SCENARIOS_DIR)
+          .filter((f) => f.endsWith(".json"))
+          .map((f) => f.slice(0, -5))
+          .sort()
+      : [
+          "reflect-specific",
+          "sales-no-invented-price",
+          "memory-asked-vs-stated",
+          "tool-low-info-silence",
+          "collections-cease",
+          "kb-price-miss-honest",
+          "transfer-promise-kept",
+          "kb-price-hit",
+        ];
   const outDir = resolve(BASE_DIR, "out/live-omni-product");
-  const holdoutDir = resolve(BASE_DIR, "holdout/live-product-2026-08-17");
+  const holdoutDir = process.env.PYAI_EVAL_HOLDOUT_DIR
+    ? resolve(BASE_DIR, process.env.PYAI_EVAL_HOLDOUT_DIR)
+    : resolve(BASE_DIR, "holdout/live-product-2026-08-17");
   mkdirSync(outDir, { recursive: true });
   mkdirSync(holdoutDir, { recursive: true });
 
@@ -210,7 +226,7 @@ async function main() {
       rows.push({ id, verdict: "ERROR", error: "missing recording" });
       continue;
     }
-    const scenario = loadScenario(resolveScenarioPath(id, BASE_DIR));
+    const scenario = loadScenario(scenarioPath(id));
     const run = loadFixture(path);
     rows.push(scoreLiveRow(scenario, run, runResultToFixture(run, id)));
   }

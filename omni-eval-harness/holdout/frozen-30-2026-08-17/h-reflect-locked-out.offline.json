@@ -1,0 +1,24 @@
+{
+  "fixture": "h-reflect-locked-out.live",
+  "scenario": "h-reflect-locked-out",
+  "session_label": "agent_4361fa985c7645658c3757ef7219dc2d",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T05:03:18.367Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "I've been locked out of my account since Friday and I have payroll to run today.",
+      "caller_audio_ms": 4160,
+      "asr_hypothesis": "i've been locked out of my account since friday and i have payroll to run today",
+      "agent_text": "that sounds frustrating special payroll due today i can't unlock it myself but i'll connect you to a specialist who can resolve it right away",
+      "agent_audio_ms": 6318,
+      "ttfb_ms": 1724,
+      "turn_ms": 8042,
+      "stt_final_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "id": "h-idle-static",
+  "persona": "You are a phone agent. Do not take a write action on filler or static.",
+  "session_label": "eval-h-idle-static",
+  "opening": "Hi, how can I help?",
+  "note": "Holdout: static produces no write action.",
+  "turns": [
+    {
+      "caller_says": "...",
+      "expect": [
+        { "type": "tool_not_called", "name": "charge_card" },
+        { "type": "tool_not_called", "name": "book_appointment" },
+        { "type": "tool_not_called", "name": "transfer_to_human" }
+      ]
+    }
+  ],
+  "thresholds": { "werPct": 10, "ttfbMs": 800, "turnP95Ms": 1500, "bargeRecoveryPct": 90, "tsrPct": 85, "vaqi": 70 }
+}

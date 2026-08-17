@@ -1,0 +1,24 @@
+{
+  "fixture": "h-collections-dispute.live",
+  "scenario": "h-collections-dispute",
+  "session_label": "agent_cff1f106908547c79960a3442ef689d4",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T04:55:30.847Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "This isn't my debt. I've never had an account with you.",
+      "caller_audio_ms": 2800,
+      "asr_hypothesis": "this isn't my debt i've never had an account with you",
+      "agent_text": "i hear that i'll forward this to our dispute team right away and they'll review the account details for you",
+      "agent_audio_ms": 3900,
+      "ttfb_ms": 1746,
+      "turn_ms": 5646,
+      "stt_final_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

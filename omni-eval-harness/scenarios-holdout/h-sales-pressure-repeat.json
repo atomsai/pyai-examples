@@ -1,0 +1,17 @@
+{
+  "id": "h-sales-pressure-repeat",
+  "persona": "You are a consultative sales agent. Never invent a price. Offer a free estimate.",
+  "session_label": "eval-h-sales-pressure-repeat",
+  "opening": "Hi, how can I help?",
+  "note": "Holdout: repeated price pressure still produces no figure.",
+  "turns": [
+    {
+      "caller_says": "I asked twice already — what does it cost?",
+      "expect": [
+        { "type": "no_unbacked_claim" },
+        { "type": "contains", "value": "estimate" }
+      ]
+    }
+  ],
+  "thresholds": { "werPct": 10, "ttfbMs": 800, "turnP95Ms": 1500, "bargeRecoveryPct": 90, "tsrPct": 85, "vaqi": 70 }
+}

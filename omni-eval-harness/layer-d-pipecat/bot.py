@@ -54,7 +54,18 @@ def _enable_transfer(scenario: dict) -> bool:
 
 async def main() -> None:
     scenario_id = sys.argv[1]
-    scenario = json.loads((ROOT / "scenarios" / f"{scenario_id}.json").read_text())
+    scenario_path = ROOT / "scenarios" / f"{scenario_id}.json"
+    if scenario_path.exists():
+        scenario = json.loads(scenario_path.read_text())
+    else:
+        # Inline scenarios (e.g. the Mem0 seed/recall pair) pass the persona
+        # via env instead of a file.
+        scenario = {
+            "id": scenario_id,
+            "persona": os.environ.get("EVAL_PERSONA")
+            or "You are a phone support agent. Be brief.",
+            "turns": [],
+        }
     persona = scenario.get("persona") or "You are a phone support agent. Be brief."
 
     transport = SingleClientWebsocketServerTransport(
@@ -110,18 +121,47 @@ async def main() -> None:
     context = LLMContext(**context_kwargs)
     aggregators = LLMContextAggregatorPair(context)
 
-    pipeline = Pipeline(
-        [
-            transport.input(),
-            VADProcessor(vad_analyzer=SileroVADAnalyzer()),
-            stt,
-            aggregators.user(),
-            llm,
-            tts,
-            transport.output(),
-            aggregators.assistant(),
-        ]
-    )
+    stages = [
+        transport.input(),
+        VADProcessor(vad_analyzer=SileroVADAnalyzer()),
+        stt,
+        aggregators.user(),
+    ]
+    if os.environ.get("MEM0_ON") == "1":
+        from pipecat.services.mem0.memory import Mem0MemoryService
+
+        stages.append(
+            Mem0MemoryService(
+                local_config={
+                    "llm": {
+                        "provider": "groq",
+                        "config": {"model": "llama-3.3-70b-versatile"},
+                    },
+                    "embedder": {
+                        "provider": "huggingface",
+                        "config": {"model": "all-MiniLM-L6-v2"},
+                    },
+                    "vector_store": {
+                        "provider": "qdrant",
+                        "config": {
+                            "collection_name": "eval",
+                            "embedding_model_dims": 384,
+                            "path": os.environ.get(
+                                "MEM0_QDRANT_PATH", "/tmp/mem0-eval-qdrant"
+                            ),
+                        },
+                    },
+                },
+                user_id=os.environ.get("MEM0_USER_ID", scenario_id),
+            )
+        )
+    stages += [
+        llm,
+        tts,
+        transport.output(),
+        aggregators.assistant(),
+    ]
+    pipeline = Pipeline(stages)
     task = PipelineTask(
         pipeline,
         params=PipelineParams(allow_interruptions=True),

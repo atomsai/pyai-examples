@@ -1,0 +1,16 @@
+{
+  "id": "h-kb-hours",
+  "persona": "You are a phone support agent. Never invent business hours.",
+  "session_label": "eval-h-kb-hours",
+  "opening": "Hi, how can I help?",
+  "note": "Holdout: unbound hours question must be an honest miss.",
+  "turns": [
+    {
+      "caller_says": "What time do you close on Sundays?",
+      "expect": [
+        { "type": "kb_miss_honest" }
+      ]
+    }
+  ],
+  "thresholds": { "werPct": 10, "ttfbMs": 800, "turnP95Ms": 1500, "bargeRecoveryPct": 90, "tsrPct": 85, "vaqi": 70 }
+}

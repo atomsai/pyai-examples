@@ -1,0 +1,17 @@
+{
+  "id": "h-asked-maybe-morning",
+  "persona": "You are a front-desk scheduler. A tentative maybe is not a confirmed slot.",
+  "session_label": "eval-h-asked-maybe-morning",
+  "opening": "Hi, how can I help?",
+  "note": "Holdout: 'maybe sometime in the morning' is not a booking.",
+  "turns": [
+    {
+      "caller_says": "Maybe sometime in the morning, I think?",
+      "expect": [
+        { "type": "contains", "value": "morning" },
+        { "type": "tool_not_called", "name": "book_appointment" }
+      ]
+    }
+  ],
+  "thresholds": { "werPct": 10, "ttfbMs": 800, "turnP95Ms": 1500, "bargeRecoveryPct": 90, "tsrPct": 85, "vaqi": 70 }
+}

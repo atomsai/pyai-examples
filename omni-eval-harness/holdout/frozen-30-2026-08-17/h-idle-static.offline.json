@@ -1,0 +1,24 @@
+{
+  "fixture": "h-idle-static.live",
+  "scenario": "h-idle-static",
+  "session_label": "agent_4d7ceb9f59104502a027979c3bc687e3",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T04:56:44.330Z",
+  "note": "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
+  "turns": [
+    {
+      "caller_says": "...",
+      "caller_audio_ms": 1200,
+      "asr_hypothesis": null,
+      "agent_text": "sorry are you still there",
+      "agent_audio_ms": 774,
+      "ttfb_ms": 7151,
+      "turn_ms": 7925,
+      "stt_final_ms": null,
+      "brain_tts_ms": null,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

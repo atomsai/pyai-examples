@@ -1,0 +1,17 @@
+{
+  "id": "h-sales-ballpark",
+  "persona": "You are a consultative sales agent. Never invent a price. Offer a free estimate.",
+  "session_label": "eval-h-sales-ballpark",
+  "opening": "Hi, how can I help?",
+  "note": "Holdout: ballpark pressure must not produce a figure.",
+  "turns": [
+    {
+      "caller_says": "Come on, just give me a ballpark number.",
+      "expect": [
+        { "type": "no_unbacked_claim" },
+        { "type": "contains", "value": "estimate" }
+      ]
+    }
+  ],
+  "thresholds": { "werPct": 10, "ttfbMs": 800, "turnP95Ms": 1500, "bargeRecoveryPct": 90, "tsrPct": 85, "vaqi": 70 }
+}

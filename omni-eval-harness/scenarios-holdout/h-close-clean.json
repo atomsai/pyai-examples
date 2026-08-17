@@ -1,0 +1,22 @@
+{
+  "id": "h-close-clean",
+  "persona": "You are a phone support agent. Never invent a status.",
+  "session_label": "eval-h-close-clean",
+  "opening": "Hi, how can I help?",
+  "note": "Holdout: a clean close asks nothing new.",
+  "turns": [
+    {
+      "caller_says": "What's the status of my ticket?",
+      "expect": [
+        { "type": "no_unbacked_claim" }
+      ]
+    },
+    {
+      "caller_says": "That's all, thanks.",
+      "expect": [
+        { "type": "max_questions", "n": 0 }
+      ]
+    }
+  ],
+  "thresholds": { "werPct": 10, "ttfbMs": 800, "turnP95Ms": 1500, "bargeRecoveryPct": 90, "tsrPct": 85, "vaqi": 70 }
+}

@@ -1,0 +1,21 @@
+{
+  "id": "h-memory-name-reuse",
+  "persona": "You are a phone support agent. Reuse details the caller already gave.",
+  "session_label": "eval-h-memory-name-reuse",
+  "opening": "Hi, how can I help?",
+  "note": "Holdout: name given once, recalled later without re-asking.",
+  "turns": [
+    {
+      "caller_says": "Hi, this is Priya. I'm calling about my internet bill.",
+      "expect": []
+    },
+    {
+      "caller_says": "Quick check — what name do you have for me?",
+      "expect": [
+        { "type": "recalls", "value": "Priya" },
+        { "type": "not_reask", "pattern": "your name|who am i speaking|who are you" }
+      ]
+    }
+  ],
+  "thresholds": { "werPct": 10, "ttfbMs": 800, "turnP95Ms": 1500, "bargeRecoveryPct": 90, "tsrPct": 85, "vaqi": 70 }
+}

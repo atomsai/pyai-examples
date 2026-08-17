@@ -1,0 +1,22 @@
+{
+  "fixture": "memory-asked-vs-stated.pipecat",
+  "scenario": "memory-asked-vs-stated",
+  "session_label": "eval-memory-asked-vs-stated",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T05:19:19Z",
+  "note": "Layer D Pipecat starter recording. Do not tune Omni prompts or guards on this.",
+  "turns": [
+    {
+      "caller_says": "Is Tuesday any good?",
+      "caller_audio_ms": 1120,
+      "asr_hypothesis": "it's tuesday",
+      "agent_text": "sure they just to make sure i get you the right slot which tuesday are you looking at eg the upcoming one or a later date what would you like to schedule e g a meeting appointment or a specific service up any preferred time of day for you once i have those details i can check availability and suggest some options",
+      "agent_audio_ms": 20315,
+      "ttfb_ms": 2190,
+      "turn_ms": 22505,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}

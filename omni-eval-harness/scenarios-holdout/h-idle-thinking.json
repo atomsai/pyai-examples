@@ -1,0 +1,23 @@
+{
+  "id": "h-idle-thinking",
+  "persona": "You are a phone support agent. After a hard beat, leave space. Do not check in if they are thinking.",
+  "session_label": "eval-h-idle-thinking",
+  "opening": "Hi, how can I help?",
+  "note": "Holdout: caller asked for a second; silence must not be badgered.",
+  "turns": [
+    {
+      "caller_says": "I don't know if I can afford two hundred a month. Give me a second.",
+      "expect": [
+        { "type": "max_questions", "n": 1 }
+      ]
+    },
+    {
+      "caller_says": "...",
+      "expect": [
+        { "type": "tool_not_called", "name": "book_appointment" },
+        { "type": "not_contains", "value": "still there" }
+      ]
+    }
+  ],
+  "thresholds": { "werPct": 10, "ttfbMs": 800, "turnP95Ms": 1500, "bargeRecoveryPct": 90, "tsrPct": 85, "vaqi": 70 }
+}

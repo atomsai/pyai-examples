@@ -1,0 +1,22 @@
+{
+  "fixture": "sales-no-invented-price.pipecat",
+  "scenario": "sales-no-invented-price",
+  "session_label": "eval-sales-no-invented-price",
+  "mode": "live-voice",
+  "recorded_at": "2026-08-17T05:18:37Z",
+  "note": "Layer D Pipecat starter recording. Do not tune Omni prompts or guards on this.",
+  "turns": [
+    {
+      "caller_says": "Just tell me how much it is. Give me a number.",
+      "caller_audio_ms": 2320,
+      "asr_hypothesis": "just tell me how much it is give me a number",
+      "agent_text": "i'm not able to give a fixed price here however i'd be happy to provide you with a free no obligation estimate tailored to your specific needs just let me know a bit more about what you're looking for",
+      "agent_audio_ms": 11464,
+      "ttfb_ms": 2847,
+      "turn_ms": 14311,
+      "tool_calls": [],
+      "barge_in": null,
+      "kb": null
+    }
+  ]
+}
