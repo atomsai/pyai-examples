@@ -16,6 +16,11 @@
     "live-continuity": "node --env-file=.env src/live-continuity.js",
     "score-holdout": "node src/score-holdout.js",
     "bakeoff": "node src/bakeoff-cli.js",
+    "bakeoff:in-region": "bash scripts/run-in-region-bakeoff.sh",
+    "bakeoff:repeated": "node src/repeated-bakeoff.js",
+    "layer-e-bundle": "node src/layer-e-bundle.js",
+    "layer-e-score": "node src/layer-e-score.js",
+    "test:layer-d-audio": "python3 -m unittest discover -s test -p 'test_*.py'",
     "test": "node --test 'test/**/*.test.js'"
   },
   "license": "MIT",

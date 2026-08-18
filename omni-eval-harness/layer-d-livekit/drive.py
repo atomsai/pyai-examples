@@ -7,7 +7,9 @@ import asyncio
 import json
 import os
 import re
+import shutil
 import struct
+import sys
 import time
 import wave
 from io import BytesIO
@@ -18,6 +20,11 @@ from dotenv import load_dotenv
 from livekit import api, rtc
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from layer_d_audio import write_call_wav  # noqa: E402
+
+
 load_dotenv(ROOT / ".env")
 
 AGENT_NAME = "omni-eval-livekit"
@@ -46,6 +53,12 @@ def env(name: str) -> str:
     if not value:
         raise SystemExit(f"missing {name} in .env")
     return value
+
+
+def eval_dir(name: str, default: Path) -> Path:
+    value = os.environ.get(name, "").strip()
+    path = Path(value) if value else default
+    return path if path.is_absolute() else ROOT / path
 
 
 def is_non_speech(text: str) -> bool:
@@ -317,6 +330,7 @@ async def run_scenario(scenario: dict, voice: str, client: httpx.AsyncClient) ->
         await wait_settle(cap, allow_empty=True, timeout=GREETING_DRAIN_S)
 
         turns = []
+        audio_turns = []
         for i, spec in enumerate(scenario.get("turns") or []):
             caller_text = spec.get("caller_says") or ""
             caller_pcm = caller_pcms[i]
@@ -338,6 +352,13 @@ async def run_scenario(scenario: dict, voice: str, client: httpx.AsyncClient) ->
                 int((cap.last_at - cap.first_at) * 1000)
                 if cap.first_at and cap.last_at
                 else None
+            )
+            audio_turns.append(
+                {
+                    "caller_pcm": caller_pcm,
+                    "agent_pcm": agent_pcm,
+                    "ttfb_ms": ttfb,
+                }
             )
             turns.append(
                 {
@@ -372,6 +393,7 @@ async def run_scenario(scenario: dict, voice: str, client: httpx.AsyncClient) ->
         "mode": "live-voice",
         "source": "livekit-starter",
         "recordedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "_audio_turns": audio_turns,
         "turns": turns,
     }
 
@@ -408,8 +430,16 @@ async def main() -> None:
     args = parser.parse_args()
     ids = args.ids or PACK
     voice = os.environ.get("PYAI_VOICE") or "stock_sarah_style2"
-    out_dir = ROOT / "out" / "livekit"
-    holdout = ROOT / "holdout" / "livekit-2026-08-17"
+    out_dir = eval_dir("PYAI_EVAL_OUTPUT_DIR", ROOT / "out" / "livekit")
+    holdout = eval_dir(
+        "PYAI_EVAL_HOLDOUT_DIR",
+        ROOT / "holdout" / "livekit-2026-08-17",
+    )
+    if (holdout / "DO_NOT_TUNE").exists():
+        raise SystemExit(
+            f"refusing to overwrite frozen holdout {holdout}; "
+            "set PYAI_EVAL_HOLDOUT_DIR to a new directory"
+        )
     out_dir.mkdir(parents=True, exist_ok=True)
     holdout.mkdir(parents=True, exist_ok=True)
     rows = []
@@ -423,11 +453,32 @@ async def main() -> None:
             except Exception as err:
                 print(f"[livekit-pack] {sid} ERROR {err}", flush=True)
                 rows.append({"id": sid, "verdict": "ERROR", "error": str(err)})
+                (holdout / f"{sid}.error.json").write_text(
+                    json.dumps(
+                        {
+                            "id": sid,
+                            "error": str(err),
+                            "at": time.strftime(
+                                "%Y-%m-%dT%H:%M:%SZ", time.gmtime()
+                            ),
+                        },
+                        indent=2,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
                 continue
+            audio = write_call_wav(
+                holdout / f"{sid}.wav",
+                run.pop("_audio_turns"),
+                OMNI_RATE,
+            )
             fixture = to_fixture(run, sid)
+            fixture["audio"] = {"file": f"{sid}.wav", **audio}
             payload = json.dumps(fixture, indent=2) + "\n"
             (out_dir / f"{sid}.offline.json").write_text(payload, encoding="utf-8")
             (holdout / f"{sid}.offline.json").write_text(payload, encoding="utf-8")
+            shutil.copyfile(holdout / f"{sid}.wav", out_dir / f"{sid}.wav")
             agent = " | ".join(t.get("agent_text") or "" for t in fixture["turns"])
             print(f"[livekit-pack] {sid} agent={agent!r}", flush=True)
             first = fixture["turns"][0] if fixture["turns"] else {}
@@ -439,6 +490,8 @@ async def main() -> None:
         encoding="utf-8",
     )
     print(json.dumps(summary, indent=2))
+    if any(row.get("verdict") == "ERROR" for row in rows):
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":

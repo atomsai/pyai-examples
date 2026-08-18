@@ -245,6 +245,78 @@ npm run live
 If they aren't built, live mode fails with an actionable message (offline mode and
 tests are unaffected).
 
+### Frozen production packs and call audio
+
+`live-product` runs managed Agent profiles and writes each fixture beside a
+listenable WAV built from the exact captured caller/agent PCM plus the measured
+time-to-first-audio gap:
+
+```bash
+PYAI_EVAL_SCENARIOS_DIR=scenarios-holdout \
+PYAI_EVAL_HOLDOUT_DIR=holdout/social-canary-30-2026-08-18 \
+npm run live-product
+```
+
+Completed directories contain `DO_NOT_TUNE`; every live runner refuses to
+overwrite one. Always choose a new `PYAI_EVAL_HOLDOUT_DIR`. The LiveKit and
+Pipecat drivers honor that variable plus `PYAI_EVAL_OUTPUT_DIR` and produce the
+same `<scenario>.offline.json` + `<scenario>.wav` pair.
+
+### Repeated in-region bake-off
+
+On an ephemeral runner in `us-central1`, create the two isolated virtualenvs,
+install their pinned requirements, build the workspace TypeScript SDKs, and
+run:
+
+```bash
+PYAI_EVAL_RUN_ID=20260818T090000Z \
+PYAI_EVAL_REPEATS=3 \
+npm run bakeoff:in-region
+```
+
+The script refuses to run outside the requested GCP region and records the same
+eight scenarios for Omni, LiveKit, and Pipecat on every repetition. Summarize
+only a complete run matrix:
+
+```bash
+npm run bakeoff:repeated -- \
+  --system omni=holdout/in-region-20260818T090000Z/omni \
+  --system livekit=holdout/in-region-20260818T090000Z/livekit \
+  --system pipecat=holdout/in-region-20260818T090000Z/pipecat \
+  --out holdout/in-region-20260818T090000Z/summary.json
+```
+
+The summarizer fails if any repetition has an error, a missing scenario, or a
+missing WAV; failed calls cannot disappear from the comparison.
+
+### Layer E blinded panel
+
+Build a balanced bundle only after every system has real audio for the same
+scenarios:
+
+```bash
+npm run layer-e-bundle -- \
+  --out out/layer-e-2026-08-18 \
+  --system omni=holdout/social-canary-30-2026-08-18 \
+  --system livekit=holdout/livekit-in-region-2026-08-18 \
+  --system pipecat=holdout/pipecat-in-region-2026-08-18
+```
+
+Share only `out/layer-e-2026-08-18/rater/`. The system mapping stays under
+`coordinator/`. After two independent sheets are returned:
+
+```bash
+npm run layer-e-score -- \
+  --mapping out/layer-e-2026-08-18/coordinator/mapping.json \
+  --rater /path/to/rater-one.csv \
+  --rater /path/to/rater-two.csv \
+  --out out/layer-e-2026-08-18/coordinator/results.json
+```
+
+Calls with disagreement on two or more dimensions are emitted as
+`needs_adjudication`; pass a third blinded sheet with another `--rater` to
+complete the result. `n/a` is excluded rather than silently counted as a yes.
+
 ## Fully functional vs stubbed
 
 **Fully functional (deterministic, tested, offline):**
@@ -270,4 +342,3 @@ tests are unaffected).
 mid-call tool calls, the Omni protocol marks both as not-yet-honored, so live
 mode sends them and captures whatever the engine returns; the offline fixtures
 exercise the scoring of both today.
-```

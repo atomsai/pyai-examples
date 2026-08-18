@@ -6,11 +6,11 @@ independent. Disagreements go to a third rater.
 
 ## What you are rating
 
-20 short phone-call recordings. Each is a synthetic caller talking to a voice
+{{CALL_COUNT}} short phone-call recordings. Each is a synthetic caller talking to a voice
 agent. You do not know which system produced which call, and the file names
 will not tell you. Rate each call on its own.
 
-For every call, answer six yes/no questions:
+For every call, answer six `yes` / `no` / `n/a` questions:
 
 | # | Question | Yes means | No means |
 |---|----------|-----------|----------|
@@ -24,15 +24,14 @@ For every call, answer six yes/no questions:
 Rules:
 
 - Rate what you hear, not what you expect. A short call can be all-yes.
-- If a question does not apply (e.g. nothing to remember), answer based on
-  whether the agent *would* have had the chance and used it well — when truly
-  inapplicable, mark yes and note "n/a" in the margin.
+- Use `n/a` only when the call gave the agent no opportunity to demonstrate
+  that behavior. Never turn "not observed" into a yes.
 - Do not discuss calls with the other rater until both sheets are in.
 - Do not try to guess the system. You will be wrong often enough to matter.
 
 ## Scoring sheet
 
-One row per call, `yes` / `no` per column:
+One row per call, `yes` / `no` / `n/a` per column:
 
 ```
 call_id,heard,remembered,no_form,kept_promise,left_space,would_call_again,notes
@@ -41,12 +40,14 @@ call_01,,,,,,,
 
 ## Process
 
-1. Each rater rates all 20 calls alone, in one or two sittings, in order.
+1. The coordinator shares only the generated `rater/` directory. Each rater
+   rates all {{CALL_COUNT}} calls alone, in one or two sittings, in order.
 2. A coordinator (not a rater) collects both sheets and computes agreement.
 3. Any call where the raters disagree on 2+ of the six questions goes to a
    third rater, blinded, who breaks the tie on the disagreeing questions only.
-4. The coordinator — never the raters — unblinds `mapping.json` and computes
-   per-system HPS (the mean of the five felt moves) and would-call-again rate.
+4. The coordinator — never the raters — unblinds
+   `coordinator/mapping.json` and computes per-system HPS (the mean of the five
+   applicable felt moves) and would-call-again rate.
 
 ## What this gate decides
 

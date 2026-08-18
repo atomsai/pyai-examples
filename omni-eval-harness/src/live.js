@@ -14,6 +14,9 @@
 // Omni has no end-of-input control: after the caller utterance we keep sending
 // realtime silence until the agent has spoken and settled.
 
+import { writeCallWav } from "./call-audio.js";
+
+
 const SETTLE_MS = 2000; // quiet after last agent audio before the turn is done
 const MIN_AGENT_AUDIO_MS = 350; // ignore a click / first-chunk blip
 const GREETING_DRAIN_MS = 4000;
@@ -122,7 +125,7 @@ export function kbFromQueryEvent(evt) {
 /**
  * Run a scenario live against Omni. Returns a normalized RunResult.
  * @param {object} scenario validated scenario
- * @param {object} opts { apiKey, sessionLabel, mode, voice, baseURL, omniRate, tools, callerKey }
+ * @param {object} opts { apiKey, sessionLabel, mode, voice, baseURL, omniRate, tools, callerKey, captureAudioPath }
  */
 export async function runLive(scenario, opts) {
   const { twilio, sdk } = await loadDeps();
@@ -131,6 +134,9 @@ export async function runLive(scenario, opts) {
 
   const omniRate = opts.omniRate ?? 24000;
   const mode = opts.mode === "text" ? "text" : "voice";
+  if (opts.captureAudioPath && mode !== "voice") {
+    throw new Error("call audio capture requires live voice mode");
+  }
   const pyai = new PyAI({ apiKey: opts.apiKey, baseURL: opts.baseURL });
   const toHear = makeResampler(omniRate, HEAR_RATE);
   const tools = opts.tools ?? toolsForScenario(scenario);
@@ -271,6 +277,7 @@ export async function runLive(scenario, opts) {
   });
 
   const turns = [];
+  const audioTurns = [];
   for (let i = 0; i < prepared.length; i++) {
     const { callerText, callerPcm, callerAudioMs, asrHypothesis } = prepared[i];
     turnCtx = newTurnCtx();
@@ -309,6 +316,13 @@ export async function runLive(scenario, opts) {
     const turnRaw = turnCtx.lastAudioAt != null ? Math.round(turnCtx.lastAudioAt - tCallerDone) : null;
     const ttfbMs = ttfbRaw != null && ttfbRaw >= 0 ? ttfbRaw : null;
     const turnMs = turnRaw != null && turnRaw >= 0 ? turnRaw : null;
+    if (mode === "voice") {
+      audioTurns.push({
+        callerPcm: callerPcm ?? new Int16Array(),
+        agentPcm,
+        ttfbMs,
+      });
+    }
     // Latency decomposition from the engine's turn_begin frame: EOU/STT
     // (caller end -> turn_begin, measured server-side) and brain+TTS
     // (turn_begin -> first agent audio). Null on engines without the frame.
@@ -336,6 +350,9 @@ export async function runLive(scenario, opts) {
   }
 
   omni.close();
+  const audio = opts.captureAudioPath
+    ? writeCallWav(opts.captureAudioPath, audioTurns, omniRate)
+    : null;
 
   return {
     scenarioId: scenario.id,
@@ -344,6 +361,7 @@ export async function runLive(scenario, opts) {
     mode: mode === "voice" ? "live-voice" : "live-text",
     source: opts.baseURL ?? "api.pyai.com",
     recordedAt: new Date().toISOString(),
+    audio,
     turns,
   };
 }

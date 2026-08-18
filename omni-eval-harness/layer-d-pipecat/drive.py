@@ -12,6 +12,7 @@ import asyncio
 import json
 import os
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -26,6 +27,11 @@ from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[1]
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT))
+
+from layer_d_audio import write_call_wav  # noqa: E402
+
+
 load_dotenv(ROOT / ".env")
 
 RATE = 24000
@@ -52,6 +58,12 @@ def env(name: str) -> str:
     if not value:
         raise SystemExit(f"missing {name} in .env")
     return value
+
+
+def eval_dir(name: str, default: Path) -> Path:
+    value = os.environ.get(name, "").strip()
+    path = Path(value) if value else default
+    return path if path.is_absolute() else ROOT / path
 
 
 def is_non_speech(text: str) -> bool:
@@ -145,6 +157,7 @@ async def run_scenario(scenario: dict, voice: str, client: httpx.AsyncClient) ->
         env=bot_env,
     )
     try:
+        (HERE / "out").mkdir(parents=True, exist_ok=True)
         bot_log = open(HERE / "out" / f"bot-{sid}.log", "a", encoding="utf-8")
         deadline = time.monotonic() + BOT_READY_TIMEOUT_S
         ready = False
@@ -234,6 +247,7 @@ async def run_scenario(scenario: dict, voice: str, client: httpx.AsyncClient) ->
             await wait_settle(allow_empty=True, timeout=GREETING_DRAIN_S)
 
             turns = []
+            audio_turns = []
             silence = b"\x00" * int(RATE * FRAME_MS / 1000) * 2
             for i, spec in enumerate(scenario.get("turns") or []):
                 caller_text = spec.get("caller_says") or ""
@@ -259,6 +273,13 @@ async def run_scenario(scenario: dict, voice: str, client: httpx.AsyncClient) ->
                 agent_ms = (
                     int((last_at - first_at) * 1000) if first_at and last_at else None
                 )
+                audio_turns.append(
+                    {
+                        "caller_pcm": caller_pcm,
+                        "agent_pcm": bytes(agent_pcm),
+                        "ttfb_ms": ttfb,
+                    }
+                )
                 turns.append(
                     {
                         "index": i,
@@ -282,6 +303,7 @@ async def run_scenario(scenario: dict, voice: str, client: httpx.AsyncClient) ->
             "mode": "live-voice",
             "source": "pipecat-starter",
             "recordedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "_audio_turns": audio_turns,
             "turns": turns,
         }
     finally:
@@ -344,10 +366,21 @@ async def main() -> None:
     ids = args.ids or PACK
     voice = os.environ.get("PYAI_VOICE") or "stock_sarah_style2"
     mem0_on = os.environ.get("MEM0_ON") == "1"
-    out_dir = ROOT / "out" / ("pipecat-mem0" if mem0_on else "pipecat")
-    holdout = ROOT / "holdout" / (
-        "pipecat-mem0-2026-08-17" if mem0_on else "pipecat-2026-08-17"
+    out_dir = eval_dir(
+        "PYAI_EVAL_OUTPUT_DIR",
+        ROOT / "out" / ("pipecat-mem0" if mem0_on else "pipecat"),
     )
+    holdout = eval_dir(
+        "PYAI_EVAL_HOLDOUT_DIR",
+        ROOT
+        / "holdout"
+        / ("pipecat-mem0-2026-08-17" if mem0_on else "pipecat-2026-08-17"),
+    )
+    if (holdout / "DO_NOT_TUNE").exists():
+        raise SystemExit(
+            f"refusing to overwrite frozen holdout {holdout}; "
+            "set PYAI_EVAL_HOLDOUT_DIR to a new directory"
+        )
     out_dir.mkdir(parents=True, exist_ok=True)
     holdout.mkdir(parents=True, exist_ok=True)
     rows = []
@@ -377,11 +410,32 @@ async def main() -> None:
             except Exception as err:
                 print(f"[pipecat-pack] {sid} ERROR {err}", flush=True)
                 rows.append({"id": sid, "verdict": "ERROR", "error": str(err)})
+                (holdout / f"{sid}.error.json").write_text(
+                    json.dumps(
+                        {
+                            "id": sid,
+                            "error": str(err),
+                            "at": time.strftime(
+                                "%Y-%m-%dT%H:%M:%SZ", time.gmtime()
+                            ),
+                        },
+                        indent=2,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
                 continue
+            audio = write_call_wav(
+                holdout / f"{sid}.wav",
+                run.pop("_audio_turns"),
+                RATE,
+            )
             fixture = to_fixture(run, sid)
+            fixture["audio"] = {"file": f"{sid}.wav", **audio}
             payload = json.dumps(fixture, indent=2) + "\n"
             (out_dir / f"{sid}.offline.json").write_text(payload, encoding="utf-8")
             (holdout / f"{sid}.offline.json").write_text(payload, encoding="utf-8")
+            shutil.copyfile(holdout / f"{sid}.wav", out_dir / f"{sid}.wav")
             agent = " | ".join(t.get("agent_text") or "" for t in fixture["turns"])
             print(f"[pipecat-pack] {sid} agent={agent!r}", flush=True)
             first = fixture["turns"][0] if fixture["turns"] else {}
@@ -393,6 +447,8 @@ async def main() -> None:
         encoding="utf-8",
     )
     print(json.dumps(summary, indent=2))
+    if any(row.get("verdict") == "ERROR" for row in rows):
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":

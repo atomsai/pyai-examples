@@ -2,7 +2,14 @@
 // /v1/agents profile (role -> mode, bound KB) instead of a bare persona.
 // Does not mint or print keys. Does not tune the holdout.
 
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -147,7 +154,7 @@ async function ensureAgent(scenario, kbId) {
   return agentId;
 }
 
-async function runOne(id, apiKey, kbId) {
+async function runOne(id, apiKey, kbId, captureAudioPath) {
   const scenario = loadScenario(scenarioPath(id));
   const agentId = await ensureAgent(scenario, kbId);
   const run = await runLive(scenario, {
@@ -156,6 +163,7 @@ async function runOne(id, apiKey, kbId) {
     mode: "voice",
     voice: process.env.PYAI_VOICE || "stock_sarah_style2",
     baseURL: process.env.PYAI_BASE_URL,
+    captureAudioPath,
   });
   return { scenario, run, fixture: runResultToFixture(run, id) };
 }
@@ -188,6 +196,11 @@ async function main() {
   const holdoutDir = process.env.PYAI_EVAL_HOLDOUT_DIR
     ? resolve(BASE_DIR, process.env.PYAI_EVAL_HOLDOUT_DIR)
     : resolve(BASE_DIR, "holdout/live-product-2026-08-17");
+  if (existsSync(resolve(holdoutDir, "DO_NOT_TUNE"))) {
+    throw new Error(
+      `refusing to overwrite frozen holdout ${holdoutDir}; set PYAI_EVAL_HOLDOUT_DIR to a new directory`,
+    );
+  }
   mkdirSync(outDir, { recursive: true });
   mkdirSync(holdoutDir, { recursive: true });
 
@@ -198,13 +211,25 @@ async function main() {
 
   for (const id of pack) {
     console.error(`[live-product] starting ${id}`);
+    const audioPath = resolve(holdoutDir, `${id}.wav`);
+    if (existsSync(audioPath)) unlinkSync(audioPath);
     let lastErr = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        const { scenario, run, fixture } = await runOne(id, apiKey, kbId);
+        const { scenario, run, fixture } = await runOne(
+          id,
+          apiKey,
+          kbId,
+          audioPath,
+        );
+        fixture.audio = {
+          file: `${id}.wav`,
+          ...run.audio,
+        };
         const json = `${JSON.stringify(fixture, null, 2)}\n`;
         writeFileSync(resolve(outDir, `${id}.offline.json`), json);
         writeFileSync(resolve(holdoutDir, `${id}.offline.json`), json);
+        copyFileSync(audioPath, resolve(outDir, `${id}.wav`));
         const row = scoreLiveRow(scenario, run, fixture);
         console.error(
           `[live-product] ${id} ${row.verdict} content=${row.content_verdict} ttfb=${row.ttfb_p95}`,
