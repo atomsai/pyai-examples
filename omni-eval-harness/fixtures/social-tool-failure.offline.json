@@ -1,0 +1,17 @@
+{
+  "fixture": "social-tool-failure.offline",
+  "scenario": "social-tool-failure",
+  "session_label": "eval-social-tool-failure",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-18T00:00:00Z",
+  "note": "Synthetic intended-PASS contract fixture; not a frozen holdout recording.",
+  "turns": [
+    {
+      "caller_says": "Book me for Tuesday at three.",
+      "agent_text": "I couldn't confirm that booking completed just now.",
+      "ttfb_ms": 250,
+      "turn_ms": 470,
+      "tool_calls": []
+    }
+  ]
+}

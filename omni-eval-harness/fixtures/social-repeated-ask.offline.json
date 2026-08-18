@@ -1,0 +1,24 @@
+{
+  "fixture": "social-repeated-ask.offline",
+  "scenario": "social-repeated-ask",
+  "session_label": "eval-social-repeated-ask",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-18T00:00:00Z",
+  "note": "Synthetic intended-PASS contract fixture; not a frozen holdout recording.",
+  "turns": [
+    {
+      "caller_says": "What does the priority plan include?",
+      "agent_text": "Let me answer that clearly.",
+      "ttfb_ms": 260,
+      "turn_ms": 520,
+      "tool_calls": []
+    },
+    {
+      "caller_says": "What does the priority plan include?",
+      "agent_text": "The priority plan includes priority support.",
+      "ttfb_ms": 250,
+      "turn_ms": 490,
+      "tool_calls": []
+    }
+  ]
+}

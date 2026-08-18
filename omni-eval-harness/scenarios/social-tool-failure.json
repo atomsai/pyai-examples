@@ -1,0 +1,27 @@
+{
+  "id": "social-tool-failure",
+  "persona": "You are a scheduling agent. Never claim an action completed unless its tool succeeded.",
+  "session_label": "eval-social-tool-failure",
+  "opening": "Hi, how can I help?",
+  "note": "Social-state canary: a failed booking receives a contextual, provider-neutral repair.",
+  "turns": [
+    {
+      "caller_says": "Book me for Tuesday at three.",
+      "expect": [
+        { "type": "tool_not_called", "name": "book_appointment" },
+        { "type": "contains", "value": "couldn't confirm" },
+        { "type": "contains", "value": "booking" },
+        { "type": "not_contains", "value": "keep helping" },
+        { "type": "no_unbacked_claim" }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

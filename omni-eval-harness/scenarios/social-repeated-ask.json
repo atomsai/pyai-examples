@@ -1,0 +1,31 @@
+{
+  "id": "social-repeated-ask",
+  "persona": "You are a concise support agent. Answer repeated questions before asking for anything else.",
+  "session_label": "eval-social-repeated-ask",
+  "opening": "Hi, how can I help?",
+  "note": "Social-state canary: the second identical ask is answered directly with no intake question.",
+  "turns": [
+    {
+      "caller_says": "What does the priority plan include?",
+      "expect": [
+        { "type": "max_questions", "n": 1 }
+      ]
+    },
+    {
+      "caller_says": "What does the priority plan include?",
+      "expect": [
+        { "type": "contains", "value": "priority support" },
+        { "type": "max_questions", "n": 0 },
+        { "type": "not_reask", "pattern": "what (?:else|do you)|which" }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

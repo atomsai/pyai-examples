@@ -33,6 +33,9 @@ export const SHARED_PACK = [
   { id: "reflect-specific", intended: "PASS" },
   { id: "barge-partial-context", intended: "PASS" },
   { id: "slow-tool-bridge", intended: "PASS" },
+  { id: "social-repeated-ask", intended: "PASS" },
+  { id: "social-tool-failure", intended: "PASS" },
+  { id: "social-interruption-resume", intended: "PASS" },
 ];
 
 export function toSharedScenario(scenario) {

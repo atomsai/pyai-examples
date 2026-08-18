@@ -1,0 +1,31 @@
+{
+  "id": "social-interruption-resume",
+  "persona": "You are a concise support agent. Resume a partly heard answer without restarting intake.",
+  "session_label": "eval-social-interruption-resume",
+  "opening": "Hi, how can I help?",
+  "note": "Social-state canary: a genuine barge carries one interrupted-answer repair into the next turn.",
+  "turns": [
+    {
+      "caller_says": "How long do refunds normally take?",
+      "expect": [
+        { "type": "max_questions", "n": 0 }
+      ]
+    },
+    {
+      "caller_says": "Go on.",
+      "expect": [
+        { "type": "contains", "value": "five business days" },
+        { "type": "max_questions", "n": 0 },
+        { "type": "not_reask", "pattern": "how long|what refund" }
+      ]
+    }
+  ],
+  "thresholds": {
+    "werPct": 10,
+    "ttfbMs": 800,
+    "turnP95Ms": 1500,
+    "bargeRecoveryPct": 90,
+    "tsrPct": 85,
+    "vaqi": 70
+  }
+}

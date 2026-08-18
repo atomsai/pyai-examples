@@ -1,0 +1,27 @@
+{
+  "fixture": "social-interruption-resume.offline",
+  "scenario": "social-interruption-resume",
+  "session_label": "eval-social-interruption-resume",
+  "mode": "offline-text",
+  "recorded_at": "2026-08-18T00:00:00Z",
+  "note": "Synthetic intended-PASS contract fixture; not a frozen holdout recording.",
+  "turns": [
+    {
+      "caller_says": "How long do refunds normally take?",
+      "agent_text": "Refunds normally take",
+      "ttfb_ms": 240,
+      "turn_ms": 360,
+      "tool_calls": [],
+      "barge_in": { "attempted": true, "recovered": true },
+      "conversation_state": { "commitments": [] }
+    },
+    {
+      "caller_says": "Go on.",
+      "agent_text": "The key point was five business days.",
+      "ttfb_ms": 250,
+      "turn_ms": 460,
+      "tool_calls": [],
+      "conversation_state": { "commitments": [] }
+    }
+  ]
+}
