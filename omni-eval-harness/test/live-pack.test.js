@@ -73,3 +73,35 @@ test("scoreLiveRow reads agentText from a normalized run", async () => {
   const row = scoreLiveRow(scenario, run, run);
   assert.equal(row.agent, "Nobody called you back for a week.");
 });
+
+test("content verdict excludes ASR and latency failures", async () => {
+  const { scoreLiveRow } = await import("../src/live-pack.js");
+  const scenario = {
+    id: "transport-noise",
+    persona: "Be brief.",
+    turns: [
+      {
+        caller_says: "callback for a week",
+        expect: [{ type: "contains", value: "week" }],
+      },
+    ],
+    thresholds: { werPct: 10, ttfbMs: 800, turnP95Ms: 1500 },
+  };
+  const run = {
+    turns: [
+      {
+        callerText: "callback for a week",
+        asrHypothesis: "completely unrelated words",
+        agentText: "Nobody called you back for a week.",
+        ttfbMs: 5000,
+        turnMs: 8000,
+        toolCalls: [],
+      },
+    ],
+  };
+
+  const row = scoreLiveRow(scenario, run, run);
+  assert.equal(row.verdict, "FAIL");
+  assert.equal(row.content_verdict, "PASS");
+  assert.equal(row.tsr, 100);
+});

@@ -16,7 +16,6 @@ from livekit.agents import (
     cli,
     function_tool,
 )
-from livekit.agents.stt import STTCapabilities
 from livekit.plugins import openai, silero
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
@@ -73,13 +72,10 @@ def _llm():
 def _stt():
     from livekit.plugins import pyai
 
-    # Streaming Hear WS died mid-session in the first Layer D probe
-    # (`stream terminated unexpectedly`). Batch recognize uses the same
-    # Hear REST path Layer C already proved, so the bake-off compares
-    # conversation behavior instead of a broken stream.
-    stt = pyai.STT(language="en")
-    stt._capabilities = STTCapabilities(streaming=False, interim_results=False)
-    return stt
+    # Exercise the released plugin's public realtime path. Version 0.1.0 waits
+    # for every committed final before closing, fixing the lifecycle failure
+    # that forced the original Layer D probe onto batch recognition.
+    return pyai.STT(language="en")
 
 
 def _tts():

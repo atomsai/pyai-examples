@@ -50,15 +50,18 @@ export function runResultToFixture(run, scenarioId) {
   };
 }
 
-/** Same assertions, latency gates opened so content is visible next to TTFB. */
+/** Same assertions with transport gates opened so content is measured alone. */
 export function contentOnlyScenario(scenario) {
   const shared = toSharedScenario(scenario);
   return {
     ...shared,
     thresholds: {
       ...(shared.thresholds || {}),
-      ttfbMs: 30000,
-      turnP95Ms: 30000,
+      werPct: Number.MAX_SAFE_INTEGER,
+      ttfbMs: Number.MAX_SAFE_INTEGER,
+      turnP95Ms: Number.MAX_SAFE_INTEGER,
+      bargeRecoveryPct: 0,
+      vaqi: 0,
     },
   };
 }

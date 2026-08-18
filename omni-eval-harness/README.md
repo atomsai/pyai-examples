@@ -275,8 +275,12 @@ npm run bakeoff:in-region
 ```
 
 The script refuses to run outside the requested GCP region and records the same
-eight scenarios for Omni, LiveKit, and Pipecat on every repetition. Summarize
-only a complete run matrix:
+eight scenarios for Omni, LiveKit, and Pipecat on every repetition. The
+LiveKit arm uses the public plugin's streaming Hear path; do not replace it
+with batch recognition, which changes the framework pipeline being measured.
+`content_verdict` excludes WER, latency, barge-in, and VAQI transport gates so
+speech-recognition variance cannot be mislabeled as a conversation-content
+failure. Summarize only a complete run matrix:
 
 ```bash
 npm run bakeoff:repeated -- \
