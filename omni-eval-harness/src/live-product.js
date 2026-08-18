@@ -20,10 +20,15 @@ function scenarioPath(id) {
   return resolve(SCENARIOS_DIR, `${id}.json`);
 }
 
-// The public /v1/agents API does not accept `role` (console-only). Mode stays
-// "default" for every agent here, so sales_price_guard / collections_intercept
-// are NOT armed. What this run DOES test: agent profile persona, bound KB,
-// transfer tool, and the grounding contract.
+// Role is a public agent field. Keep the mapping structural (scenario class,
+// never outcome) so the product run exercises the same deterministic sales /
+// collections policy a customer gets without tuning against holdout replies.
+export function roleForScenario(id) {
+  const value = String(id || "").toLowerCase();
+  if (value.includes("collections")) return "collections";
+  if (value.includes("sales")) return "sales";
+  return "support";
+}
 
 const KB_SCENARIOS = new Set(["kb-price-hit", "kb-price-miss-honest"]);
 const KB_TEXT =
@@ -105,11 +110,12 @@ async function ensureAgent(scenario, kbId) {
   const existing = (list?.data || []).find((a) => a.name === name);
   const persona = scenario.persona || null;
   const voice = process.env.PYAI_VOICE || "stock_sarah_style2";
+  const role = roleForScenario(scenario.id);
 
   if (existing) {
     await api(`/v1/agents/${encodeURIComponent(existing.agent_id)}`, {
       method: "POST",
-      body: { persona_system_prompt: persona, voice_id: voice },
+      body: { persona_system_prompt: persona, voice_id: voice, role },
     });
     if (kbId && KB_SCENARIOS.has(scenario.id)) {
       await api(`/v1/agents/${encodeURIComponent(existing.agent_id)}/knowledgebases`, {
@@ -126,6 +132,7 @@ async function ensureAgent(scenario, kbId) {
       name,
       persona_system_prompt: persona,
       voice_id: voice,
+      role,
       tools: [],
     },
   });

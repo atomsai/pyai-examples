@@ -122,7 +122,7 @@ export function kbFromQueryEvent(evt) {
 /**
  * Run a scenario live against Omni. Returns a normalized RunResult.
  * @param {object} scenario validated scenario
- * @param {object} opts { apiKey, sessionLabel, mode, voice, baseURL, omniRate, tools }
+ * @param {object} opts { apiKey, sessionLabel, mode, voice, baseURL, omniRate, tools, callerKey }
  */
 export async function runLive(scenario, opts) {
   const { twilio, sdk } = await loadDeps();
@@ -183,10 +183,13 @@ export async function runLive(scenario, opts) {
     onReadyResolve = res;
   });
   let latestConfigured = null;
+  let callId = null;
   let onConfiguredResolve;
   const configured = new Promise((res) => {
     onConfiguredResolve = res;
   });
+  let configuredEvents = 0;
+  const configuredEventsNeeded = opts.callerKey ? 2 : 1;
 
   const omni = new OmniClient({
     apiKey: opts.apiKey,
@@ -196,7 +199,15 @@ export async function runLive(scenario, opts) {
     voice: opts.voice,
     persona: scenario.persona,
     tools,
-    onReady: () => onReadyResolve(),
+    onReady: () => {
+      // caller_key is an internal eval/telephony stamp, deliberately absent
+      // from the public SDK options. A second configure frame lets this harness
+      // prove product continuity without widening the customer-facing client.
+      if (opts.callerKey) {
+        omni.sendControl({ type: "configure", caller_key: opts.callerKey });
+      }
+      onReadyResolve();
+    },
     onAudio: (pcm) => {
       const t = now();
       if (turnCtx.firstAudioAt == null) turnCtx.firstAudioAt = t;
@@ -211,9 +222,11 @@ export async function runLive(scenario, opts) {
     },
     onEvent: (evt) => {
       const event = typeof evt.event === "string" ? evt.event : "";
+      if (!callId && typeof evt.call_id === "string") callId = evt.call_id;
       if (event === "configured") {
         latestConfigured = evt;
-        onConfiguredResolve(evt);
+        configuredEvents += 1;
+        if (configuredEvents >= configuredEventsNeeded) onConfiguredResolve(evt);
       }
       if (event === "tool_call") {
         const name = evt.name ?? evt.tool ?? evt.function?.name;
@@ -326,6 +339,7 @@ export async function runLive(scenario, opts) {
 
   return {
     scenarioId: scenario.id,
+    callId,
     sessionLabel: opts.sessionLabel,
     mode: mode === "voice" ? "live-voice" : "live-text",
     source: opts.baseURL ?? "api.pyai.com",
