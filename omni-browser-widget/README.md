@@ -1,6 +1,6 @@
 # Hosted Omni browser widget v7
 
-Publish a website widget from **Agent → Connect → Website**, then paste one
+Publish a website widget from **Agents → Website & phone**, then paste one
 script tag:
 
 ```html
