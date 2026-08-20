@@ -36,6 +36,19 @@ test("widget v7 tags caller PCM and accepts only strict server frames", () => {
   assert.doesNotMatch(server, /"\/pyai-widget\.js"|widget\/v[2-6]/);
 });
 
+test("widget v8 preserves strict framing with bounded duplex capture", () => {
+  const widget = read("./omni-browser-widget/public/v8/pyai-widget.js");
+  const server = read("./omni-browser-widget/server.js");
+  assert.match(widget, /VERSION = "8\.0\.0"/);
+  assert.match(widget, /frame\[0\] = 0x01/);
+  assert.match(widget, /captureMute\.gain\.value = 0/);
+  assert.match(widget, /AGENT_BARGE_ARM_DELAY_MS = 350/);
+  assert.match(widget, /selectCallerSamples\(samples, state, Date\.now\(\)\)/);
+  assert.match(widget, /state\.ws\.close\(1002, "binary_frames_required"\)/);
+  assert.match(widget, /state\.ws\.close\(1002, "invalid_binary_frame"\)/);
+  assert.match(server, /"\/widget\/v8\/pyai-widget\.js"/);
+});
+
 test("concierge direct browser transport is tagged, resampled, and strict", () => {
   const client = read("./pyai-site-voice-concierge/public/app.js");
   assert.match(client, /connectMode === "direct" \? frame01\(pcm\) : pcm/);

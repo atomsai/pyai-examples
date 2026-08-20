@@ -1,10 +1,13 @@
-# Hosted Omni browser widget v7
+# Hosted Omni browser widget v8
+
+v8 is the current runtime. v7 remains checked in and immutable for existing
+embeds.
 
 Publish a website widget from **Agents → Website & phone**, then paste one
 script tag:
 
 ```html
-<script src="https://cdn.pyai.com/widget/v7/pyai-widget.js"
+<script src="https://cdn.pyai.com/widget/v8/pyai-widget.js"
   data-widget="wdgt_public_x" async></script>
 ```
 

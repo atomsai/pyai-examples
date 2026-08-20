@@ -2,11 +2,12 @@
   "name": "pyai-example-omni-browser-widget",
   "private": true,
   "type": "module",
-  "description": "Hosted PyAI Omni browser widget v7 with a static local showcase server.",
+  "description": "Hosted PyAI Omni browser widget v8 with a static local showcase server.",
   "scripts": {
     "start": "node --env-file=.env server.js",
-    "test": "npm run test:widget-v7 && npm run test:transport",
+    "test": "npm run test:widget-v7 && npm run test:widget-v8 && npm run test:transport",
     "test:widget-v7": "node --test test/widget-v7.test.mjs",
+    "test:widget-v8": "node --test test/widget-v8.test.mjs",
     "test:transport": "node --test ../browser-omni-transport.test.mjs"
   },
   "engines": {

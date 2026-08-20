@@ -1,0 +1,37 @@
+{
+  "_README": "Live v7 0x02 bodies are plain UTF-8 caller-text deltas. A direct event-keyed JSON object remains accepted for older bridges.",
+  "live_delta": "synthetic caller delta",
+  "canonical": {
+    "event": "transcript",
+    "role": "user",
+    "text": "Synthetic caller transcript.",
+    "final": false
+  },
+  "rejected": [
+    {
+      "type": "transcript",
+      "role": "user",
+      "text": "Wrong discriminator.",
+      "final": false
+    },
+    {
+      "event": "transcript",
+      "speaker": "user",
+      "text": "Wrong role field.",
+      "final": false
+    },
+    {
+      "event": "transcript",
+      "role": "user",
+      "delta": "Wrong text field.",
+      "final": false
+    },
+    {
+      "event": "transcript",
+      "role": "user",
+      "text": "Extra field.",
+      "final": false,
+      "sequence": 1
+    }
+  ]
+}
