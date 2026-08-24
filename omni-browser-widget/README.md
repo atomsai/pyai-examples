@@ -1,13 +1,13 @@
-# Hosted Omni browser widget v8
+# Hosted Omni browser widget v9
 
-v8 is the current runtime. v7 remains checked in and immutable for existing
-embeds.
+v9 is the current runtime. v7 and v8 remain checked in and immutable for
+existing embeds.
 
 Publish a website widget from **Agents → Website & phone**, then paste one
 script tag:
 
 ```html
-<script src="https://cdn.pyai.com/widget/v8/pyai-widget.js"
+<script src="https://cdn.pyai.com/widget/v9/pyai-widget.js"
   data-widget="wdgt_public_x" async></script>
 ```
 
@@ -25,6 +25,12 @@ Server messages must use binary native framing:
 Text WebSocket frames, type-keyed server controls, unknown binary tags, and
 transcript controls outside `0x02` are rejected. Client audio/control remains
 `0x01` PCM16 and `0x03` JSON keyed on `type`.
+
+v9 also protects the turn-0 consent line and greeting from browser self-barge:
+it buffers server PCM until the shared playback graph is running, sends
+real-time digital silence instead of microphone or speaker energy through the
+opening drain, and restores normal caller barge-in after a short warm-up on
+later replies.
 
 ## Local smoke
 

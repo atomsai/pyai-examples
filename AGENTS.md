@@ -106,6 +106,9 @@ barge-in. No STT-LLM-TTS pipeline to stitch together.
   and `consent_line`. Roadmap knobs: `language`, `model_tier`.
 - **Use it for:** phone agents (receptionist, booking, qualification, support),
   website "talk to us" widgets, in-app voice assistants.
+- **Browser opening invariant:** initialize/resume playback before configure,
+  send real-time digital silence instead of mic/self-audio through the turn-0
+  consent/greeting drain, then restore mic audio and normal later barge-in.
 - **Start from:** [`twilio-omni-voice-agent`](./twilio-omni-voice-agent),
   [`freeswitch-omni-voice-agent`](./freeswitch-omni-voice-agent),
   [`pyai-site-voice-concierge`](./pyai-site-voice-concierge),

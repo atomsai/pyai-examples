@@ -145,6 +145,11 @@ persona, but with no live per-turn retrieval.
 | `src/persona.js` | The concierge persona sent in `configure`. |
 | `public/` | The "Talk to PyAI" widget: mic capture → PCM16@24k, agent playback, barge-in. |
 
+The browser uses one resumed audio graph for capture and playback. During the
+turn-0 greeting it sends real-time digital silence instead of microphone or
+speaker energy until the playback queue drains, then restores microphone audio.
+Later replies retain normal barge-in after a short echo-cancellation warm-up.
+
 ## Wiring it into the real pyai.com
 
 This standalone server is the reference. To embed in the marketing site, host
@@ -161,6 +166,9 @@ component.
 - **Audio format is load-bearing.** Omni speaks PCM16 LE at 24 kHz. Browsers may
   ignore the requested `AudioContext` rate, so the client resamples capture from
   the context's actual rate before sending it.
+- **Protect turn-0 audio.** Browser echo cancellation is not a startup gate.
+  Buffer server PCM until playback is ready, keep microphone/self-audio out of
+  the uplink through the opening drain, and rearm it for later barge-in.
 - **Exact event/frame names.** Transcript/barge-in JSON field names aren't fully
   byte-pinned across the docs; `src/omni-session.js` and `public/app.js` accept
   the documented spellings and ignore unknown frames (forward-compatible).

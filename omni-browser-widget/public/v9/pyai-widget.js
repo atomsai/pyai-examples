@@ -1,8 +1,9 @@
 (function () {
   "use strict";
 
-  var VERSION = "7.0.0";
-  var scripts = document.querySelectorAll('script[src*="/widget/v7/pyai-widget.js"]');
+  var VERSION = "9.0.0";
+  var OPENING_AUDIO_POLICY_VERSION = "omni-opening-v1";
+  var scripts = document.querySelectorAll('script[src*="/widget/v9/pyai-widget.js"]');
   var script = document.currentScript || scripts[scripts.length - 1];
   if (!script) return;
 
@@ -29,7 +30,7 @@
     ws: null,
     stream: null,
     inputContext: null,
-    outputContext: null,
+    captureMute: null,
     processor: null,
     muted: false,
     connected: false,
@@ -38,23 +39,24 @@
     previousFocus: null,
     wsErrorEmitted: false,
     destroyed: false,
-    transcriptSequence: { user: -1, assistant: -1 },
     transcriptHistory: [],
-    callerFinalizeTimer: null,
-    lastCallerChunk: null,
-    lastCallerChunkAt: 0,
     agentState: null,
     responseAudioActive: false,
+    agentPlayStartedAt: 0,
+    startupAudioPhase: "waiting",
+    connectedAt: 0,
+    playbackReady: false,
+    pendingAudio: [],
     agentEndTimer: null,
     agentSpeakingTimer: null,
   };
   var MAX_TRANSCRIPT_BYTES = 16384;
   var MAX_TRANSCRIPT_CHARS = 4000;
   var MAX_TRANSCRIPT_ROWS = 100;
-  var CALLER_INACTIVITY_MS = 1200;
-  var DUPLICATE_DELTA_WINDOW_MS = 40;
-  var AGENT_AUDIO_END_GRACE_MS = 180;
+  var AGENT_AUDIO_END_GRACE_MS = 500;
   var AGENT_STATE_TRANSITION_MS = 100;
+  var STARTUP_AUDIO_WAIT_MS = 4000;
+  var AGENT_BARGE_ARM_DELAY_MS = 350;
 
   var ERROR_CONTRACT = {
     mic_permission_denied: {
@@ -219,6 +221,17 @@
     return typeof value === "string" && value ? value : fallback;
   }
 
+  function accentText(accent) {
+    var match = /^#([0-9a-f]{6})$/i.exec(accent || "");
+    if (!match) return "#fff";
+    var channels = [0, 2, 4].map(function (offset) {
+      var channel = parseInt(match[1].slice(offset, offset + 2), 16) / 255;
+      return channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
+    });
+    var luminance = 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+    return luminance > 0.179 ? "#171411" : "#fff";
+  }
+
   function installStyles() {
     if (document.getElementById("pyai-widget-v7-styles")) return;
     var style = element("style");
@@ -227,19 +240,19 @@
     if (nonce) style.nonce = nonce;
     style.textContent =
       ".pyai-v7-unavailable{position:fixed;z-index:2147483000;bottom:max(20px,env(safe-area-inset-bottom));right:20px;max-width:320px;padding:14px 16px;border:1px solid #ddd6cc;border-radius:14px;background:#fff;color:#171411;font:500 14px/1.4 Inter,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif}" +
-      ".pyai-v4{--pa:#5b5bd6;font-family:Inter,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:#171411}" +
-      ".pyai-v4-launch{position:fixed;z-index:2147483000;bottom:max(20px,env(safe-area-inset-bottom));right:20px;border:0;background:var(--pa);color:#fff;border-radius:999px;min-height:52px;padding:0 20px;font:600 15px inherit;box-shadow:0 12px 35px rgba(0,0,0,.22);cursor:pointer}" +
-      ".pyai-v4-left{right:auto;left:20px}.pyai-v4-orb{width:56px;height:56px;padding:0;font-size:0}.pyai-v4-orb:after{content:'🎙';font-size:21px}" +
-      ".pyai-v4-card{width:300px;border-radius:20px;text-align:left;padding:18px;background:#fff;color:#171411;border:1px solid #e6e1d8}.pyai-v4-card b,.pyai-v4-card span{display:block}.pyai-v4-card span{margin-top:5px;color:#696158;font-size:13px}" +
-      ".pyai-v4-inline{position:static;box-shadow:none}.pyai-v4[hidden]{display:none!important}" +
-      ".pyai-v4-backdrop{position:fixed;z-index:2147483001;inset:0;background:rgba(20,17,14,.48);display:grid;place-items:end center;padding:20px}" +
-      ".pyai-v4-dialog{width:min(420px,100%);max-height:min(680px,calc(100vh - 40px));display:flex;flex-direction:column;background:#fff;border-radius:24px;box-shadow:0 22px 70px rgba(0,0,0,.28);overflow:hidden}" +
-      ".pyai-v4-head{display:flex;align-items:flex-start;justify-content:space-between;padding:20px;border-bottom:1px solid #ece8e2}.pyai-v4-head h2{font-size:18px;margin:0}.pyai-v4-head p{font-size:13px;color:#716960;margin:5px 0 0}.pyai-v4-close{border:0;background:transparent;font-size:24px;cursor:pointer}" +
-      ".pyai-v4-body{padding:18px;overflow:auto;min-height:180px}.pyai-v4-status{font-size:14px;color:#655e56}.pyai-v4-consent{margin:14px 0;padding:14px;border-radius:14px;background:#f4f1ff;font-size:14px;line-height:1.45}.pyai-v4-transcript{margin-top:14px;display:grid;gap:8px;font-size:14px}.pyai-v4-transcript div{padding:9px 11px;border-radius:12px;background:#f6f4f0}" +
-      ".pyai-v4-actions{display:flex;gap:10px;padding:16px 18px;border-top:1px solid #ece8e2}.pyai-v4-btn{flex:1;border:1px solid #ddd6cc;background:#fff;border-radius:999px;min-height:44px;font:600 14px inherit;cursor:pointer}.pyai-v4-primary{border-color:var(--pa);background:var(--pa);color:#fff}" +
-      ".pyai-v4-brand{display:block;text-align:center;padding:0 0 14px;font-size:11px;color:#817970}.pyai-v4-brand:focus-visible,.pyai-v4-btn:focus-visible,.pyai-v4-launch:focus-visible{outline:3px solid color-mix(in srgb,var(--pa) 45%,transparent);outline-offset:3px}" +
-      "@media(max-width:640px){.pyai-v4-backdrop{padding:0;align-items:end}.pyai-v4-dialog{width:100%;max-height:88vh;border-radius:24px 24px 0 0;padding-bottom:env(safe-area-inset-bottom)}}" +
-      "@media(prefers-color-scheme:dark){.pyai-v4[data-theme=auto] .pyai-v4-dialog,.pyai-v4[data-theme=dark] .pyai-v4-dialog{background:#181613;color:#f7f2ea}.pyai-v4[data-theme=auto] .pyai-v4-head,.pyai-v4[data-theme=auto] .pyai-v4-actions,.pyai-v4[data-theme=dark] .pyai-v4-head,.pyai-v4[data-theme=dark] .pyai-v4-actions{border-color:#332e28}.pyai-v4[data-theme=auto] .pyai-v4-transcript div,.pyai-v4[data-theme=dark] .pyai-v4-transcript div{background:#24201c}}";
+      ".pyai-v7{--pa:#5b5bd6;--pa-text:#fff;font-family:Inter,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:#171411}" +
+      ".pyai-v7-launch{position:fixed;z-index:2147483000;bottom:max(20px,env(safe-area-inset-bottom));right:20px;border:0;background:var(--pa);color:var(--pa-text);border-radius:999px;min-height:52px;padding:0 20px;font:600 15px inherit;box-shadow:0 12px 35px rgba(0,0,0,.22);cursor:pointer}" +
+      ".pyai-v7-left{right:auto;left:20px}.pyai-v7-orb{width:56px;height:56px;padding:0;font-size:0}.pyai-v7-orb:after{content:'🎙';font-size:21px}" +
+      ".pyai-v7-card{width:300px;border-radius:20px;text-align:left;padding:18px;background:#fff;color:#171411;border:1px solid #e6e1d8}.pyai-v7-card b,.pyai-v7-card span{display:block}.pyai-v7-card span{margin-top:5px;color:#696158;font-size:13px}" +
+      ".pyai-v7-inline{position:static;box-shadow:none}.pyai-v7[hidden]{display:none!important}" +
+      ".pyai-v7-backdrop{position:fixed;z-index:2147483001;inset:0;background:rgba(20,17,14,.48);display:grid;place-items:end center;padding:20px}" +
+      ".pyai-v7-dialog{width:min(420px,100%);max-height:min(680px,calc(100vh - 40px));display:flex;flex-direction:column;background:#fff;border-radius:24px;box-shadow:0 22px 70px rgba(0,0,0,.28);overflow:hidden}" +
+      ".pyai-v7-head{display:flex;align-items:flex-start;justify-content:space-between;padding:20px;border-bottom:1px solid #ece8e2}.pyai-v7-head h2{font-size:18px;margin:0}.pyai-v7-head p{font-size:13px;color:#716960;margin:5px 0 0}.pyai-v7-close{border:0;background:transparent;font-size:24px;cursor:pointer}" +
+      ".pyai-v7-body{padding:18px;overflow:auto;min-height:180px}.pyai-v7-status{font-size:14px;color:#655e56}.pyai-v7-consent{margin:14px 0;padding:14px;border-radius:14px;background:#f4f1ff;font-size:14px;line-height:1.45}.pyai-v7-transcript{margin-top:14px;display:grid;gap:8px;font-size:14px}.pyai-v7-transcript div{padding:9px 11px;border-radius:12px;background:#f6f4f0}" +
+      ".pyai-v7-actions{display:flex;gap:10px;padding:16px 18px;border-top:1px solid #ece8e2}.pyai-v7-btn{flex:1;border:1px solid #ddd6cc;background:#fff;border-radius:999px;min-height:44px;font:600 14px inherit;cursor:pointer}.pyai-v7-primary{border-color:var(--pa);background:var(--pa);color:var(--pa-text)}" +
+      ".pyai-v7-brand{display:block;text-align:center;padding:0 0 14px;font-size:11px;color:#817970}.pyai-v7-brand:focus-visible,.pyai-v7-btn:focus-visible,.pyai-v7-launch:focus-visible{outline:3px solid color-mix(in srgb,var(--pa) 45%,transparent);outline-offset:3px}" +
+      "@media(max-width:640px){.pyai-v7-backdrop{padding:0;align-items:end}.pyai-v7-dialog{width:100%;max-height:88vh;border-radius:24px 24px 0 0;padding-bottom:env(safe-area-inset-bottom)}}" +
+      "@media(prefers-color-scheme:dark){.pyai-v7[data-theme=auto] .pyai-v7-dialog,.pyai-v7[data-theme=dark] .pyai-v7-dialog{background:#181613;color:#f7f2ea}.pyai-v7[data-theme=auto] .pyai-v7-head,.pyai-v7[data-theme=auto] .pyai-v7-actions,.pyai-v7[data-theme=dark] .pyai-v7-head,.pyai-v7[data-theme=dark] .pyai-v7-actions{border-color:#332e28}.pyai-v7[data-theme=auto] .pyai-v7-transcript div,.pyai-v7[data-theme=dark] .pyai-v7-transcript div{background:#24201c}}";
     document.head.appendChild(style);
   }
 
@@ -248,7 +261,8 @@
       try { source.stop(); } catch (_) {}
     });
     state.sources = [];
-    state.playAt = 0;
+    state.pendingAudio = [];
+    state.playAt = state.inputContext ? state.inputContext.currentTime : 0;
   }
 
   function downsample(input, fromRate, toRate) {
@@ -278,6 +292,46 @@
     return frame;
   }
 
+  function beginStartupAudioPhase(phase, nowMs, connectedAtMs) {
+    if (phase !== "waiting") return phase;
+    return nowMs - connectedAtMs < STARTUP_AUDIO_WAIT_MS ? "playing" : "complete";
+  }
+
+  function completeStartupAudioPhase() {
+    return "complete";
+  }
+
+  function shouldZeroCallerSamples(captureState, nowMs) {
+    if (captureState.startupAudioPhase === "playing") return true;
+    if (
+      captureState.startupAudioPhase === "waiting" &&
+      nowMs - captureState.connectedAt < STARTUP_AUDIO_WAIT_MS
+    ) {
+      return true;
+    }
+    return (
+      captureState.responseAudioActive &&
+      nowMs - captureState.agentPlayStartedAt < AGENT_BARGE_ARM_DELAY_MS
+    );
+  }
+
+  function selectCallerSamples(samples, captureState, nowMs) {
+    return shouldZeroCallerSamples(captureState, nowMs)
+      ? new Float32Array(samples.length)
+      : samples;
+  }
+
+  function pcm16FramePeak(frame) {
+    if (!(frame instanceof Uint8Array) || frame[0] !== 0x01) return 0;
+    var count = Math.floor((frame.byteLength - 1) / 2);
+    var view = new DataView(frame.buffer, frame.byteOffset + 1, count * 2);
+    var peak = 0;
+    for (var i = 0; i < count; i += 1) {
+      peak = Math.max(peak, Math.abs(view.getInt16(i * 2, true)));
+    }
+    return peak;
+  }
+
   function controlFrame(payload) {
     var encoded = new TextEncoder().encode(JSON.stringify(payload));
     var frame = new Uint8Array(encoded.length + 1);
@@ -286,18 +340,17 @@
     return frame;
   }
 
-  function playPcm(bytes) {
-    var AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!state.outputContext) state.outputContext = new AudioContextClass({ sampleRate: 24000 });
+  function schedulePcm(bytes) {
     var count = Math.floor(bytes.byteLength / 2);
-    var buffer = state.outputContext.createBuffer(1, count, 24000);
+    if (!count || !state.inputContext) return;
+    var buffer = state.inputContext.createBuffer(1, count, 24000);
     var channel = buffer.getChannelData(0);
     var view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     for (var i = 0; i < count; i += 1) channel[i] = view.getInt16(i * 2, true) / 32768;
-    var source = state.outputContext.createBufferSource();
+    var source = state.inputContext.createBufferSource();
     source.buffer = buffer;
-    source.connect(state.outputContext.destination);
-    state.playAt = Math.max(state.outputContext.currentTime + 0.025, state.playAt);
+    source.connect(state.inputContext.destination);
+    state.playAt = Math.max(state.inputContext.currentTime + 0.025, state.playAt);
     source.start(state.playAt);
     state.playAt += buffer.duration;
     state.sources.push(source);
@@ -309,6 +362,10 @@
         state.agentEndTimer = setTimeout(function () {
           if (!state.sources.length && state.responseAudioActive) {
             state.responseAudioActive = false;
+            state.agentPlayStartedAt = 0;
+            state.startupAudioPhase = completeStartupAudioPhase(
+              state.startupAudioPhase,
+            );
             clearTimeout(state.agentSpeakingTimer);
             state.agentSpeakingTimer = null;
             setAgentState("listening");
@@ -318,41 +375,24 @@
     };
   }
 
-  function transcriptRole(value) {
-    if (value === "user" || value === "caller" || value === "human") return "user";
-    if (value === "assistant" || value === "agent") return "assistant";
-    return null;
+  function flushPendingAudio() {
+    if (!state.playbackReady || !state.inputContext) return;
+    var pending = state.pendingAudio.splice(0);
+    pending.forEach(schedulePcm);
+  }
+
+  function playPcm(bytes) {
+    if (!state.playbackReady || !state.inputContext) {
+      state.pendingAudio.push(new Uint8Array(bytes));
+      return;
+    }
+    schedulePcm(bytes);
   }
 
   function safeTranscriptText(value) {
     if (typeof value !== "string" || !value || value.length > MAX_TRANSCRIPT_CHARS) return null;
     if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)) return null;
     return value;
-  }
-
-  function normalizeTranscriptPayload(payload, liveText) {
-    if (liveText) {
-      var scalar = safeTranscriptText(payload);
-      return scalar ? { role: "user", text: scalar, final: false, mode: "delta", sequence: null } : null;
-    }
-    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
-    var role = transcriptRole(payload.role || payload.speaker);
-    if (!role) return null;
-    var mode = typeof payload.delta === "string" ? "delta" : "replace";
-    var value = mode === "delta" ? payload.delta :
-      typeof payload.text === "string" ? payload.text : payload.transcript;
-    var normalizedText = safeTranscriptText(value);
-    if (!normalizedText) return null;
-    if (payload.final !== undefined && typeof payload.final !== "boolean") return null;
-    if (payload.sequence !== undefined &&
-      (!Number.isSafeInteger(payload.sequence) || payload.sequence < 0)) return null;
-    return {
-      role: role,
-      text: normalizedText,
-      final: payload.final === true,
-      mode: mode,
-      sequence: payload.sequence === undefined ? null : payload.sequence,
-    };
   }
 
   function normalizeTranscriptBody(bytes) {
@@ -363,45 +403,44 @@
     } catch (_) {
       return null;
     }
-    var trimmed = decoded.trimStart();
-    if (trimmed.charAt(0) !== "{") return normalizeTranscriptPayload(decoded, true);
+    if (decoded.trimStart().charAt(0) !== "{") {
+      var delta = safeTranscriptText(decoded);
+      return delta ? {
+        event: "transcript",
+        role: "user",
+        text: delta,
+        final: false,
+        mode: "delta",
+      } : null;
+    }
+    var payload;
     try {
-      return normalizeTranscriptPayload(JSON.parse(decoded), false);
+      payload = JSON.parse(decoded);
     } catch (_) {
       return null;
     }
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+    var keys = Object.keys(payload);
+    if (keys.length !== 4 ||
+      !["event", "role", "text", "final"].every(function (key) { return keys.indexOf(key) >= 0; })) return null;
+    if (payload.event !== "transcript") return null;
+    if (payload.role !== "user" && payload.role !== "assistant") return null;
+    var normalizedText = safeTranscriptText(payload.text);
+    if (!normalizedText) return null;
+    if (typeof payload.final !== "boolean") return null;
+    return {
+      event: "transcript",
+      role: payload.role,
+      text: normalizedText,
+      final: payload.final,
+      mode: "replace",
+    };
   }
 
   function activeTranscriptRow(role) {
     var history = state.transcriptHistory;
     var row = history.length ? history[history.length - 1] : null;
     return row && !row.final && row.role === role ? row : null;
-  }
-
-  function overlapLength(left, right) {
-    var suffix = left.slice(Math.max(0, left.length - right.length));
-    var input = right + "\u0000" + suffix;
-    var prefix = new Array(input.length).fill(0);
-    for (var i = 1; i < input.length; i += 1) {
-      var matched = prefix[i - 1];
-      while (matched > 0 && input.charAt(i) !== input.charAt(matched)) matched = prefix[matched - 1];
-      if (input.charAt(i) === input.charAt(matched)) matched += 1;
-      prefix[i] = matched;
-    }
-    return Math.min(right.length, prefix[input.length - 1] || 0);
-  }
-
-  function mergeCallerDelta(current, delta, now) {
-    if (delta === state.lastCallerChunk &&
-      now - state.lastCallerChunkAt <= DUPLICATE_DELTA_WINDOW_MS) return null;
-    state.lastCallerChunk = delta;
-    state.lastCallerChunkAt = now;
-    var overlap = overlapLength(current, delta);
-    if (overlap === delta.length) return null;
-    var merged = current + delta.slice(overlap);
-    return merged.length > MAX_TRANSCRIPT_CHARS
-      ? merged.slice(merged.length - MAX_TRANSCRIPT_CHARS)
-      : merged;
   }
 
   function emitTranscriptRow(row) {
@@ -413,66 +452,28 @@
     });
   }
 
-  function clearCallerTimer() {
-    clearTimeout(state.callerFinalizeTimer);
-    state.callerFinalizeTimer = null;
-  }
-
-  function finalizeCallerTurn() {
-    var active = activeTranscriptRow("user");
-    clearCallerTimer();
-    if (!active) return false;
-    active.final = true;
-    renderTranscriptRows();
-    emitTranscriptRow(active);
-    return true;
-  }
-
-  function scheduleCallerFinalization() {
-    clearCallerTimer();
-    state.callerFinalizeTimer = setTimeout(function () {
-      finalizeCallerTurn();
-    }, CALLER_INACTIVITY_MS);
-  }
-
-  function finalizeTranscriptRows() {
-    return finalizeCallerTurn();
-  }
-
-  function applyTranscript(transcript, observedAt) {
+  function applyTranscript(transcript) {
     if (!transcript) return false;
-    if (transcript.sequence !== null) {
-      if (transcript.sequence <= state.transcriptSequence[transcript.role]) return false;
-      state.transcriptSequence[transcript.role] = transcript.sequence;
-    }
     var history = state.transcriptHistory;
     var active = activeTranscriptRow(transcript.role);
-    if (active && transcript.mode === "delta") {
-      var merged = transcript.role === "user"
-        ? mergeCallerDelta(active.text, transcript.text, observedAt || Date.now())
-        : active.text + transcript.text;
-      if (merged === null) return false;
-      active.text = merged.slice(Math.max(0, merged.length - MAX_TRANSCRIPT_CHARS));
-      active.final = transcript.final;
-    } else if (active) {
-      if (active.text === transcript.text && active.final === transcript.final) return false;
-      active.text = transcript.text;
+    if (active) {
+      var nextText = transcript.mode === "delta"
+        ? active.text + transcript.text
+        : transcript.text;
+      if (!safeTranscriptText(nextText)) return false;
+      if (active.text === nextText && active.final === transcript.final) return false;
+      active.text = nextText;
       active.final = transcript.final;
     } else {
-      if (history.length) history[history.length - 1].final = true;
       history.push({ role: transcript.role, text: transcript.text, final: transcript.final });
       while (history.length > MAX_TRANSCRIPT_ROWS) history.shift();
-      if (transcript.role === "user") {
-        state.lastCallerChunk = transcript.text;
-        state.lastCallerChunkAt = observedAt || Date.now();
-      }
     }
     return true;
   }
 
   function renderTranscriptRows() {
     if (!state.panel) return;
-    var log = state.panel.querySelector(".pyai-v4-transcript");
+    var log = state.panel.querySelector(".pyai-v7-transcript");
     while (log.firstChild) log.removeChild(log.firstChild);
     for (var i = 0; i < state.transcriptHistory.length; i += 1) {
       var transcript = state.transcriptHistory[i];
@@ -492,10 +493,6 @@
     var row = activeTranscriptRow(transcript.role) ||
       state.transcriptHistory[state.transcriptHistory.length - 1];
     emitTranscriptRow(row);
-    if (transcript.role === "user") {
-      if (row.final) clearCallerTimer();
-      else scheduleCallerFinalization();
-    }
   }
 
   function decodeTaggedFrame(buffer) {
@@ -510,8 +507,12 @@
       return { kind: "transcript", payload: normalizeTranscriptBody(body), bytes: body };
     }
     var payload;
-    try { payload = JSON.parse(new TextDecoder().decode(body)); }
+    try { payload = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(body)); }
     catch (_) { return { kind: "unknown", payload: null, bytes: body }; }
+    if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
+      typeof payload.event !== "string" || !payload.event || payload.event === "transcript") {
+      return { kind: "unknown", payload: null, bytes: body };
+    }
     return {
       kind: "control",
       payload: payload,
@@ -526,7 +527,12 @@
       state.agentEndTimer = null;
       if (!state.responseAudioActive) {
         state.responseAudioActive = true;
-        finalizeCallerTurn();
+        state.agentPlayStartedAt = Date.now();
+        state.startupAudioPhase = beginStartupAudioPhase(
+          state.startupAudioPhase,
+          state.agentPlayStartedAt,
+          state.connectedAt,
+        );
         setAgentState("thinking");
         clearTimeout(state.agentSpeakingTimer);
         state.agentSpeakingTimer = setTimeout(function () {
@@ -537,15 +543,19 @@
       playPcm(frame.bytes);
       return;
     }
-    if (!frame.payload) return;
+    if (!frame.payload) {
+      if (state.ws && state.ws.readyState === WebSocket.OPEN) state.ws.close(1002, "invalid_binary_frame");
+      return;
+    }
     var payload = frame.payload;
     if (frame.kind === "transcript") appendTranscript(payload);
-    if (frame.kind === "control" && payload.event === "transcript") {
-      appendTranscript(normalizeTranscriptPayload(payload, false));
-    }
     if (payload.event === "flush" || payload.event === "barge_in") {
       stopSources();
       state.responseAudioActive = false;
+      state.agentPlayStartedAt = 0;
+      state.startupAudioPhase = completeStartupAudioPhase(
+        state.startupAudioPhase,
+      );
       clearTimeout(state.agentSpeakingTimer);
       state.agentSpeakingTimer = null;
       setAgentState("listening");
@@ -559,15 +569,33 @@
       .then(function (stream) {
         state.stream = stream;
         var AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        state.inputContext = new AudioContextClass();
+        state.inputContext = new AudioContextClass({ sampleRate: 24000 });
+        state.playbackReady = false;
         var source = state.inputContext.createMediaStreamSource(stream);
         state.processor = state.inputContext.createScriptProcessor(2048, 1, 1);
+        state.captureMute = state.inputContext.createGain();
+        state.captureMute.gain.value = 0;
         state.processor.onaudioprocess = function (event) {
           if (state.muted || !state.ws || state.ws.readyState !== WebSocket.OPEN) return;
-          state.ws.send(pcm16Frame(event.inputBuffer.getChannelData(0), state.inputContext.sampleRate));
+          var samples = event.inputBuffer.getChannelData(0);
+          state.ws.send(
+            pcm16Frame(
+              selectCallerSamples(samples, state, Date.now()),
+              state.inputContext.sampleRate,
+            ),
+          );
         };
         source.connect(state.processor);
-        state.processor.connect(state.inputContext.destination);
+        state.processor.connect(state.captureMute);
+        state.captureMute.connect(state.inputContext.destination);
+        return Promise.resolve(state.inputContext.resume()).then(function () {
+          state.playbackReady = state.inputContext.state === "running";
+          if (!state.playbackReady) {
+            throw new Error("Audio playback is not ready.");
+          }
+          state.playAt = state.inputContext.currentTime;
+          flushPendingAudio();
+        });
       })
       .catch(function (error) {
         if (error && (error.name === "NotAllowedError" || error.name === "SecurityError")) {
@@ -579,7 +607,7 @@
 
   function setStatus(value) {
     if (!state.panel) return;
-    state.panel.querySelector(".pyai-v4-status").textContent = value;
+    state.panel.querySelector(".pyai-v7-status").textContent = value;
   }
 
   function setAgentState(value) {
@@ -607,6 +635,8 @@
       state.ws.binaryType = "arraybuffer";
       state.ws.onopen = function () {
         state.connected = true;
+        state.startupAudioPhase = "waiting";
+        state.connectedAt = Date.now();
         setStatus("Connected. Start speaking.");
         state.ws.send(controlFrame(session.configure || { type: "configure" }));
         emit("connected", {});
@@ -614,6 +644,9 @@
       state.ws.onmessage = function (event) {
         if (event.data instanceof ArrayBuffer) handleFrame(event.data);
         else if (event.data instanceof Blob) event.data.arrayBuffer().then(handleFrame);
+        else if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+          state.ws.close(1002, "binary_frames_required");
+        }
       };
       state.ws.onerror = function () {
         if (!state.wsErrorEmitted) {
@@ -660,48 +693,49 @@
   function open() {
     if (!state.config || state.panel) return;
     state.previousFocus = document.activeElement;
-    var root = element("div", "pyai-v4 pyai-v4-backdrop");
+    var root = element("div", "pyai-v7 pyai-v7-backdrop");
     root.setAttribute("data-theme", state.config.theme);
     root.style.setProperty("--pa", state.config.accent);
-    var dialog = element("section", "pyai-v4-dialog");
+    root.style.setProperty("--pa-text", accentText(state.config.accent));
+    var dialog = element("section", "pyai-v7-dialog");
     dialog.setAttribute("role", "dialog");
     dialog.setAttribute("aria-modal", "true");
     dialog.setAttribute("aria-labelledby", instanceId + "-title");
-    var head = element("div", "pyai-v4-head");
+    var head = element("div", "pyai-v7-head");
     var heading = element("div");
     var title = element("h2", "", state.config.title);
     title.id = instanceId + "-title";
     heading.appendChild(title);
     heading.appendChild(element("p", "", state.config.subtitle));
-    var close = element("button", "pyai-v4-close", "×");
+    var close = element("button", "pyai-v7-close", "×");
     close.type = "button"; close.setAttribute("aria-label", "Close voice agent"); close.addEventListener("click", end);
     head.appendChild(heading); head.appendChild(close);
-    var body = element("div", "pyai-v4-body");
-    var status = element("div", "pyai-v4-status", "Preparing a secure session…");
+    var body = element("div", "pyai-v7-body");
+    var status = element("div", "pyai-v7-status", "Preparing a secure session…");
     status.setAttribute("aria-live", "polite");
     body.appendChild(status);
-    var consent = element("div", "pyai-v4-consent");
+    var consent = element("div", "pyai-v7-consent");
     consent.hidden = true;
     body.appendChild(consent);
-    var transcript = element("div", "pyai-v4-transcript");
+    var transcript = element("div", "pyai-v7-transcript");
     transcript.setAttribute("role", "log"); transcript.setAttribute("aria-live", "polite");
     body.appendChild(transcript);
-    var actions = element("div", "pyai-v4-actions");
-    var mute = element("button", "pyai-v4-btn", "Mute");
+    var actions = element("div", "pyai-v7-actions");
+    var mute = element("button", "pyai-v7-btn", "Mute");
     mute.type = "button";
     mute.addEventListener("click", function () {
       state.muted = !state.muted;
       mute.textContent = state.muted ? "Unmute" : "Mute";
       emit("mute", { muted: state.muted });
     });
-    var endButton = element("button", "pyai-v4-btn", "End");
+    var endButton = element("button", "pyai-v7-btn", "End");
     endButton.type = "button"; endButton.addEventListener("click", end);
     actions.appendChild(mute); actions.appendChild(endButton);
     dialog.appendChild(head); dialog.appendChild(body); dialog.appendChild(actions);
     var referralOverride = safeReferral(script.getAttribute("data-referral"));
     var referral = referralOverride || safeReferral(state.config.referralCode);
     if (state.config.branding === "show") {
-      var brand = element("a", "pyai-v4-brand", "Powered by PyAI");
+      var brand = element("a", "pyai-v7-brand", "Powered by PyAI");
       brand.href = brandingUrl(state.config.variant, referral);
       brand.target = "_blank"; brand.rel = "noopener noreferrer";
       brand.setAttribute("aria-label", "Powered by PyAI (opens in a new tab)");
@@ -720,7 +754,7 @@
       consent.textContent = text(state.config.consentLine, "This conversation may be recorded.");
       var consentDetail = emitError("consent_required");
       setStatus(consentDetail.message);
-      var allow = element("button", "pyai-v4-btn pyai-v4-primary", "Continue and allow microphone");
+      var allow = element("button", "pyai-v7-btn pyai-v7-primary", "Continue and allow microphone");
       allow.type = "button";
       actions.insertBefore(allow, mute);
       mute.hidden = true;
@@ -743,7 +777,6 @@
   }
 
   function end() {
-    finalizeCallerTurn();
     if (state.ws) {
       try {
         if (state.ws.readyState === WebSocket.OPEN) state.ws.send(controlFrame({ type: "session_ending" }));
@@ -754,18 +787,19 @@
     }
     state.ws = null;
     if (state.processor) { try { state.processor.disconnect(); } catch (_) {} }
+    if (state.captureMute) { try { state.captureMute.disconnect(); } catch (_) {} }
     if (state.stream) state.stream.getTracks().forEach(function (track) { track.stop(); });
     if (state.inputContext) state.inputContext.close().catch(function () {});
-    if (state.outputContext) state.outputContext.close().catch(function () {});
     stopSources();
-    state.stream = null; state.processor = null; state.inputContext = null; state.outputContext = null;
+    state.stream = null; state.processor = null; state.captureMute = null; state.inputContext = null;
     state.connected = false; state.wsErrorEmitted = false;
-    state.transcriptSequence = { user: -1, assistant: -1 };
-    state.lastCallerChunk = null;
-    state.lastCallerChunkAt = 0;
     state.agentState = null;
     state.responseAudioActive = false;
-    clearCallerTimer();
+    state.agentPlayStartedAt = 0;
+    state.startupAudioPhase = "waiting";
+    state.connectedAt = 0;
+    state.playbackReady = false;
+    state.pendingAudio = [];
     clearTimeout(state.agentEndTimer);
     state.agentEndTimer = null;
     clearTimeout(state.agentSpeakingTimer);
@@ -800,21 +834,22 @@
 
   function renderLauncher(config) {
     if (config.headless) return;
-    var launcher = element("button", "pyai-v4 pyai-v4-launch");
+    var launcher = element("button", "pyai-v7 pyai-v7-launch");
     launcher.type = "button";
     launcher.style.setProperty("--pa", config.accent);
+    launcher.style.setProperty("--pa-text", accentText(config.accent));
     launcher.setAttribute("aria-label", config.label);
-    if (config.position === "bottom-left") launcher.classList.add("pyai-v4-left");
-    if (config.variant === "orb") launcher.classList.add("pyai-v4-orb");
+    if (config.position === "bottom-left") launcher.classList.add("pyai-v7-left");
+    if (config.variant === "orb") launcher.classList.add("pyai-v7-orb");
     if (config.variant === "card") {
-      launcher.classList.add("pyai-v4-card");
+      launcher.classList.add("pyai-v7-card");
       launcher.appendChild(element("b", "", config.title));
       launcher.appendChild(element("span", "", config.subtitle));
     } else {
       launcher.textContent = config.label;
     }
     if (config.variant === "inline") {
-      launcher.classList.add("pyai-v4-inline");
+      launcher.classList.add("pyai-v7-inline");
       script.parentNode.insertBefore(launcher, script.nextSibling);
     } else document.body.appendChild(launcher);
     launcher.addEventListener("click", executeAction);
@@ -918,21 +953,26 @@
       brandingUrl: brandingUrl,
       normalizePublic: normalizePublic,
       pcm16Frame: pcm16Frame,
+      pcm16FramePeak: pcm16FramePeak,
+      beginStartupAudioPhase: beginStartupAudioPhase,
+      completeStartupAudioPhase: completeStartupAudioPhase,
+      shouldZeroCallerSamples: shouldZeroCallerSamples,
+      selectCallerSamples: selectCallerSamples,
+      openingAudioPolicyVersion: OPENING_AUDIO_POLICY_VERSION,
+      startupAudioWaitMs: STARTUP_AUDIO_WAIT_MS,
+      agentBargeArmDelayMs: AGENT_BARGE_ARM_DELAY_MS,
+      agentAudioEndGraceMs: AGENT_AUDIO_END_GRACE_MS,
       controlFrame: controlFrame,
       decodeTaggedFrame: decodeTaggedFrame,
       normalizeTranscriptBody: normalizeTranscriptBody,
-      normalizeTranscriptPayload: normalizeTranscriptPayload,
       applyTranscript: applyTranscript,
-      mergeCallerDelta: mergeCallerDelta,
-      finalizeTranscriptRows: finalizeTranscriptRows,
-      finalizeCallerTurn: finalizeCallerTurn,
-      scheduleCallerFinalization: scheduleCallerFinalization,
       handleFrame: handleFrame,
       setAgentState: setAgentState,
       classifyBrokerError: classifyBrokerError,
       errorDetail: errorDetail,
       emitWebSocketError: emitWebSocketError,
       browserSupported: browserSupported,
+      startMicrophone: startMicrophone,
       sessionError: sessionError,
       end: end,
       state: state,

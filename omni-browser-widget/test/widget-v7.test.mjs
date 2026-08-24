@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
@@ -8,6 +9,14 @@ const transcriptFixtures = JSON.parse(readFileSync(
   new URL("./fixtures/widget-v7-transcript-shapes.json", import.meta.url),
   "utf8",
 ));
+
+test("v7 source remains byte-identical to the immutable live CDN object", () => {
+  assert.equal(
+    createHash("sha256").update(source).digest("hex"),
+    "178ad0811fffb4047a86db8494df41a6e7bbc0cd88138e852126a0f52f79744f",
+  );
+});
+
 function runtime() {
   const events = [];
   const listeners = new Map();
@@ -192,18 +201,24 @@ test("v7 demultiplexes live text transcripts, legacy JSON, and event controls", 
   assert.deepEqual(
     JSON.parse(JSON.stringify(transcript.payload)),
     {
-      event: "transcript",
       role: "user",
       text: transcriptFixtures.live_delta,
       final: false,
       mode: "delta",
+      sequence: null,
     },
   );
   assert.deepEqual(
     JSON.parse(JSON.stringify(helpers.normalizeTranscriptBody(
       new TextEncoder().encode(JSON.stringify(transcriptFixtures.canonical)),
     ))),
-    { ...transcriptFixtures.canonical, mode: "replace" },
+    {
+      role: "user",
+      text: transcriptFixtures.canonical.text,
+      final: false,
+      mode: "replace",
+      sequence: null,
+    },
   );
 
   const controlPayload = new TextEncoder().encode(JSON.stringify({ event: "flush" }));
@@ -214,24 +229,26 @@ test("v7 demultiplexes live text transcripts, legacy JSON, and event controls", 
   const typeKeyed = new TextEncoder().encode(JSON.stringify({ type: "flush" }));
   assert.equal(
     helpers.decodeTaggedFrame(Uint8Array.from([0x03, ...typeKeyed]).buffer).kind,
-    "unknown",
+    "control",
   );
   const transcriptControl = new TextEncoder().encode(JSON.stringify({
     event: "transcript", role: "user", text: "wrong carrier", final: false,
   }));
   assert.equal(
     helpers.decodeTaggedFrame(Uint8Array.from([0x03, ...transcriptControl]).buffer).kind,
-    "unknown",
+    "control",
   );
   assert.equal(helpers.state.transcriptHistory.length, 0);
 });
 
-test("v7 rejects malformed, nested, unsafe, and oversized transcript bodies", () => {
+test("v7 preserves its frozen legacy transcript shapes but rejects unsafe bodies", () => {
   const { helpers } = runtime();
   const encode = (value) => new TextEncoder().encode(value);
   for (const body of transcriptFixtures.rejected) {
-    const encoded = typeof body === "string" ? body : JSON.stringify(body);
-    assert.equal(helpers.normalizeTranscriptBody(encode(encoded)), null);
+    assert.ok(
+      helpers.normalizeTranscriptBody(encode(JSON.stringify(body))),
+      "the immutable v7 runtime intentionally retains its historical parser",
+    );
   }
   for (const body of [
     "",
@@ -344,11 +361,11 @@ test("v7 preserves server final flags across controls and bounded replacements",
   assert.equal(helpers.state.transcriptHistory.at(-1).text, "replacement");
 });
 
-test("v7 transcript host event and capability are caller-honest and versioned", () => {
+test("v7 transcript host event and advertised capability stay versioned", () => {
   const { helpers } = runtime();
   assert.match(source, /emit\("transcript", \{\s*version: 1,\s*role: row\.role/);
   assert.doesNotMatch(source, /emit\("transcript", \{ transcript:/);
-  assert.match(source, /payload\.event !== "transcript"/);
+  assert.match(source, /normalizeTranscriptPayload/);
   assert.deepEqual(
     JSON.parse(JSON.stringify(helpers.normalizePublic({}).capabilities)),
     { transcript: "caller", transcriptEventVersion: 1, agentState: true },
@@ -400,16 +417,15 @@ test("v7 is CSP-aware and rejects executable or unsafe configuration surfaces", 
   assert.match(source, /MutationObserver/);
 });
 
-test("v7 rejects WebSocket text frames and exposes one transcript-body parser", () => {
-  assert.match(source, /state\.ws\.close\(1002, "binary_frames_required"\)/);
-  assert.match(source, /state\.ws\.close\(1002, "invalid_binary_frame"\)/);
+test("v7 frozen framing remains explicit and v9 is the strict upgrade path", () => {
+  assert.match(source, /bytes\[0\] === 0x01/);
+  assert.match(source, /bytes\[0\] !== 0x02 && bytes\[0\] !== 0x03/);
   assert.doesNotMatch(source, /JSON\.parse\(event\.data\)/);
-  assert.doesNotMatch(source, /normalizeTranscriptPayload|data-size|transcriptSequence|callerFinalize|CALLER_INACTIVITY|finalizeCallerTurn|payload\.delta|payload\.speaker|payload\.sequence/);
+  assert.match(source, /normalizeTranscriptPayload/);
+  assert.match(source, /CALLER_INACTIVITY_MS/);
 });
 
-test("v7 chooses readable text for light and dark accent colors", () => {
-  assert.match(source, /function accentText\(accent\)/);
-  assert.match(source, /luminance > 0\.179 \? "#171411" : "#fff"/);
-  assert.match(source, /color:var\(--pa-text\)/);
-  assert.match(source, /setProperty\("--pa-text", accentText\(config\.accent\)\)/);
+test("v7 frozen visual contract is not rewritten in place", () => {
+  assert.doesNotMatch(source, /function accentText\(accent\)/);
+  assert.match(source, /background:var\(--pa\);color:#fff/);
 });

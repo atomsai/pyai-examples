@@ -19,6 +19,9 @@
 const RATE = 24000;
 const MAX_BACKLOG_SECONDS = 1;
 const FADE_SECONDS = 0.015;
+const STARTUP_AUDIO_WAIT_MS = 4000;
+const AGENT_BARGE_ARM_DELAY_MS = 350;
+const AGENT_AUDIO_END_GRACE_MS = 500;
 
 const $ = (id) => document.getElementById(id);
 const toggle = $("toggle");
@@ -34,6 +37,11 @@ let processor;
 let captureMute;
 let outputGain;
 let running = false;
+let startupAudioPhase = "waiting";
+let connectedAt = 0;
+let responseAudioActive = false;
+let agentPlayStartedAt = 0;
+let agentEndTimer = null;
 
 // Playback scheduling for the agent's audio.
 let nextPlayTime = 0;
@@ -41,6 +49,44 @@ const playing = new Set(); // active AudioBufferSourceNodes (for barge-in cancel
 
 // Transcript rendering.
 let lastAssistantTurn = null;
+
+function beginStartupAudioPhase(phase, nowMs, connectedAtMs) {
+  if (phase !== "waiting") return phase;
+  return nowMs - connectedAtMs < STARTUP_AUDIO_WAIT_MS ? "playing" : "complete";
+}
+
+function completeStartupAudioPhase() {
+  return "complete";
+}
+
+function shouldZeroCallerSamples(nowMs) {
+  if (startupAudioPhase === "playing") return true;
+  if (
+    startupAudioPhase === "waiting" &&
+    nowMs - connectedAt < STARTUP_AUDIO_WAIT_MS
+  ) {
+    return true;
+  }
+  return (
+    responseAudioActive &&
+    nowMs - agentPlayStartedAt < AGENT_BARGE_ARM_DELAY_MS
+  );
+}
+
+function selectCallerSamples(samples, nowMs) {
+  return shouldZeroCallerSamples(nowMs)
+    ? new Float32Array(samples.length)
+    : samples;
+}
+
+function beginConnectionAudioState() {
+  startupAudioPhase = "waiting";
+  connectedAt = Date.now();
+  responseAudioActive = false;
+  agentPlayStartedAt = 0;
+  clearTimeout(agentEndTimer);
+  agentEndTimer = null;
+}
 
 function setStatus(text, kind = "") {
   statusEl.textContent = text;
@@ -120,6 +166,7 @@ async function connectDirect() {
   ws = new WebSocket(session.url, [`pyai-key.${session.token}`]);
   ws.binaryType = "arraybuffer";
   ws.onopen = () => {
+    beginConnectionAudioState();
     // Stateless on PyAI: the agent's whole behavior travels in this one frame.
     // Control frames are 0x03-prefixed (OMNI_PROTOCOL_V2.md §2/§3).
     try { ws.send(frame03(pendingConfigure)); } catch {}
@@ -139,6 +186,7 @@ function connectBroker() {
   ws = new WebSocket(brokerWsUrl());
   ws.binaryType = "arraybuffer";
   ws.onopen = () => {
+    beginConnectionAudioState();
     setStatus("Connecting to the agent…");
     startCapture();
   };
@@ -160,7 +208,10 @@ function startCapture() {
   processor.onaudioprocess = (ev) => {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     const input = ev.inputBuffer.getChannelData(0);
-    const pcm = pcm16(input, audioCtx.sampleRate);
+    const pcm = pcm16(
+      selectCallerSamples(input, Date.now()),
+      audioCtx.sampleRate,
+    );
     // DIRECT mode talks the engine's wire, so tag the frame. BROKER mode talks
     // our own relay, which tags upstream (see src/omni-session.js).
     ws.send(connectMode === "direct" ? frame01(pcm) : pcm);
@@ -312,7 +363,7 @@ function handleEvent(evt) {
       break;
     case "barge_in":
     case "flush":
-      stopPlayback(true); // fade, then drop buffered agent audio immediately
+      stopPlayback(true, true); // fade, drop stale audio, and fail-open capture
       setOrb("live");
       break;
     case "session_end":
@@ -330,7 +381,21 @@ function playAgentAudio(bytes) {
   if (!audioCtx || !outputGain) return;
   const sampleCount = Math.floor(bytes.byteLength / 2);
   if (!sampleCount) return;
-  if (Math.max(0, nextPlayTime - audioCtx.currentTime) > MAX_BACKLOG_SECONDS) {
+  clearTimeout(agentEndTimer);
+  agentEndTimer = null;
+  if (!responseAudioActive) {
+    responseAudioActive = true;
+    agentPlayStartedAt = Date.now();
+    startupAudioPhase = beginStartupAudioPhase(
+      startupAudioPhase,
+      agentPlayStartedAt,
+      connectedAt,
+    );
+  }
+  if (
+    startupAudioPhase !== "playing" &&
+    Math.max(0, nextPlayTime - audioCtx.currentTime) > MAX_BACKLOG_SECONDS
+  ) {
     stopPlayback(true);
   }
   const buffer = audioCtx.createBuffer(1, sampleCount, RATE);
@@ -351,11 +416,21 @@ function playAgentAudio(bytes) {
   src.onended = () => {
     playing.delete(src);
     src.disconnect();
-    if (playing.size === 0 && running) setOrb("live");
+    if (playing.size === 0) {
+      clearTimeout(agentEndTimer);
+      agentEndTimer = setTimeout(() => {
+        if (playing.size !== 0 || !responseAudioActive) return;
+        responseAudioActive = false;
+        agentPlayStartedAt = 0;
+        startupAudioPhase = completeStartupAudioPhase(startupAudioPhase);
+        agentEndTimer = null;
+        if (running) setOrb("live");
+      }, AGENT_AUDIO_END_GRACE_MS);
+    }
   };
 }
 
-function stopPlayback(fade = false) {
+function stopPlayback(fade = false, completeOpening = false) {
   const now = audioCtx ? audioCtx.currentTime : 0;
   const fadeEnd = fade && outputGain ? now + FADE_SECONDS : now;
   if (fade && outputGain) {
@@ -366,6 +441,13 @@ function stopPlayback(fade = false) {
   for (const src of playing) { try { src.stop(fadeEnd); } catch {} }
   playing.clear();
   nextPlayTime = now;
+  clearTimeout(agentEndTimer);
+  agentEndTimer = null;
+  if (completeOpening) {
+    responseAudioActive = false;
+    agentPlayStartedAt = 0;
+    startupAudioPhase = completeStartupAudioPhase(startupAudioPhase);
+  }
   if (fade && outputGain) {
     outputGain.gain.setValueAtTime(0, fadeEnd);
     outputGain.gain.linearRampToValueAtTime(1, fadeEnd + FADE_SECONDS);
@@ -395,7 +477,7 @@ function renderTranscript(evt) {
 
 function stop(reason = "Call ended.") {
   running = false;
-  stopPlayback(false);
+  stopPlayback(false, true);
   try { if (processor) processor.onaudioprocess = null; } catch {}
   try { processor && processor.disconnect(); } catch {}
   try { micSource && micSource.disconnect(); } catch {}
@@ -417,6 +499,10 @@ function stop(reason = "Call ended.") {
   micStream = null;
   ws = null;
   lastAssistantTurn = null;
+  startupAudioPhase = "waiting";
+  connectedAt = 0;
+  responseAudioActive = false;
+  agentPlayStartedAt = 0;
   toggle.textContent = "Start talking";
   toggle.classList.remove("stop");
   setOrb("");
@@ -426,3 +512,15 @@ function stop(reason = "Call ended.") {
 toggle.onclick = () => (running ? stop() : start());
 
 loadMode();
+
+if (window.__PYAI_CONCIERGE_TEST__) {
+  window.__PYAI_CONCIERGE_TEST__.helpers = {
+    beginStartupAudioPhase,
+    completeStartupAudioPhase,
+    shouldZeroCallerSamples,
+    selectCallerSamples,
+    startupAudioWaitMs: STARTUP_AUDIO_WAIT_MS,
+    agentBargeArmDelayMs: AGENT_BARGE_ARM_DELAY_MS,
+    agentAudioEndGraceMs: AGENT_AUDIO_END_GRACE_MS,
+  };
+}
