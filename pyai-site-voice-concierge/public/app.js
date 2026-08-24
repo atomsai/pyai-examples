@@ -339,6 +339,30 @@ function normalizeTranscriptBody(body) {
   }
 }
 
+function normalizeServerControl(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  if (typeof value.event === "string" && value.event && value.event !== "transcript") {
+    return value;
+  }
+  const allowedKeys = new Set(["type", "call_id", "sent_ms", "realtime_ms"]);
+  const validNumber = (number) => (
+    typeof number === "number" && Number.isFinite(number) && number >= 0
+  );
+  if (
+    value.type !== "audio_position"
+    || !Object.keys(value).every((key) => allowedKeys.has(key))
+    || !validNumber(value.sent_ms)
+    || !validNumber(value.realtime_ms)
+    || (
+      value.call_id !== undefined
+      && (typeof value.call_id !== "string" || !value.call_id)
+    )
+  ) {
+    return null;
+  }
+  return { ...value, event: "audio_position" };
+}
+
 // First-byte demux for the engine's binary frames (direct mode). Treating every
 // binary frame as audio plays control/transcript frames as a glitch and drops
 // every event, the #1 Omni integration bug.
@@ -355,9 +379,10 @@ function onBinaryFrame(arrayBuffer) {
     }
     case 0x03:
       try {
-        const event = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(u8.subarray(1)));
-        if (!event || typeof event !== "object" || typeof event.event !== "string" ||
-            !event.event || event.event === "transcript") throw new Error();
+        const event = normalizeServerControl(
+          JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(u8.subarray(1))),
+        );
+        if (!event) throw new Error();
         handleEvent(event);
       } catch {
         closeForProtocolViolation("invalid_control_frame");
@@ -545,6 +570,7 @@ if (window.__PYAI_CONCIERGE_TEST__) {
     agentBargeArmDelayMs: AGENT_BARGE_ARM_DELAY_MS,
     agentAudioEndGraceMs: AGENT_AUDIO_END_GRACE_MS,
     closeForProtocolViolation,
+    normalizeServerControl,
     protocolViolationCloseCode: PROTOCOL_VIOLATION_CLOSE_CODE,
     state: () => ({
       running,

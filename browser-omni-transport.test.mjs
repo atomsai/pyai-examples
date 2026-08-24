@@ -76,6 +76,17 @@ test("widget v10 keeps the protected opening and browser-safe protocol close", (
   assert.match(server, /"\/widget\/v10\/pyai-widget\.js"/);
 });
 
+test("widget v11 narrowly accepts legacy audio_position telemetry", () => {
+  const widget = read("./omni-browser-widget/public/v11/pyai-widget.js");
+  const server = read("./omni-browser-widget/server.js");
+  assert.match(widget, /VERSION = "11\.0\.0"/);
+  assert.match(widget, /payload\.type !== "audio_position"/);
+  assert.match(widget, /normalized\.event = "audio_position"/);
+  assert.match(widget, /PROTOCOL_VIOLATION_CLOSE_CODE = 4002/);
+  assert.doesNotMatch(widget, /\.close\(1002,/);
+  assert.match(server, /"\/widget\/v11\/pyai-widget\.js"/);
+});
+
 test("concierge direct browser transport is tagged, resampled, and strict", () => {
   const client = read("./pyai-site-voice-concierge/public/app.js");
   assert.match(client, /connectMode === "direct" \? frame01\(pcm\) : pcm/);
@@ -87,6 +98,7 @@ test("concierge direct browser transport is tagged, resampled, and strict", () =
   assert.match(client, /startupAudioPhase = completeStartupAudioPhase/);
   assert.match(client, /outputGain\.gain\.linearRampToValueAtTime/);
   assert.match(client, /PROTOCOL_VIOLATION_CLOSE_CODE = 4002/);
+  assert.match(client, /value\.type !== "audio_position"/);
   assert.match(client, /closeForProtocolViolation\("unknown_binary_tag"\)/);
   assert.doesNotMatch(client, /\.close\(1002,/);
   assert.match(client, /value\.event !== "transcript"/);

@@ -68,6 +68,31 @@ export function normalizeOmniTranscriptBody(body) {
   };
 }
 
+export function normalizeOmniServerControl(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  if (typeof value.event === "string" && value.event && value.event !== "transcript") {
+    return value;
+  }
+  const allowedKeys = new Set(["type", "call_id", "sent_ms", "realtime_ms"]);
+  if (
+    value.type !== "audio_position"
+    || !Object.keys(value).every((key) => allowedKeys.has(key))
+    || typeof value.sent_ms !== "number"
+    || !Number.isFinite(value.sent_ms)
+    || value.sent_ms < 0
+    || typeof value.realtime_ms !== "number"
+    || !Number.isFinite(value.realtime_ms)
+    || value.realtime_ms < 0
+    || (
+      value.call_id !== undefined
+      && (typeof value.call_id !== "string" || !value.call_id)
+    )
+  ) {
+    return null;
+  }
+  return { ...value, event: "audio_position" };
+}
+
 /**
  * @typedef {Object} OmniSessionOptions
  * @property {string}  apiKey        pyai_live_ / pyai_test_ key (server-side only).
@@ -161,8 +186,10 @@ export class OmniSession {
       }
     } else if (tag === 0x03) {
       try {
-        evt = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(buf.subarray(1)));
-        if (!evt || typeof evt !== "object" || Array.isArray(evt)) throw new Error();
+        evt = normalizeOmniServerControl(
+          JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(buf.subarray(1))),
+        );
+        if (!evt) throw new Error();
       } catch {
         this.opts.onError?.(new Error("Unparseable Omni control frame"));
         return;
