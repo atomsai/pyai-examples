@@ -22,6 +22,7 @@ const FADE_SECONDS = 0.015;
 const STARTUP_AUDIO_WAIT_MS = 4000;
 const AGENT_BARGE_ARM_DELAY_MS = 350;
 const AGENT_AUDIO_END_GRACE_MS = 500;
+const PROTOCOL_VIOLATION_CLOSE_CODE = 4002;
 
 const $ = (id) => document.getElementById(id);
 const toggle = $("toggle");
@@ -42,6 +43,8 @@ let connectedAt = 0;
 let responseAudioActive = false;
 let agentPlayStartedAt = 0;
 let agentEndTimer = null;
+let protocolCloseRequested = false;
+let protocolCloseAttempts = 0;
 
 // Playback scheduling for the agent's audio.
 let nextPlayTime = 0;
@@ -163,6 +166,8 @@ async function connectDirect() {
   const session = await res.json();
   pendingConfigure = session.configure || { type: "configure" };
 
+  protocolCloseRequested = false;
+  protocolCloseAttempts = 0;
   ws = new WebSocket(session.url, [`pyai-key.${session.token}`]);
   ws.binaryType = "arraybuffer";
   ws.onopen = () => {
@@ -183,6 +188,8 @@ async function connectDirect() {
 
 // BROKER: connect to our own server, which relays to PyAI server-side.
 function connectBroker() {
+  protocolCloseRequested = false;
+  protocolCloseAttempts = 0;
   ws = new WebSocket(brokerWsUrl());
   ws.binaryType = "arraybuffer";
   ws.onopen = () => {
@@ -278,7 +285,7 @@ function onMessage(ev) {
     return;
   }
   if (connectMode === "direct") {
-    ws?.close(1002, "binary_frames_required");
+    closeForProtocolViolation("binary_frames_required");
     return;
   }
   try {
@@ -286,6 +293,20 @@ function onMessage(ev) {
   } catch {
     /* ignore malformed */
   }
+}
+
+function closeForProtocolViolation(reason) {
+  if (
+    protocolCloseRequested ||
+    !ws ||
+    ws.readyState > WebSocket.OPEN
+  ) {
+    return false;
+  }
+  protocolCloseRequested = true;
+  protocolCloseAttempts += 1;
+  ws.close(PROTOCOL_VIOLATION_CLOSE_CODE, reason);
+  return true;
 }
 
 function normalizeTranscriptBody(body) {
@@ -339,11 +360,11 @@ function onBinaryFrame(arrayBuffer) {
             !event.event || event.event === "transcript") throw new Error();
         handleEvent(event);
       } catch {
-        ws?.close(1002, "invalid_control_frame");
+        closeForProtocolViolation("invalid_control_frame");
       }
       return;
     default:
-      ws?.close(1002, "unknown_binary_tag");
+      closeForProtocolViolation("unknown_binary_tag");
       return;
   }
 }
@@ -503,6 +524,7 @@ function stop(reason = "Call ended.") {
   connectedAt = 0;
   responseAudioActive = false;
   agentPlayStartedAt = 0;
+  protocolCloseRequested = false;
   toggle.textContent = "Start talking";
   toggle.classList.remove("stop");
   setOrb("");
@@ -522,5 +544,15 @@ if (window.__PYAI_CONCIERGE_TEST__) {
     startupAudioWaitMs: STARTUP_AUDIO_WAIT_MS,
     agentBargeArmDelayMs: AGENT_BARGE_ARM_DELAY_MS,
     agentAudioEndGraceMs: AGENT_AUDIO_END_GRACE_MS,
+    closeForProtocolViolation,
+    protocolViolationCloseCode: PROTOCOL_VIOLATION_CLOSE_CODE,
+    state: () => ({
+      running,
+      hasSocket: Boolean(ws),
+      hasAudioContext: Boolean(audioCtx),
+      hasMicrophone: Boolean(micStream),
+      protocolCloseRequested,
+      protocolCloseAttempts,
+    }),
   };
 }

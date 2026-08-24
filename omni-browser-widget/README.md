@@ -1,13 +1,14 @@
-# Hosted Omni browser widget v9
+# Hosted Omni browser widget v10
 
-v9 is the current runtime. v7 and v8 remain checked in and immutable for
-existing embeds.
+v10 is the current runtime. v1-v9 remain immutable for existing embeds. v9
+introduced protected opening audio but is superseded because malformed server
+frames could trigger a browser-invalid close request.
 
 Publish a website widget from **Agents → Website & phone**, then paste one
 script tag:
 
 ```html
-<script src="https://cdn.pyai.com/widget/v9/pyai-widget.js"
+<script src="https://cdn.pyai.com/widget/v10/pyai-widget.js"
   data-widget="wdgt_public_x" async></script>
 ```
 
@@ -26,11 +27,14 @@ Text WebSocket frames, type-keyed server controls, unknown binary tags, and
 transcript controls outside `0x02` are rejected. Client audio/control remains
 `0x01` PCM16 and `0x03` JSON keyed on `type`.
 
-v9 also protects the turn-0 consent line and greeting from browser self-barge:
+v10 protects the turn-0 consent line and greeting from browser self-barge:
 it buffers server PCM until the shared playback graph is running, sends
 real-time digital silence instead of microphone or speaker energy through the
 opening drain, and restores normal caller barge-in after a short warm-up on
 later replies.
+
+Protocol violations close once with application-private code `4002`; all
+reasons are short stable ASCII values within the browser's 123-byte limit.
 
 ## Local smoke
 

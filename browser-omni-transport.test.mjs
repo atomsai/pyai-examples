@@ -63,6 +63,19 @@ test("widget v9 preserves strict framing and the canonical protected opening", (
   assert.match(server, /"\/widget\/v9\/pyai-widget\.js"/);
 });
 
+test("widget v10 keeps the protected opening and browser-safe protocol close", () => {
+  const widget = read("./omni-browser-widget/public/v10/pyai-widget.js");
+  const server = read("./omni-browser-widget/server.js");
+  assert.match(widget, /VERSION = "10\.0\.0"/);
+  assert.match(widget, /startupAudioPhase/);
+  assert.match(widget, /pendingAudio/);
+  assert.match(widget, /PROTOCOL_VIOLATION_CLOSE_CODE = 4002/);
+  assert.match(widget, /closeForProtocolViolation\("binary_frames_required"\)/);
+  assert.match(widget, /closeForProtocolViolation\("invalid_binary_frame"\)/);
+  assert.doesNotMatch(widget, /\.close\(1002,/);
+  assert.match(server, /"\/widget\/v10\/pyai-widget\.js"/);
+});
+
 test("concierge direct browser transport is tagged, resampled, and strict", () => {
   const client = read("./pyai-site-voice-concierge/public/app.js");
   assert.match(client, /connectMode === "direct" \? frame01\(pcm\) : pcm/);
@@ -73,7 +86,9 @@ test("concierge direct browser transport is tagged, resampled, and strict", () =
   assert.match(client, /AGENT_BARGE_ARM_DELAY_MS = 350/);
   assert.match(client, /startupAudioPhase = completeStartupAudioPhase/);
   assert.match(client, /outputGain\.gain\.linearRampToValueAtTime/);
-  assert.match(client, /ws\?\.close\(1002, "unknown_binary_tag"\)/);
+  assert.match(client, /PROTOCOL_VIOLATION_CLOSE_CODE = 4002/);
+  assert.match(client, /closeForProtocolViolation\("unknown_binary_tag"\)/);
+  assert.doesNotMatch(client, /\.close\(1002,/);
   assert.match(client, /value\.event !== "transcript"/);
   assert.doesNotMatch(client, /untagged fallback|return playAgentAudio\(arrayBuffer\)/);
 });

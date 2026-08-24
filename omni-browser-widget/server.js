@@ -1,4 +1,4 @@
-// Static local host for the canonical hosted Omni widget v9 showcase.
+// Static local host for the canonical hosted Omni widget v10 showcase.
 // In production the asset is served by cdn.pyai.com and sessions are brokered
 // by PyAI; customer pages contain neither an API key nor a token endpoint.
 
@@ -21,6 +21,7 @@ const STATIC = {
   "/widget/v7/pyai-widget.js": ["v7/pyai-widget.js", "text/javascript; charset=utf-8"],
   "/widget/v8/pyai-widget.js": ["v8/pyai-widget.js", "text/javascript; charset=utf-8"],
   "/widget/v9/pyai-widget.js": ["v9/pyai-widget.js", "text/javascript; charset=utf-8"],
+  "/widget/v10/pyai-widget.js": ["v10/pyai-widget.js", "text/javascript; charset=utf-8"],
 };
 
 const server = createServer(async (req, res) => {
@@ -42,5 +43,5 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(Number(PORT), () => {
-  console.log(`Omni widget v9 showcase on http://localhost:${PORT}`);
+  console.log(`Omni widget v10 showcase on http://localhost:${PORT}`);
 });
