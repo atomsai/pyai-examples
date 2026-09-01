@@ -17,6 +17,37 @@ Twilio's exact `AnsweredBy` enum, so your existing routing logic doesn't change.
   it classifies the call.
 - On boot it sets the account-default operating point via `POST /v1/amd/config`.
 
+## What to do with each verdict
+
+`server.mjs` implements this in `routeCall()`. The table is the part worth copying.
+
+| `answered_by` (webhook) | do | why |
+|---|---|---|
+| `human` | connect the agent | |
+| `voicemail` | drop a message, waiting for the record tone | talking over the greeting loses the start of your message, and some systems never beep |
+| `ivr` | navigate the menu or abandon | **never drop a message** — a phone tree discards it |
+| `screening` | engage it | an AI screener (iPhone/Google) is relaying to a person who may still pick up |
+| `music` | keep waiting | hold music or ringback; nothing said yet |
+| `sit_invalid` | scrub the number | carrier intercept, the number is dead; retrying burns spend and reputation |
+| `unknown` + subtype `silence` | retry later | answered but nothing came down the line — don't burn an agent slot on dead air |
+| `unknown` | your default | no decisive evidence; see `aggressiveness` below |
+
+**Mind which field you read.** On the **webhook**, `answered_by` carries the machine
+*subtype* (`voicemail` / `ivr` / `screening` / `music`). On the event pushed over the
+**WebSocket** it carries only the coarse class (`human` / `machine` / `sit_invalid` /
+`unknown`). Same field name, different value space — that is why this example routes
+off the webhook.
+
+**The mistake this prevents:** treating every `machine` as a voicemail. Three of the
+subtypes above are machines, and a message dropped into two of them is simply lost.
+
+### When to expect the decision
+
+Measured over ~1,850 real answered calls: `human` typically ~1.4 s (~3.0 s at the
+90th percentile), `machine` ~2.2 s (~3.2 s). There is a hard deadline at 6 s — if
+nothing is decisive by then you get a verdict anyway. Size any fallback timer past
+6 s rather than past the typical case.
+
 ## Run it
 
 ```bash

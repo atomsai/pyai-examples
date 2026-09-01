@@ -94,15 +94,15 @@ const server = createServer(async (req, res) => {
     }
     // event: { event: "amd.call.completed", call_id, answered_by,
     //          answered_by_twilio, confidence, decision_ms, reason, ... }
+    const route = routeCall(event);
     console.log(
       `[AMD] call=${event.call_id} answered_by=${event.answered_by} ` +
-        `(twilio=${event.answered_by_twilio}) in ${event.decision_ms}ms, ${event.reason ?? ""}`,
+        `(twilio=${event.answered_by_twilio}) in ${event.decision_ms}ms, ${event.reason ?? ""}` +
+        ` -> ${route.action}`,
     );
-    // Branch your dialer logic on event.answered_by here:
-    //   human            -> connect the agent
-    //   voicemail / fax  -> drop a message or hang up
-    //   screening        -> your Omni agent can answer the screener
-    //   sit_invalid      -> scrub the number from your list
+    // `route.action` is where your dialer takes over: connect the agent, start a
+    // voicemail drop, navigate the menu, scrub the number. Everything above this
+    // line is PyAI; everything below it is your business logic.
     res.writeHead(204);
     res.end();
     return;
@@ -111,6 +111,68 @@ const server = createServer(async (req, res) => {
   res.writeHead(404, { "content-type": "text/plain" });
   res.end("Not found. Point your Twilio number's Voice webhook at /twiml.");
 });
+
+/**
+ * Decide what the dialer should DO with a decision.
+ *
+ * NOTE the field: on THIS webhook `answered_by` carries the machine SUBTYPE
+ * (`voicemail` / `ivr` / `screening` / `music`), while the event pushed on the
+ * WebSocket carries only the coarse class (`human` / `machine` / `sit_invalid` /
+ * `unknown`). Same field name, different value space, so branch on the webhook if
+ * you need the subtype -- that is the whole reason this example uses it.
+ *
+ * The expensive mistake this function exists to prevent: treating every `machine`
+ * as a voicemail. `voicemail`, `ivr` and `screening` are all machines, but a
+ * message dropped into a phone tree or an AI screener is simply lost.
+ */
+function routeCall(event) {
+  switch (event.answered_by) {
+    case "human":
+      // A person. Connect the agent.
+      return { action: "connect_agent" };
+
+    case "voicemail":
+      // The only case where dropping a message is correct. Wait for the record
+      // tone rather than assuming one -- some systems never emit a beep, and
+      // talking over the greeting loses the start of your message.
+      return { action: "drop_voicemail", waitForBeep: true };
+
+    case "ivr":
+      // A phone tree. DO NOT drop a message: nobody will ever hear it. Either
+      // navigate the menu (DTMF) or abandon and retry.
+      return { action: "navigate_or_abandon" };
+
+    case "screening":
+      // An AI screener (iPhone Live Voicemail / Google Call Screen) is relaying
+      // to a real person who may still pick up. Treat it as a live-ish path, not
+      // as voicemail -- a two-way agent can answer the screener's question.
+      return { action: "engage_screener" };
+
+    case "music":
+      // Hold music or ringback: nothing has been said yet. Keep waiting.
+      return { action: "keep_waiting" };
+
+    case "sit_invalid":
+      // Carrier intercept -- the number is dead. Scrub it; retrying burns spend
+      // and hurts your dialing reputation.
+      return { action: "scrub_number" };
+
+    case "unknown":
+      // No decisive evidence inside the window. `silence` means the call was
+      // answered but nothing came down the line at all: retry later rather than
+      // burning an agent slot on dead air. Everything else falls back to your own
+      // default -- see `aggressiveness` in the README for which way to lean.
+      return event.subtype === "silence"
+        ? { action: "retry_later" }
+        : { action: "apply_default" };
+
+    default:
+      // Unrecognised value: fail SAFE for a live-agent dialer. Never assume a
+      // machine on a value you do not understand -- that is the one error a
+      // person actually experiences.
+      return { action: "apply_default" };
+  }
+}
 
 const cfg = await configureAmd();
 console.log(`AMD configured: aggressiveness=${cfg.aggressiveness}, webhook=${BASE_URL}/amd-events`);
