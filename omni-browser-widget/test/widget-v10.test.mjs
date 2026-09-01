@@ -326,15 +326,17 @@ test("v10 protects the full opening drain and then preserves later barge-in", as
   processors[0].onaudioprocess(event);
   assert.ok(helpers.pcm16FramePeak(sent.at(-1)) > 1000);
 
+  // Later replies are interruptible IMMEDIATELY. The fixed mic mute was removed
+  // in #845: the engine now requires sustained energetic onset before a
+  // destructive cancel, so a browser-side warm-up would only add latency to a
+  // real barge without preventing a false one. The OPENING is still protected --
+  // that is asserted above, and it is the part that actually mattered.
   helpers.handleFrame(taggedAudio());
   advance(200);
   processors[0].onaudioprocess(event);
-  assert.equal(helpers.pcm16FramePeak(sent.at(-1)), 0);
-  advance(151);
-  processors[0].onaudioprocess(event);
   assert.ok(
     helpers.pcm16FramePeak(sent.at(-1)) > 1000,
-    "later replies remain interruptible after the bounded warm-up",
+    "later replies are interruptible with no fixed warm-up",
   );
 });
 
