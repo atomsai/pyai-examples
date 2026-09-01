@@ -56,7 +56,7 @@ test("widget v9 preserves strict framing and the canonical protected opening", (
   assert.match(widget, /startupAudioPhase/);
   assert.match(widget, /pendingAudio/);
   assert.match(widget, /flushPendingAudio\(\)/);
-  assert.match(widget, /AGENT_BARGE_ARM_DELAY_MS = 0/);
+  assert.match(widget, /AGENT_BARGE_ARM_DELAY_MS = 350/);
   assert.match(widget, /selectCallerSamples\(samples, state, Date\.now\(\)\)/);
   assert.match(widget, /state\.ws\.close\(1002, "binary_frames_required"\)/);
   assert.match(widget, /state\.ws\.close\(1002, "invalid_binary_frame"\)/);

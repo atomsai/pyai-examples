@@ -56,12 +56,7 @@
   var AGENT_AUDIO_END_GRACE_MS = 500;
   var AGENT_STATE_TRANSITION_MS = 100;
   var STARTUP_AUDIO_WAIT_MS = 4000;
-  // Later replies no longer use a fixed mic mute. The engine requires sustained
-  // energetic onset before destructive cancel, and the browser ducks/restores on
-  // a candidate. The opening disclosure remains protected through playout.
-  // Kept in lockstep with marketing/src/lib/eva-audio-policy.mjs, which the
-  // widget-v9/v10/v11 tests assert against.
-  var AGENT_BARGE_ARM_DELAY_MS = 0;
+  var AGENT_BARGE_ARM_DELAY_MS = 350;
 
   var ERROR_CONTRACT = {
     mic_permission_denied: {
@@ -314,7 +309,10 @@
     ) {
       return true;
     }
-    return false;
+    return (
+      captureState.responseAudioActive &&
+      nowMs - captureState.agentPlayStartedAt < AGENT_BARGE_ARM_DELAY_MS
+    );
   }
 
   function selectCallerSamples(samples, captureState, nowMs) {
