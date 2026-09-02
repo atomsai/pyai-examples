@@ -4,12 +4,26 @@ import test from "node:test";
 import vm from "node:vm";
 import {
   AGENT_AUDIO_END_GRACE_MS,
-  AGENT_BARGE_ARM_DELAY_MS,
+  AGENT_BARGE_ARM_DELAY_MS as SHARED_AGENT_BARGE_ARM_DELAY_MS,
   STARTUP_AUDIO_WAIT_MS,
   beginStartupAudioPhase,
   completeStartupAudioPhase,
   shouldZeroCallerSamples,
 } from "../../../marketing/src/lib/eva-audio-policy.mjs";
+
+// The hosted widget deliberately keeps a bounded browser-side mic warm-up on
+// later agent replies. #845 (9c322c30) moved that gate into the engine for the
+// marketing Eva page (shared AGENT_BARGE_ARM_DELAY_MS 1200 -> 0, trailing
+// clause of shouldZeroCallerSamples removed) WITHOUT touching the widget copies.
+// Mirroring #845 into the widgets was tried (#1060) and reverted (#1061,
+// 218f452b): it breaks the browser e2e
+// (marketing/e2e/customer-browser-opening.spec.ts, "hosted-widget-v11 protects
+// turn-0 audio and restores later barge-in") with protocol errors, because the
+// hosted-widget path does not carry the engine-side gate. So the widget's own
+// value is the contract here; only the OPENING protection is asserted against
+// the shared module. Porting the engine gate and dropping this to 0 is a
+// separate Omni audio-policy change (option 1 on #1060), not a test edit.
+const WIDGET_AGENT_BARGE_ARM_DELAY_MS = 350;
 
 const source = readFileSync(
   new URL("../public/v10/pyai-widget.js", import.meta.url),
@@ -236,7 +250,12 @@ test("v10 matches the canonical protected-opening state machine", () => {
   assert.match(source, /VERSION = "10\.0\.0"/);
   assert.match(source, /OPENING_AUDIO_POLICY_VERSION = "omni-opening-v1"/);
   assert.equal(helpers.startupAudioWaitMs, STARTUP_AUDIO_WAIT_MS);
-  assert.equal(helpers.agentBargeArmDelayMs, AGENT_BARGE_ARM_DELAY_MS);
+  assert.equal(helpers.agentBargeArmDelayMs, WIDGET_AGENT_BARGE_ARM_DELAY_MS);
+  assert.equal(
+    SHARED_AGENT_BARGE_ARM_DELAY_MS,
+    0,
+    "shared policy gates later replies engine-side; if it grows a browser-side warm-up again, re-decide the widget divergence",
+  );
   assert.equal(helpers.agentAudioEndGraceMs, AGENT_AUDIO_END_GRACE_MS);
 
   for (const [phase, now, connectedAt] of [
@@ -255,19 +274,27 @@ test("v10 matches the canonical protected-opening state machine", () => {
     );
   }
 
-  const cases = [
+  // Opening protection: identical to the shared policy.
+  const openingCases = [
     [{ startupAudioPhase: "waiting", connectedAt: 0, responseAudioActive: false, agentPlayStartedAt: 0 }, 3999],
     [{ startupAudioPhase: "waiting", connectedAt: 0, responseAudioActive: false, agentPlayStartedAt: 0 }, 4000],
     [{ startupAudioPhase: "playing", connectedAt: 0, responseAudioActive: true, agentPlayStartedAt: 1000 }, 9000],
-    [{ startupAudioPhase: "complete", connectedAt: 0, responseAudioActive: true, agentPlayStartedAt: 1000 }, 1200],
-    [{ startupAudioPhase: "complete", connectedAt: 0, responseAudioActive: true, agentPlayStartedAt: 1000 }, 1350],
   ];
-  for (const [state, now] of cases) {
+  for (const [state, now] of openingCases) {
     assert.equal(
       helpers.shouldZeroCallerSamples(state, now),
       shouldZeroCallerSamples(state, now),
     );
   }
+
+  // Later replies: the widget's bounded browser-side warm-up (see
+  // WIDGET_AGENT_BARGE_ARM_DELAY_MS above). The shared policy returns false
+  // for both because its gate lives in the engine.
+  const laterReply = { startupAudioPhase: "complete", connectedAt: 0, responseAudioActive: true, agentPlayStartedAt: 1000 };
+  assert.equal(helpers.shouldZeroCallerSamples(laterReply, 1000 + WIDGET_AGENT_BARGE_ARM_DELAY_MS - 1), true);
+  assert.equal(helpers.shouldZeroCallerSamples(laterReply, 1000 + WIDGET_AGENT_BARGE_ARM_DELAY_MS), false);
+  assert.equal(shouldZeroCallerSamples(laterReply, 1200), false);
+  assert.equal(shouldZeroCallerSamples(laterReply, 1350), false);
 
   assert.match(historicalV8, /heardAgent/);
   assert.doesNotMatch(historicalV8, /startupAudioPhase/);
