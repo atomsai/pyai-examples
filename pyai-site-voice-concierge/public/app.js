@@ -168,7 +168,7 @@ async function connectDirect() {
 
   protocolCloseRequested = false;
   protocolCloseAttempts = 0;
-  ws = new WebSocket(session.url, [`pyai-key.${session.token}`]);
+  ws = new WebSocket(session.url, ["pyai.v1", `pyai-key.${session.token}`]);
   ws.binaryType = "arraybuffer";
   ws.onopen = () => {
     beginConnectionAudioState();

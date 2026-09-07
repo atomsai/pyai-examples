@@ -132,7 +132,9 @@ export class OmniSession {
     if (opts.sessionLabel) q.set("session_label", opts.sessionLabel);
     const url = `${base}/v1/omni?${q.toString()}`;
 
-    this.ws = new WebSocket(url, [`pyai-key.${opts.apiKey}`]);
+    // marker + credential: the edge echoes only the marker (it must never
+    // reflect the key), and `ws` rejects a 101 that selects nothing.
+    this.ws = new WebSocket(url, ["pyai.v1", `pyai-key.${opts.apiKey}`]);
     this.ws.binaryType = "nodebuffer";
     this.ws.on("open", () => this.#handleOpen());
     this.ws.on("message", (data, isBinary) => this.#handleMessage(data, isBinary));

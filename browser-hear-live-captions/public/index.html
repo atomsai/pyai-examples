@@ -98,7 +98,7 @@
 
         const url = `${baseEl.value.replace(/\/$/, "")}/v1/audio/transcriptions/stream` +
           `?protocol=pyai-hear-v1&model=pyai-hear&sample_rate=${sampleRate}&encoding=pcm16&interim_results=true`;
-        ws = new WebSocket(url, [`pyai-key.${key}`]);
+        ws = new WebSocket(url, ["pyai.v1", `pyai-key.${key}`]);
         ws.binaryType = "arraybuffer";
 
         ws.onopen = () => {

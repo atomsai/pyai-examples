@@ -90,7 +90,7 @@ emotion-aware voices. It's **zero-state**: connect with your key and send one
 
 ```
 wss://api.pyai.com/v1/omni?format=pcm16&rate=24000
-# auth on the upgrade with subprotocol:  pyai-key.<your key>
+# auth on the upgrade with subprotocols:  pyai.v1, pyai-key.<your key>
 
 # One configure frame = the whole agent:
 # { "type": "configure",

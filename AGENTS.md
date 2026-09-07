@@ -48,7 +48,7 @@ For production, create a `pyai_live_…` key in the console
 - Send the key as a bearer token: `Authorization: Bearer pyai_…`
   (`x-api-key: pyai_…` is an accepted alias).
 - On a WebSocket upgrade (browsers can't set headers), pass the key as a
-  subprotocol: `pyai-key.pyai_…`. Server-side WS clients may instead append
+  subprotocols: `pyai.v1, pyai-key.pyai_…` (both, always). Server-side WS clients may instead append
   `?api_key=pyai_…`.
 - **Keys are opaque strings (≤512 chars).** Never parse, split, decode, or log
   them. They work on every surface the instant they're created, no activation

@@ -104,7 +104,9 @@ function normalizeTranscriptBody(body) {
 }
 
 function connectOmni() {
-  const ws = new WebSocket(`${BASE}/v1/omni?format=pcm16&rate=${RATE}`, [`pyai-key.${KEY}`]);
+  // Offer the `pyai.v1` marker with the credential: the edge echoes only the
+  // marker, never the key, and `ws` rejects a 101 that selects nothing.
+  const ws = new WebSocket(`${BASE}/v1/omni?format=pcm16&rate=${RATE}`, ["pyai.v1", `pyai-key.${KEY}`]);
   ws.binaryType = "nodebuffer";
   return ws;
 }

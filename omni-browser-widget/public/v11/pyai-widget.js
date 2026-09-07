@@ -699,7 +699,7 @@
       var url = new URL(session.url);
       url.searchParams.set("session_label", session.session_label);
       try {
-        state.ws = new WebSocket(url.toString(), ["pyai-key." + session.token]);
+        state.ws = new WebSocket(url.toString(), ["pyai.v1", "pyai-key." + session.token]);
       } catch (_) {
         throw errorDetail("websocket_failed");
       }
