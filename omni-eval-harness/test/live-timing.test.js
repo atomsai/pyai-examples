@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { audibleBounds, captureTiming, newAudioCapture, recordAudio,
+import { audibleBounds, captureTiming, newAudioCapture, recordAudio, recordTurnBegin,
   streamPcmRealtime, waitForAgentSettle } from "../src/live-timing.js";
 import { runLive, safeConfiguredMetadata } from "../src/live.js";
 
@@ -86,10 +86,16 @@ function transportFixture({ plans = [{}, {}], greetingMs = 0, ack = true,
         const index = state.callerStarts.length;
         const plan = plans[index] ?? {};
         state.callerStarts.push(clock.now());
+        if (plan.cueFromStartMs != null) clock.setTimeout(() => {
+          this.options.onAudio(sound(outputRate, plan.cueDurationMs ?? 120));
+        }, plan.cueFromStartMs);
+        for (const item of plan.callerTranscripts ?? []) clock.setTimeout(() => {
+          this.options.onTranscript({ role: "user", mode: "delta", final: false, ...item });
+        }, item.fromStartMs);
         if (!plan.noAudio) {
           const delay = plan.responseFromStartMs ?? speechMs + 500;
           clock.setTimeout(() => this.options.onEvent({ event: "turn_begin", turn: index + 1,
-            since_caller_end_ms: 450 }), delay - 30);
+            since_caller_end_ms: 450 }), plan.turnBeginFromStartMs ?? delay - 30);
           clock.setTimeout(() => {
             state.replies.push(clock.now());
             if (protocolError) this.options.onError(new Error("Omni server control frame is missing its event key"));
@@ -191,6 +197,77 @@ test("genuine agent overlap stays negative and is not rewritten to missing TTFB"
   assert.equal(run.turns[0].ttfbMs, -200);
   assert.equal(run.turns[0].timing.packetTtfbMs, -200);
   assert.equal(run.captureIntegrity.valid, true, "overlap is observed behavior, not corrupt capture");
+});
+
+test("recorded baseline cue timings cannot complete a pending real reply", async () => {
+  for (const witness of [
+    { name: "empty", cueAt: 5672, cueMs: 640, beginAt: 6496, replyAt: 8641, callerEnd: 5714, waitAt: 5735 },
+    { name: "support", cueAt: 6154, cueMs: 400, beginAt: 7955, replyAt: 9482, callerEnd: 7553, waitAt: 7612 },
+  ]) {
+    const clock = virtualClock();
+    const ctx = newAudioCapture(0);
+    clock.setTimeout(() => recordAudio(ctx, sound(1000, witness.cueMs), clock.now(), 1000), witness.cueAt);
+    clock.setTimeout(() => recordTurnBegin(ctx, clock.now(), 1), witness.beginAt);
+    clock.setTimeout(() => recordAudio(ctx, sound(1000, 1000), clock.now(), 1000), witness.replyAt);
+    const result = await clock.complete((async () => {
+      await clock.sleep(witness.waitAt);
+      return waitForAgentSettle(() => ctx, clock, { requireTurnBegin: true });
+    })());
+    assert.equal(result.reason, "settled");
+    assert.ok(result.at >= witness.replyAt + 3000, `${witness.name}: full reply + quiet must precede next caller`);
+    assert.equal(ctx.samples, witness.cueMs + 1000, "retain every cue and reply sample");
+    const timing = captureTiming(ctx, { speechOffsetAt: witness.callerEnd });
+    assert.equal(timing.anyAudioTtfbMs, witness.cueAt - witness.callerEnd);
+    assert.equal(timing.postTurnBeginTtfbMs, witness.replyAt - witness.callerEnd);
+  }
+});
+
+test("latest turn begin supersedes earlier response evidence while advisory extends quiet without pretending to be audio", async () => {
+  const clock = virtualClock();
+  const ctx = newAudioCapture(0);
+  clock.setTimeout(() => recordTurnBegin(ctx, clock.now(), 1), 100);
+  clock.setTimeout(() => recordAudio(ctx, sound(1000, 120), clock.now(), 1000), 200);
+  clock.setTimeout(() => recordTurnBegin(ctx, clock.now(), 2), 1000);
+  clock.setTimeout(() => recordAudio(ctx, sound(1000, 120), clock.now(), 1000), 4000);
+  // A valid synthesis advisory can arrive after the final PCM packet. It
+  // extends the observation window; requiring a subsequent packet is wrong.
+  clock.setTimeout(() => { ctx.lastAssistantTranscriptAt = clock.now(); }, 5000);
+  const settled = await clock.complete(waitForAgentSettle(() => ctx, clock, { requireTurnBegin: true }));
+  assert.equal(settled.at, 7000);
+  assert.equal(ctx.postTurnBeginFirstAudioAt, 4000);
+  assert.equal(ctx.samples, 240);
+});
+
+test("cue-only output times out instead of certifying response completion", async () => {
+  const clock = virtualClock();
+  const ctx = newAudioCapture(0);
+  recordAudio(ctx, sound(1000, 400), 0, 1000);
+  clock.setTimeout(() => recordTurnBegin(ctx, clock.now(), 1), 1000);
+  const settled = await clock.complete(waitForAgentSettle(() => ctx, clock, { requireTurnBegin: true, timeoutMs: 5000 }));
+  assert.equal(settled.reason, "timeout");
+  assert.equal(ctx.samples, 400);
+  assert.equal(ctx.postTurnBeginFirstAudioAt, null);
+});
+
+test("fake transport retains pre-turn cues, waits for real response and records engine caller deltas separately from Hear", async () => {
+  const f = transportFixture({ plans: [{ cueFromStartMs: 300, turnBeginFromStartMs: 800,
+    responseFromStartMs: 2600, callerTranscripts: [
+      { fromStartMs: 150, text: "The order is five" },
+      { fromStartMs: 250, text: " one three." },
+    ] }, {}] });
+  const run = await f.clock.complete(runLive(f.scenario, f.opts, f.runtime));
+  assert.equal(run.captureIntegrity.valid, true);
+  assert.equal(run.turns[0].agentAudioMs, 240, "cue PCM is retained alongside reply PCM");
+  assert.ok(f.state.callerStarts[1] >= f.state.replies[0] + 2120);
+  assert.equal(run.turns[0].anyAudioTtfbMs, -100);
+  assert.equal(run.turns[0].postTurnBeginTtfbMs, 2200);
+  assert.equal(run.turns[0].engineCallerText, "The order is five one three.");
+  assert.equal(run.turns[0].asrHypothesis, "A caller question.");
+  assert.equal(run.engineCallerTranscriptEvents.length, 2);
+  assert.deepEqual(run.engineCallerTranscriptEvents.map(event => event.mode), ["delta", "delta"]);
+  assert.ok(run.engineCallerTranscriptEvents.every(event => Number.isFinite(event.atMs) && event.clientTurnIndex === 0 && event.final === false));
+  assert.ok(run.turns[0].engineAssistantTranscriptEvents[0].atMs > run.turns[0].turnBegins[0].atMs);
+  assert.match(run.captureMethod.completionLimitation, /No server reply-end marker/);
 });
 
 test("protocol errors invalidate capture instead of disappearing from results", async () => {

@@ -25,8 +25,21 @@ export function newAudioCapture(started) {
     started, firstPacketAt: null, lastPacketAt: null,
     firstAudioAt: null, lastAudioAt: null, playbackEndAt: null,
     samples: 0, pcm: [], turnBeginAt: null, eouMs: null,
+    latestTurnBeginAt: null, postTurnBeginFirstPacketAt: null,
+    postTurnBeginFirstAudioAt: null, lastAssistantTranscriptAt: null,
+    callerTranscriptEvents: [], assistantTranscriptEvents: [],
     turnBegins: [], tools: [], toolResults: [], kb: null, events: [],
   };
+}
+
+export function recordTurnBegin(ctx, at, turn, origin = 0) {
+  ctx.turnBeginAt ??= at;
+  ctx.latestTurnBeginAt = at;
+  // Earlier PCM can be a listening cue. A new reply is still pending even
+  // when that cue has already finished playing; retain all of its PCM.
+  ctx.postTurnBeginFirstPacketAt = null;
+  ctx.postTurnBeginFirstAudioAt = null;
+  ctx.turnBegins.push({ atMs: Math.round(at - origin), turn: turn ?? null });
 }
 
 export function recordAudio(ctx, pcm, at, rate) {
@@ -38,9 +51,12 @@ export function recordAudio(ctx, pcm, at, rate) {
   ctx.firstPacketAt ??= at;
   ctx.lastPacketAt = at;
   ctx.playbackEndAt = endAt;
+  const afterTurnBegin = ctx.latestTurnBeginAt != null && at >= ctx.latestTurnBeginAt;
+  if (afterTurnBegin) ctx.postTurnBeginFirstPacketAt ??= at;
   if (bounds.first != null) {
     ctx.firstAudioAt ??= playbackAt + (bounds.first / rate) * 1000;
     ctx.lastAudioAt = playbackAt + (bounds.last / rate) * 1000;
+    if (afterTurnBegin) ctx.postTurnBeginFirstAudioAt ??= playbackAt + (bounds.first / rate) * 1000;
   }
   ctx.samples += copy.length;
   ctx.pcm.push(copy);
@@ -54,6 +70,8 @@ export function captureTiming(ctx, caller, origin = 0) {
     ? null : Math.round(at - caller.speechOffsetAt);
   return {
     ttfbMs: gap(ctx.firstAudioAt),
+    anyAudioTtfbMs: gap(ctx.firstAudioAt),
+    postTurnBeginTtfbMs: gap(ctx.postTurnBeginFirstAudioAt),
     turnMs: gap(ctx.lastAudioAt),
     packetTtfbMs: gap(ctx.firstPacketAt),
     callerStartMs: relative(caller.startedAt),
@@ -65,6 +83,10 @@ export function captureTiming(ctx, caller, origin = 0) {
     agentSpeechOnsetMs: relative(ctx.firstAudioAt),
     agentSpeechOffsetMs: relative(ctx.lastAudioAt),
     agentPlaybackEndMs: relative(ctx.playbackEndAt),
+    latestTurnBeginMs: relative(ctx.latestTurnBeginAt),
+    postTurnBeginFirstPacketMs: relative(ctx.postTurnBeginFirstPacketAt),
+    postTurnBeginSpeechOnsetMs: relative(ctx.postTurnBeginFirstAudioAt),
+    lastAssistantTranscriptMs: relative(ctx.lastAssistantTranscriptAt),
     callerMaxFrameGapMs: Math.round(caller.maxFrameGapMs ?? 0),
     method: "client-monotonic-queued-playback-energy-bounds",
   };
@@ -117,7 +139,14 @@ export async function waitForAgentSettle(getCtx, clock, opts = {}) {
     const ctx = getCtx();
     const at = clock.now();
     if (opts.isClosed?.()) return { reason: "closed", at };
-    if (ctx.firstPacketAt != null && at >= ctx.playbackEndAt + settleMs) {
+    const hasResponseAudio = !opts.requireTurnBegin || (ctx.latestTurnBeginAt != null
+      && ctx.postTurnBeginFirstAudioAt != null);
+    // Synthesis text is progress, not a completion event. It can arrive after
+    // early/final audio, so extend the quiet floor without demanding another
+    // packet after every advisory. The protocol still has no reply-end marker.
+    const activityEnd = Math.max(ctx.playbackEndAt ?? -Infinity,
+      ctx.latestTurnBeginAt ?? -Infinity, ctx.lastAssistantTranscriptAt ?? -Infinity);
+    if (ctx.firstPacketAt != null && hasResponseAudio && at >= activityEnd + settleMs) {
       return { reason: "settled", at };
     }
     if (opts.allowEmpty && ctx.firstPacketAt == null && at - started >= (opts.emptyWaitMs ?? 800)) {

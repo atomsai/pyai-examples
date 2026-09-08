@@ -32,6 +32,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { normalizeConversationState } from "./humanness.js";
+import { captureEvidence } from "./capture-evidence.js";
 
 /** Normalize a parsed fixture object into the internal RunResult shape. */
 export function normalizeFixture(obj, source = null) {
@@ -49,6 +50,7 @@ export function normalizeFixture(obj, source = null) {
     source,
     fixtureReplay: true,
     ...(hasIntegrity ? { captureIntegrity } : {}),
+    ...captureEvidence(obj),
     conversationState: normalizeConversationState(obj.conversation_state),
     kb: typeof obj.kb === "string" ? obj.kb : null,
     turns: obj.turns.map((t, i) => ({
@@ -69,6 +71,7 @@ export function normalizeFixture(obj, source = null) {
       conversationState: normalizeConversationState(t.conversation_state),
       kb: typeof t.kb === "string" ? t.kb : null,
       idlePromptS: numOrNull(t.idle_prompt_s),
+      ...captureEvidence(t, { turn: true }),
     })),
   };
 }

@@ -16,7 +16,7 @@
 
 import { writeCallTimelineWav } from "./call-audio.js";
 import {
-  captureTiming, newAudioCapture, recordAudio, REALTIME_GAP_LIMIT_MS,
+  captureTiming, newAudioCapture, recordAudio, recordTurnBegin, REALTIME_GAP_LIMIT_MS,
   streamPcmRealtime, streamSilenceWhile, waitForAgentSettle, withTimeout,
 } from "./live-timing.js";
 
@@ -207,6 +207,7 @@ export async function runLive(scenario, opts, runtime = {}) {
   let turnCtx = newAudioCapture(sessionStartedAt);
   const openingCtx = turnCtx;
   const timeline = { caller: [], agent: [] };
+  const engineCallerTranscriptEvents = [];
   let outputRate = omniRate === 8000 ? 8000 : 24000;
   let rateConfirmed = false;
   let callId = null;
@@ -268,7 +269,22 @@ export async function runLive(scenario, opts, runtime = {}) {
       // Engine text is useful telemetry, but only Hear of captured PCM is the
       // speech actually graded. Do not substitute intended text for spoken audio.
       if (tr.final && tr.role === "assistant" && tr.text) {
+        const at = clock.now();
+        turnCtx.lastAssistantTranscriptAt = at;
         (turnCtx.assistantText ??= []).push(tr.text);
+        turnCtx.assistantTranscriptEvents.push({ atMs: Math.round(at - sessionStartedAt),
+          text: tr.text, final: true, mode: tr.mode ?? "replace" });
+      }
+      if (tr.role === "user" && typeof tr.text === "string" && tr.text) {
+        // These are the serving engine's observed caller deltas, not the
+        // standalone Hear hypothesis prepared before this call. Keep raw
+        // timing/mode so late pieces and replacements remain inspectable.
+        const event = { atMs: Math.round(clock.now() - sessionStartedAt),
+          clientTurnIndex: turnIndex, text: tr.text, final: tr.final === true,
+          mode: tr.mode === "replace" ? "replace" : "delta",
+          ...(Number.isSafeInteger(tr.sequence) ? { sequence: tr.sequence } : {}) };
+        engineCallerTranscriptEvents.push(event);
+        turnCtx.callerTranscriptEvents.push(event);
       }
     },
     onTransfer: (evt) => {
@@ -291,8 +307,7 @@ export async function runLive(scenario, opts, runtime = {}) {
       if (event === "kb_query") turnCtx.kb = kbFromQueryEvent(evt);
       if (event === "turn_begin") {
         const at = clock.now();
-        turnCtx.turnBeginAt ??= at;
-        turnCtx.turnBegins.push({ atMs: Math.round(at - sessionStartedAt), turn: evt.turn ?? null });
+        recordTurnBegin(turnCtx, at, evt.turn, sessionStartedAt);
         if (turnCtx.eouMs == null && typeof evt.since_caller_end_ms === "number") {
           turnCtx.eouMs = evt.since_caller_end_ms;
         }
@@ -363,10 +378,15 @@ export async function runLive(scenario, opts, runtime = {}) {
             maxFrameGapMs: 0, offsetBasis: "text-submit" };
         }
         startSilence(); // Continue through ALL agent playback and pauses.
-        const settled = await waitForAgentSettle(() => turnCtx, clock, { isClosed: () => closed });
+        const requireTurnBegin = !isNonSpeechCaller(preparedTurn.callerText);
+        const settled = await waitForAgentSettle(() => turnCtx, clock, {
+          isClosed: () => closed, requireTurnBegin,
+        });
         await stopSilence();
         if (settled.reason !== "settled") addIssue(`turn_${settled.reason}`, i);
         if (turnCtx.firstAudioAt == null) addIssue("agent_audio_inaudible", i);
+        if (requireTurnBegin && turnCtx.latestTurnBeginAt == null) addIssue("response_turn_begin_missing", i);
+        else if (requireTurnBegin && turnCtx.postTurnBeginFirstAudioAt == null) addIssue("response_audio_missing_after_turn_begin", i);
         if (turnCtx.turnBegins.length > 1) addIssue("multiple_response_turns", i);
         if (turnCtx.events.some((e) => e.event === "flush" || e.event === "barge_in")) {
           addIssue("output_playback_interrupted", i);
@@ -412,6 +432,8 @@ export async function runLive(scenario, opts, runtime = {}) {
       index: i, ...callerFields, agentText,
       agentAudioMs: Math.round((agentPcm.length / outputRate) * 1000),
       ttfbMs: timing.ttfbMs, turnMs: timing.turnMs,
+      anyAudioTtfbMs: timing.anyAudioTtfbMs,
+      postTurnBeginTtfbMs: timing.postTurnBeginTtfbMs,
       replyStartedAtMs: timing.agentSpeechOnsetMs,
       sttFinalMs: ctx.eouMs,
       brainTtsMs: ctx.turnBeginAt != null && ctx.firstPacketAt != null
@@ -419,6 +441,10 @@ export async function runLive(scenario, opts, runtime = {}) {
       toolCalls: ctx.tools, toolResults: ctx.toolResults,
       bargeIn: null, kb: ctx.kb, timing,
       engineAssistantText: (ctx.assistantText ?? []).join(" "),
+      engineAssistantTranscriptEvents: ctx.assistantTranscriptEvents,
+      engineCallerText: ctx.callerTranscriptEvents.reduce((text, event) =>
+        event.mode === "replace" ? event.text : text + event.text, ""),
+      engineCallerTranscriptEvents: ctx.callerTranscriptEvents,
       turnBegins: ctx.turnBegins, events: ctx.events,
     });
   }
@@ -437,12 +463,17 @@ export async function runLive(scenario, opts, runtime = {}) {
     scenarioId: scenario.id, callId, sessionLabel: opts.sessionLabel,
     mode: mode === "voice" ? "live-voice" : "live-text",
     source: opts.baseURL ?? "api.pyai.com", recordedAt: new Date().toISOString(),
-    audio, turns, configured: safeConfigured,
+    audio, turns, configured: safeConfigured, engineCallerTranscriptEvents,
     availableTools: toolsMatch ? tools.map((tool) => tool.name ?? tool.function?.name).filter(Boolean) : null,
     availableToolsProvenance: toolsMatch ? "requested-declarations-and-configured-count" : "unverified",
     captureIntegrity: { valid: !issues.some((issue) => issue.severity === "error"), issues },
     captureMethod: { inputRate: omniRate, outputRate, agentTranscription: "post-session-hear",
+      callerTranscription: "pre-session-hear",
+      engineCallerTranscription: "server-0x02-observed-deltas-with-client-turn-timestamps",
       timing: "client-monotonic-queued-playback-energy-bounds", settleQuietMs: 2000,
+      turnBoundary: "audio-after-latest-turn-begin-plus-playout-and-advisory-quiet",
+      postTurnBeginTiming: "First audible PCM received after latest turn_begin; not a semantic claim that the audio is substantive.",
+      completionLimitation: "No server reply-end marker; an intra-reply silence longer than the quiet window can still be mistaken for completion.",
       maxInputGapMs: Math.round(maxInputGapMs) },
   };
 }

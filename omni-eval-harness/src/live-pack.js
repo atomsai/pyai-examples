@@ -10,6 +10,7 @@ import { loadFixture } from "./fixture.js";
 import { evaluate } from "./scorers.js";
 import { toSharedScenario } from "./bakeoff.js";
 import { runLive } from "./live.js";
+import { captureEvidence } from "./capture-evidence.js";
 
 const BASE_DIR = fileURLToPath(new URL("..", import.meta.url));
 
@@ -33,6 +34,7 @@ export function runResultToFixture(run, scenarioId) {
     mode: run.mode ?? "live-voice",
     recorded_at: run.recordedAt ?? new Date().toISOString(),
     ...(Object.hasOwn(run, "captureIntegrity") ? { capture_integrity: run.captureIntegrity } : {}),
+    ...captureEvidence(run, { serialized: true }),
     note: "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
     turns: (run.turns || []).map((t) => ({
       caller_says: t.callerText ?? t.caller_says ?? "",
@@ -47,6 +49,7 @@ export function runResultToFixture(run, scenarioId) {
       tool_calls: t.toolCalls ?? t.tool_calls ?? [],
       barge_in: t.bargeIn ?? t.barge_in ?? null,
       kb: t.kb ?? null,
+      ...captureEvidence(t, { turn: true, serialized: true }),
     })),
   };
 }
