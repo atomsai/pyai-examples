@@ -1,0 +1,112 @@
+[
+  {
+    "slug": "python",
+    "name": "Python",
+    "package": "pyai-sdk",
+    "version": "0.4.0",
+    "runtime": "Python 3.10+",
+    "headline": "Natural speech, a few lines of Python.",
+    "description": "Build with the PyAI Python SDK: stream natural speech, transcribe recordings, and start from a runnable project with copyable code and AI agent setup guides.",
+    "summary": "Stream Speak and transcribe recordings with Hear through one reusable client.",
+    "install": "python -m pip install pyai-sdk==0.4.0",
+    "entry": "main.py",
+    "run": "python main.py",
+    "guide": "https://docs.pyai.com/guides/sdks",
+    "features": [
+      "Receive audio as it arrives with speech_stream.",
+      "Reuse pooled connections across synthesis and transcription requests.",
+      "Leave the Hear language hint unset for automatic detection."
+    ],
+    "needs": "A PyAI key. The starter writes speech.wav; add --transcribe call.wav to transcribe your own recording.",
+    "note": "The starter measures first received bytes, not speaker playback latency. Feed PCM chunks to your audio sink for live playback.",
+    "setup": "python3 -m venv .venv\n. .venv/bin/activate\npython -m pip install -r requirements.txt\ncp .env.example .env\n# Fill in .env, then export its values in this shell:\nset -a\n. ./.env\nset +a\npython main.py"
+  },
+  {
+    "slug": "typescript",
+    "name": "TypeScript",
+    "package": "@pyai/sdk",
+    "version": "0.4.0",
+    "runtime": "Node.js 22+",
+    "headline": "Bring natural voice to your TypeScript app.",
+    "description": "Build with the PyAI TypeScript SDK: stream speech, transcribe audio, and download a runnable Node.js starter with copyable code and coding agent setup guides.",
+    "summary": "Use typed requests and native ReadableStream audio in your Node.js backend.",
+    "install": "npm install @pyai/sdk@0.4.0",
+    "entry": "main.ts",
+    "run": "npm start",
+    "guide": "https://docs.pyai.com/guides/sdks",
+    "features": [
+      "Consume speechStream without collecting the whole response.",
+      "Preserve backpressure and cancel the reader when stopping early.",
+      "Upload a recording with the same authenticated client."
+    ],
+    "needs": "A PyAI key. The starter writes speech.pcm; run npm start -- call.wav to also transcribe a recording.",
+    "note": "The starter runs on Node.js. Keep secret keys on your backend; use the browser voice-agent guide for frontend authentication.",
+    "setup": "npm install\ncp .env.example .env\n# Fill in .env, then:\nnpm start"
+  },
+  {
+    "slug": "twilio",
+    "name": "Twilio",
+    "package": "@pyai/twilio",
+    "version": "0.4.2",
+    "runtime": "Node.js 22+",
+    "headline": "Give your phone number a natural voice agent.",
+    "description": "Connect Twilio Media Streams to PyAI Omni with a runnable Node.js voice agent, signed webhook validation, copyable setup commands, and coding agent guidance.",
+    "summary": "Bridge a Twilio Media Stream to Omni for the complete speech-to-speech loop.",
+    "install": "npm install @pyai/twilio@0.4.2",
+    "entry": "server.mjs",
+    "run": "npm start",
+    "guide": "https://docs.pyai.com/guides/twilio-voice-agent",
+    "features": [
+      "Convert Twilio audio to the Omni stream through OmniAgent.bridge.",
+      "Let the bridge handle audio pacing and interruptions.",
+      "Validate Twilio signatures before accepting webhooks and sockets."
+    ],
+    "needs": "A PyAI key, a Twilio phone number and auth token, and an HTTPS tunnel or deployed server. Set PUBLIC_ORIGIN to its origin.",
+    "note": "After starting the server, set your Twilio number’s incoming voice webhook to https://YOUR-HOST/voice (POST). Carrier charges apply when you make a call.",
+    "setup": "npm install\ncp .env.example .env\n# Fill in .env, then:\nnpm start"
+  },
+  {
+    "slug": "livekit",
+    "name": "LiveKit",
+    "package": "livekit-plugins-pyai",
+    "version": "0.1.2",
+    "runtime": "Python 3.10–3.13",
+    "headline": "Keep LiveKit. Add the PyAI voice layer.",
+    "description": "Add PyAI Hear and Speak to LiveKit Agents. Download a runnable Python audio starter, copy adapter setup code, and connect your preferred coding agent today.",
+    "summary": "Add Hear and Speak to an existing LiveKit Agents session.",
+    "install": "python -m pip install livekit-plugins-pyai==0.1.2",
+    "entry": "main.py",
+    "run": "python main.py",
+    "guide": "https://docs.pyai.com/guides/livekit-agents",
+    "features": [
+      "Use pyai.STT() and pyai.TTS() in AgentSession.",
+      "Receive audio frames as Speak generates them.",
+      "Keep your existing room, LLM, tools, and turn-taking configuration."
+    ],
+    "needs": "Only a PyAI key for the included speech.wav smoke test. A complete room agent also needs LiveKit credentials and your chosen LLM; the linked guide covers that setup.",
+    "note": "This starter tests the TTS adapter without opening a room. LiveKit continues to own your agent loop; the adapter does not create an Omni session.",
+    "setup": "python3 -m venv .venv\n. .venv/bin/activate\npython -m pip install -r requirements.txt\ncp .env.example .env\n# Fill in .env, then export its values in this shell:\nset -a\n. ./.env\nset +a\npython main.py"
+  },
+  {
+    "slug": "pipecat",
+    "name": "Pipecat",
+    "package": "pipecat-pyai",
+    "version": "0.1.2",
+    "runtime": "Python 3.10–3.13",
+    "headline": "Natural speech inside your Pipecat pipeline.",
+    "description": "Add PyAI Hear and Speak to Pipecat. Download a complete text-to-audio pipeline, copy the adapter commands, and build with Cursor, Codex, or Claude Code today.",
+    "summary": "Plug PyAI speech services into the transport and LLM pipeline you already use.",
+    "install": "python -m pip install pipecat-pyai==0.1.2",
+    "entry": "main.py",
+    "run": "python main.py",
+    "guide": "https://docs.pyai.com/guides/pipecat",
+    "features": [
+      "Use PyAISTTService and PyAITTSService as pipeline processors.",
+      "Receive TTSAudioRawFrame output for your audio transport.",
+      "Keep your existing LLM, context aggregators, and application logic."
+    ],
+    "needs": "Only a PyAI key for the included text-to-WAV pipeline. A conversational bot additionally needs a Pipecat transport and an LLM; follow the linked integration guide.",
+    "note": "The downloadable starter is a complete text-to-audio pipeline. It does not open a microphone, room, or phone call.",
+    "setup": "python3 -m venv .venv\n. .venv/bin/activate\npython -m pip install -r requirements.txt\ncp .env.example .env\n# Fill in .env, then export its values in this shell:\nset -a\n. ./.env\nset +a\npython main.py"
+  }
+]
