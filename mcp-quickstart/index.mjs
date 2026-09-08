@@ -86,20 +86,14 @@ async function main() {
   const { tools } = await request("tools/list");
   console.log(`Tools: ${tools.map((t) => t.name).join(", ")}`);
 
-  // 3. Get a key with no human steps (skip if one is already in the env). The
-  //    server adopts the minted key for the rest of this session.
-  if (haveKey) {
-    console.log("Using PYAI_API_KEY from the environment.");
-  } else {
-    const key = toolResult(await request("tools/call", {
-      name: "create_sandbox_key",
-      arguments: { label: "mcp-quickstart" },
+  // Local MCP shares the CLI profile. Sandbox creation is an explicit option.
+  if (!haveKey && process.argv.includes("--sandbox")) {
+    const result = toolResult(await request("tools/call", {
+      name: "create_sandbox_key", arguments: { label: "mcp-quickstart" },
     }));
-    if (key?.api_key) {
-      console.log(`Minted sandbox key ${String(key.api_key).slice(0, 12)}… (org ${key.org_id ?? "?"}); adopted for this session.`);
-    } else {
-      console.log("create_sandbox_key returned:", key);
-    }
+    console.log(`Sandbox adopted privately (org ${result?.org_id ?? "?"}).`);
+  } else {
+    console.log("Using the environment key or saved PyAI CLI profile.");
   }
 
   // 4. Synthesize speech. The MCP server writes the audio to output_path on this

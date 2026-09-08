@@ -102,19 +102,12 @@ def main():
         tools = client.request("tools/list").get("tools", [])
         print("Tools: " + ", ".join(t["name"] for t in tools))
 
-        # 3. Get a key with no human steps (skip if one is already set). The server
-        #    adopts the minted key for the rest of this session.
-        if HAVE_KEY:
-            print("Using PYAI_API_KEY from the environment.")
+        # Local MCP shares the CLI profile. Sandbox creation is explicit.
+        if not HAVE_KEY and "--sandbox" in sys.argv:
+            result = client.call_tool("create_sandbox_key", {"label": "mcp-quickstart"})
+            print("Sandbox adopted privately; credentials are not returned.")
         else:
-            key = client.call_tool("create_sandbox_key", {"label": "mcp-quickstart"})
-            if isinstance(key, dict) and key.get("api_key"):
-                print(
-                    f"Minted sandbox key {str(key['api_key'])[:12]}… "
-                    f"(org {key.get('org_id', '?')}); adopted for this session."
-                )
-            else:
-                print("create_sandbox_key returned:", key)
+            print("Using the environment key or saved PyAI CLI profile.")
 
         # 4. Synthesize speech. The MCP server writes the audio to output_path on
         #    this machine (it runs locally via npx).

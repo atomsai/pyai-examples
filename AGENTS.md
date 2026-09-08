@@ -54,28 +54,14 @@ For production, create a `pyai_live_…` key in the console
   them. They work on every surface the instant they're created, no activation
   delay.
 
-### Use PyAI through MCP (Cursor / Claude Code / Codex)
-If you're an AI coding agent in an MCP host, skip the curl above entirely: the
-PyAI **MCP server** ([`@pyai/mcp`](https://www.npmjs.com/package/@pyai/mcp)) lets
-you mint your own key and call PyAI (TTS, STT, voices, async jobs) as **tools**,
-so you never guess endpoints. With no key set it exposes `create_sandbox_key`,
-calls it for you, and adopts the minted key for the session.
+### Use PyAI through MCP
 
-```jsonc
-// .cursor/mcp.json (project) or ~/.cursor/mcp.json (global)
-{ "mcpServers": { "pyai": { "command": "npx", "args": ["-y", "@pyai/mcp"] } } }
-```
-
-```bash
-claude mcp add pyai -- npx -y @pyai/mcp      # Claude Code
-# Codex / other hosts: point them at the stdio command `npx -y @pyai/mcp`
-```
-
-Tools: `create_sandbox_key`, `get_started`, `whoami`, `list_models`,
-`list_voices`, `synthesize_speech`, `create_transcription_job`,
-`get_transcription_job`, `configure_amd`, `list_amd_calls`, `get_amd_call`,
-`enable_recap`, `create_recap`, `get_recap`, `list_recap_calls`.
-Working setup + a zero-dep stdio client: [`mcp-quickstart`](./mcp-quickstart).
+Connect to `https://api.pyai.com/mcp` with native browser OAuth. Setup for chat
+apps and coding agents: https://pyai.com/mcp. Local stdio uses
+`npx -y @pyai/mcp@latest` and shares your `pyai login` profile. Local sandbox
+creation is an explicit choice and never returns its secret to the model.
+Start with `get_started`, `whoami` and `discover_tools`.
+Read https://pyai.com/mcp-agent-guide.md before integrating a product.
 
 ---
 

@@ -1,9 +1,15 @@
 ---
+
 name: pyai
 description: Build applications with PyAI Hear, Speak, Omni, and the official SDKs. Use for PyAI API integrations, streaming audio, and signed completion webhooks.
 ---
 
 # Build with PyAI
+
+## Connect through MCP
+
+Use https://api.pyai.com/mcp with browser OAuth. Setup: https://pyai.com/mcp. Agent handbook: https://pyai.com/mcp-agent-guide.md. Tool schemas: https://pyai.com/mcp-tools.json. Start with `get_started`, `whoami`, and `discover_tools`. Local stdio reuses `pyai login`.
+
 
 Use the user's existing language, framework, and transport. Choose Hear for
 transcription, Speak for synthesis, or Omni for the complete voice-agent loop.
