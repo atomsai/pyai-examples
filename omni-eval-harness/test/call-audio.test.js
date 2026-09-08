@@ -10,6 +10,8 @@ import {
   pcm16ToWav,
   stitchCallPcm,
   writeCallWav,
+  stitchCallTimeline,
+  writeCallTimelineWav,
 } from "../src/call-audio.js";
 
 
@@ -70,4 +72,40 @@ test("call audio rejects missing turns and wrong PCM types", () => {
     () => stitchCallPcm([{ callerPcm: Buffer.alloc(4) }], 24000),
     /Int16Array/,
   );
+});
+
+test("timeline preserves cross-talk and silence in separate channels", () => {
+  const { pcm } = stitchCallTimeline({
+    caller: [{ atMs: 0, pcm: new Int16Array([11, 12, 13, 14]) }],
+    agent: [{ atMs: 2, pcm: new Int16Array([21, 22]) }, { atMs: 8, pcm: new Int16Array([23]) }],
+  }, 1000);
+  assert.deepEqual([...pcm], [11, 0, 12, 0, 13, 21, 14, 22, 0, 0, 0, 0, 0, 0, 0, 0, 0, 23]);
+});
+
+test("bursty chunks queue on one lane without erasing PCM or moving the other speaker", () => {
+  const result = stitchCallTimeline({
+    caller: [{ atMs: 1, pcm: new Int16Array([10]) }],
+    agent: [{ atMs: 0, pcm: new Int16Array([1, 2]) }, { atMs: 1, pcm: new Int16Array([3, 4]) }],
+  }, 1000);
+  assert.deepEqual([...result.pcm], [0, 1, 10, 2, 0, 3, 0, 4]);
+  assert.equal(result.queuedChunks, 1);
+  assert.equal(result.maximumQueueMs, 1);
+});
+
+test("timeline WAV describes stereo estimated playout rather than a clean synthetic dialogue", () => {
+  const path = join(mkdtempSync(join(tmpdir(), "pyai-timed-audio-")), "call.wav");
+  const metadata = writeCallTimelineWav(path, { caller: [{ atMs: 0, pcm: new Int16Array(100) }], agent: [{ atMs: 50, pcm: new Int16Array(100) }] }, 1000);
+  const wav = readFileSync(path);
+  assert.equal(wav.readUInt16LE(22), 2);
+  assert.equal(wav.readUInt32LE(28), 4000);
+  assert.equal(wav.readUInt16LE(32), 4);
+  assert.equal(metadata.duration_ms, 150);
+  assert.equal(metadata.representation, "estimated-playout-stereo");
+});
+
+test("timeline rejects corrupt and unbounded timestamps", () => {
+  const pcm = new Int16Array([1]);
+  for (const atMs of [-1, NaN, Infinity]) assert.throws(() => stitchCallTimeline({ caller: [{ atMs, pcm }] }, 1000));
+  assert.throws(() => stitchCallTimeline({ caller: [{ atMs: 2, pcm }, { atMs: 1, pcm }] }, 1000), /ordered/);
+  assert.throws(() => stitchCallTimeline({ caller: [{ atMs: 900001, pcm }] }, 1000), /15 minutes/);
 });

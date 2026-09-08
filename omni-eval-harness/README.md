@@ -209,6 +209,67 @@ call as a test").
 
 ## Live mode
 
+### Agent creator development probes
+
+With Node 22.18+ and the workspace SDKs built (instructions below), run the
+creator's actual versioned prompt compiler across its seven roles plus Custom:
+
+```bash
+# Use an existing test key through PYAI_API_KEY, or explicitly mint a sandbox key.
+npm run live-creator -- --sandbox --out /tmp/creator-eval-first-run
+```
+
+Use `--roles receptionist,sales,scratch` to limit a run. The optional
+`--variant grounded-candidate` adds an evaluation-only missing-facts rule;
+it does not change the shipped console templates. The manifest identifies the
+variant and records its different prompt hash. `--key-stdin` reads an opaque
+key from the first stdin line instead of the environment; disable terminal
+echo before entering any key interactively.
+
+The output directory must not exist. Each of the eight scenarios has two caller
+turns, synthesized with Speak and sent as audio to Omni using the creator's
+default voice. This pack uses inline prompts with **no KB or connected tools**
+to probe missing-knowledge honesty and unsupported action confirmations.
+It does not yet test custom greetings, voice delivery instructions, managed
+Agent persistence, successful integrations, barge-in, or human-rated voice
+quality. These are development probes, not a held-out benchmark.
+
+`manifest.json` freezes the prompt text, template version, SHA-256 and hashes
+of the harness source files before the run. Per-scenario JSON and WAV files preserve transcripts, audio and
+deterministic checks. `summary.json` retains errors in the run count;
+`status.json` distinguishes a blocked or incomplete run from a completed one.
+Missing credentials and rate limits fail visibly. Do not repeatedly mint keys
+to work around a sandbox cap; supply an existing authorized test key instead.
+
+The creator scorer checks unsupported facts and action promises against explicit
+scenario evidence and configured tools. It also flags multiple requested details,
+idle responses and missing conversational relevance. Exact successful tool results
+must match the call and precede speech before they can support a completion claim.
+These are conservative lexical checks; ambiguous quotations or paraphrases require
+review rather than a confident semantic verdict.
+
+`checksVerdict: CHECKS_PASS` means individual deterministic assertions passed,
+not that the conversation was good. The overall result remains `REVIEW` until
+human assessment. Shared hard assertions also remain blocking. The broader aggregate verdict is recorded separately:
+its question-rate gate can reject valid clarification questions in a short
+two-turn probe. Negative first-audio gaps are retained as overlap; missing timing
+must not be counted as zero latency. `INVALID_CAPTURE` distinguishes framing,
+timeout, dropped-stream or incomplete-recording failures from content quality.
+Empty replies fail, but heuristic passes
+still require transcript and audio review. The
+existing judge is a stub and provides no independent quality certification.
+Keep original evidence, use a new directory on every run, and use a separate
+holdout before claiming improvements from prompt tuning.
+
+Creator command exit codes: `1` for a content failure, `2` for an incomplete or
+invalid capture, and `3` when automated checks finished but human review remains.
+No creator run silently becomes an automated quality certification.
+
+Shared scoring also rejects invalid captures, including replayed recordings with
+explicit failure metadata. Legacy fixtures without that metadata remain usable
+as unverified replays; their absence of metadata does not establish capture
+validity. The general `run.js` command exits `2` for an invalid capture.
+
 Live mode reuses the repo's packages instead of re-implementing audio/transport:
 
 - **`@pyai/twilio`** → `OmniClient` (Omni WS client + event demux), the
@@ -216,11 +277,18 @@ Live mode reuses the repo's packages instead of re-implementing audio/transport:
 - **`@pyai/sdk`** → Speak (synthetic-caller TTS) and the Hear stream (caller-audio
   WER).
 
-Per caller turn it: synthesizes the turn (Speak → PCM16 @ 24 kHz), transcribes
-that audio through the Hear stream for a real WER, streams the PCM to Omni in
-real-time ~20 ms frames, then captures the agent's transcript, **TTFB**, and
-**turn latency** (first agent audio after the caller stops; turn end after the
-agent goes quiet for a settle window).
+Before connecting it synthesizes and transcribes caller audio through Speak and
+Hear REST. It streams PCM in real-time frames, including silence throughout the
+greeting and responses. Reply transcription happens after closing the socket, so
+REST processing cannot cause idle messages during the call. Engine synthesis text
+is recorded separately from the transcription of audio actually captured.
+
+The WAV uses separate caller/agent channels on an estimated playout timeline,
+preserving gaps and overlaps. It is not an acoustic speaker recording. Timing
+uses monotonic timestamps and approximate energy bounds; response completion still
+uses two seconds of quiet because the public transport has no explicit reply-end
+event. Do not treat overlap as fast turn-taking or these client measurements as
+a production latency benchmark.
 
 ### The gate
 
@@ -257,10 +325,17 @@ PYAI_EVAL_HOLDOUT_DIR=holdout/social-canary-30-2026-08-18 \
 npm run live-product
 ```
 
-Completed directories contain `DO_NOT_TUNE`; every live runner refuses to
-overwrite one. Always choose a new `PYAI_EVAL_HOLDOUT_DIR`. The LiveKit and
+Completed `live-product` directories contain `DO_NOT_TUNE`, and that runner
+refuses to overwrite one. Always choose a new `PYAI_EVAL_HOLDOUT_DIR`. The LiveKit and
 Pipecat drivers honor that variable plus `PYAI_EVAL_OUTPUT_DIR` and produce the
 same `<scenario>.offline.json` + `<scenario>.wav` pair.
+
+The `live-pack`, `live-product` and `live-continuity` commands exit `2` for an
+incomplete or invalid capture, `1` for failed checks and `3` when automated checks
+finish but human review remains. Their `listen` fields are unrated until human
+assessment. The accompanying observations are literal transcript measurements,
+with zero human raters; they cannot prove that a promise was kept or that a
+listener would call again. Blinded ratings use the separate Layer E workflow.
 
 ### Repeated in-region bake-off
 

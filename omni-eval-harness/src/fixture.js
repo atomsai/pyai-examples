@@ -36,7 +36,9 @@ import { normalizeConversationState } from "./humanness.js";
 /** Normalize a parsed fixture object into the internal RunResult shape. */
 export function normalizeFixture(obj, source = null) {
   if (!obj || typeof obj !== "object") throw new Error("fixture must be a JSON object");
-  if (!Array.isArray(obj.turns) || obj.turns.length === 0) {
+  const hasIntegrity = Object.hasOwn(obj, "capture_integrity") || Object.hasOwn(obj, "captureIntegrity");
+  const captureIntegrity = Object.hasOwn(obj, "capture_integrity") ? obj.capture_integrity : obj.captureIntegrity;
+  if (!Array.isArray(obj.turns) || (obj.turns.length === 0 && (!hasIntegrity || captureIntegrity?.valid === true))) {
     throw new Error("fixture `turns` must be a non-empty array");
   }
   return {
@@ -45,6 +47,8 @@ export function normalizeFixture(obj, source = null) {
     mode: obj.mode ?? "offline",
     recordedAt: obj.recorded_at ?? null,
     source,
+    fixtureReplay: true,
+    ...(hasIntegrity ? { captureIntegrity } : {}),
     conversationState: normalizeConversationState(obj.conversation_state),
     kb: typeof obj.kb === "string" ? obj.kb : null,
     turns: obj.turns.map((t, i) => ({

@@ -134,6 +134,32 @@ export function computeVaqi({ bargeRecoveryRate, missedResponseRate, turnP95 }) 
 
 // --- the full evaluation ----------------------------------------------------
 
+function captureIntegrityForRun(run, expectedTurns) {
+  const hasIntegrity = Object.hasOwn(run, "captureIntegrity");
+  // Historical recorded fixtures often retain mode=live-voice. The loader
+  // marks replay explicitly so absent old metadata is not invented or failed.
+  const requiresIntegrity = /^live(?:-|$)/.test(run.mode ?? "") && run.fixtureReplay !== true;
+  if (!hasIntegrity && !requiresIntegrity) {
+    return { valid: null, status: run.fixtureReplay ? "legacy-unverified" : "not-recorded", issues: [] };
+  }
+  const metadata = run.captureIntegrity;
+  const issues = Array.isArray(metadata?.issues) ? metadata.issues.map((issue) => ({
+    code: typeof issue?.code === "string" && /^[a-z0-9_]{1,80}$/.test(issue.code)
+      ? issue.code : "capture_issue",
+    severity: issue?.severity === "warning" ? "warning" : "error",
+    turnIndex: Number.isSafeInteger(issue?.turnIndex) && issue.turnIndex >= 0 ? issue.turnIndex : null,
+  })) : [];
+  if (metadata?.valid !== true && !issues.some((issue) => issue.severity === "error")) {
+    issues.push({ code: !hasIntegrity ? "capture_integrity_missing" : "capture_integrity_invalid",
+      severity: "error", turnIndex: null });
+  }
+  if (run.turns.length !== expectedTurns || expectedTurns === 0) {
+    issues.push({ code: "capture_turn_count_mismatch", severity: "error", turnIndex: null });
+  }
+  const valid = metadata?.valid === true && !issues.some((issue) => issue.severity === "error");
+  return { valid, status: valid ? "verified" : "invalid", issues };
+}
+
 /**
  * Evaluate a RunResult against a scenario, producing a structured scorecard.
  * @param {object} scenario  loaded + validated scenario
@@ -144,6 +170,8 @@ export function evaluate(scenario, run, opts = {}) {
   const judge = resolveJudge(opts);
   const thresholds = scenario.thresholds ?? {};
   const scenarioTurns = scenario.turns ?? [];
+  const captureIntegrity = captureIntegrityForRun(run, scenarioTurns.length);
+  const invalidCapture = captureIntegrity.valid === false;
 
   const turns = run.turns.map((turn, i) => {
     const spec = scenarioTurns[i] ?? {};
@@ -160,7 +188,9 @@ export function evaluate(scenario, run, opts = {}) {
     const perTurnWer =
       turn.asrHypothesis != null ? Number(wer(turn.callerText, turn.asrHypothesis).toFixed(2)) : null;
 
-    const judgeResult = judge({
+    const judgeResult = invalidCapture ? {
+      pass: null, score: null, rationale: "Not evaluated: capture integrity is invalid or missing.",
+    } : judge({
       callerText: turn.callerText,
       agentText: turn.agentText,
       expectedKeywords: expectedKeywordsFor(spec.expect ?? []),
@@ -239,9 +269,9 @@ export function evaluate(scenario, run, opts = {}) {
       unit: spec.unit,
       value,
       band,
-      verdict: bandVerdict(band),
+      verdict: invalidCapture ? "INVALID_CAPTURE" : bandVerdict(band),
       gateLine: line,
-      gatePass: passes,
+      gatePass: invalidCapture ? null : passes,
       lowerIsBetter: spec.lowerIsBetter,
     };
   }
@@ -253,7 +283,8 @@ export function evaluate(scenario, run, opts = {}) {
   const anyWarn = Object.values(metrics).some((m) => m.band === "warn");
 
   let verdict;
-  if (hardFailures > 0 || gateFailed) verdict = "FAIL";
+  if (invalidCapture) verdict = "INVALID_CAPTURE";
+  else if (hardFailures > 0 || gateFailed) verdict = "FAIL";
   else if (anyWarn || softMisses > 0) verdict = "WARN";
   else verdict = "PASS";
 
@@ -265,6 +296,8 @@ export function evaluate(scenario, run, opts = {}) {
     source: run.source ?? null,
     generatedAt: new Date().toISOString(),
     verdict,
+    captureIntegrity,
+    qualityScored: !invalidCapture,
     metrics,
     extra: {
       ttfbP50,
@@ -277,7 +310,8 @@ export function evaluate(scenario, run, opts = {}) {
       turnsPassed: passedTurns,
     },
     judge: { stub: judge.stub, name: judge.name_ },
-    counts: { turns: totalTurns, hardFailures, softMisses },
+    counts: { turns: totalTurns, hardFailures, softMisses,
+      captureFailures: captureIntegrity.issues.filter((issue) => issue.severity === "error").length },
     turns,
   };
 }

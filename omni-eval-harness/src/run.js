@@ -17,7 +17,7 @@
 //   scenario  a path (scenarios/foo.json) or bare id (foo). Default:
 //             scenarios/appointment-booking.json
 //
-// Exit code: 0 on PASS/WARN, 1 on FAIL (so it can gate CI). Disable with
+// Exit code: 0 on PASS/WARN, 1 on FAIL, 2 on INVALID_CAPTURE/error. Disable with
 // --no-exit-code.
 
 import { fileURLToPath } from "node:url";
@@ -112,7 +112,11 @@ async function main() {
   console.log(renderMarkdown(scorecard));
   console.error(`\nwrote ${rel(mdPath)} and ${rel(jsonPath)}`);
 
-  if (opts.exitCode && scorecard.verdict === "FAIL") process.exit(1);
+  if (opts.exitCode && scorecardExitCode(scorecard)) process.exit(scorecardExitCode(scorecard));
+}
+
+export function scorecardExitCode(scorecard) {
+  return scorecard.verdict === "INVALID_CAPTURE" ? 2 : scorecard.verdict === "FAIL" ? 1 : 0;
 }
 
 function resolveOut(out) {

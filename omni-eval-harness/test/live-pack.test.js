@@ -45,7 +45,7 @@ test("ellipsis-only caller text is non-speech", () => {
   assert.equal(isNonSpeechCaller("I want a real person."), false);
 });
 
-test("runResultToFixture keeps spoken text and listenRubric stays single-rater", () => {
+test("runResultToFixture keeps spoken text and listenRubric identifies automated observations", () => {
   const run = {
     sessionLabel: "eval-x",
     mode: "live-voice",
@@ -55,8 +55,33 @@ test("runResultToFixture keeps spoken text and listenRubric stays single-rater",
   const fixture = runResultToFixture(run, "reflect-specific");
   assert.equal(fixture.turns[0].agent_text, "Nobody called you back for a week.");
   const listen = listenRubric({ id: "reflect-specific" }, run);
-  assert.equal(listen.rater, "engineering-single");
-  assert.equal(listen.heard, true);
+  assert.equal(listen.rater, "automated-transcript-heuristic");
+  assert.equal(listen.heard, null);
+  assert.equal(listen.observations.callerWordOverlap, true);
+});
+
+test("fluent transcripts and tool calls never fabricate human ratings or completed promises", () => {
+  for (const run of [{ turns: [] }, { turns: [{
+    callerText: "Please email me", agentText: "Thursday works. I'll email you.",
+    toolCalls: [{ name: "send_email" }],
+  }] }]) {
+    const listen = listenRubric({}, run);
+    for (const field of ["heard", "remembered", "no_form", "kept_promise", "left_space", "would_call_again"]) {
+      assert.equal(listen[field], null, field);
+    }
+    assert.equal(listen.humanRaters, 0);
+    assert.equal(listen.humanReviewRequired, true);
+    assert.equal(listen.basis, "last-turn-transcript-only");
+    assert.match(listen.note, /No human has rated/);
+    assert.equal(listen.observations.toolCallCount, run.turns.length ? 1 : 0);
+  }
+});
+
+test("fixture export preserves invalid capture evidence without certifying legacy recordings", () => {
+  const evidence = { valid: false, issues: [{ code: "stream_gap" }] };
+  const fixture = runResultToFixture({ turns: [], captureIntegrity: evidence }, "broken-capture");
+  assert.deepEqual(fixture.capture_integrity, evidence);
+  assert.equal(Object.hasOwn(runResultToFixture({ turns: [] }, "legacy"), "capture_integrity"), false);
 });
 
 test("scoreLiveRow reads agentText from a normalized run", async () => {

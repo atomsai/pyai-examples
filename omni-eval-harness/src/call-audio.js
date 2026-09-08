@@ -54,8 +54,11 @@ export function stitchCallPcm(turns, rate) {
 }
 
 
-export function pcm16ToWav(pcmValue, rate) {
+export function pcm16ToWav(pcmValue, rate, channels = 1) {
   const pcm = asPcm16(pcmValue);
+  if (![1, 2].includes(channels) || pcm.length % channels !== 0) {
+    throw new TypeError("PCM must contain complete mono or stereo frames");
+  }
   const dataBytes = pcm.length * 2;
   const wav = Buffer.alloc(44 + dataBytes);
   wav.write("RIFF", 0, "ascii");
@@ -64,10 +67,10 @@ export function pcm16ToWav(pcmValue, rate) {
   wav.write("fmt ", 12, "ascii");
   wav.writeUInt32LE(16, 16);
   wav.writeUInt16LE(1, 20);
-  wav.writeUInt16LE(1, 22);
+  wav.writeUInt16LE(channels, 22);
   wav.writeUInt32LE(rate, 24);
-  wav.writeUInt32LE(rate * 2, 28);
-  wav.writeUInt16LE(2, 32);
+  wav.writeUInt32LE(rate * 2 * channels, 28);
+  wav.writeUInt16LE(2 * channels, 32);
   wav.writeUInt16LE(16, 34);
   wav.write("data", 36, "ascii");
   wav.writeUInt32LE(dataBytes, 40);
@@ -75,6 +78,62 @@ export function pcm16ToWav(pcmValue, rate) {
     wav.writeInt16LE(pcm[i], 44 + i * 2);
   }
   return wav;
+}
+
+/**
+ * Preserve caller/agent overlap and measured gaps on separate channels.
+ * Chunk timestamps describe the harness's estimated playout, not a recording
+ * made at a customer's speaker. Within each lane PCM is queued in event order.
+ * Unlike the legacy turn stitcher, no synthetic lead/gap/spacing is inserted.
+ */
+export function stitchCallTimeline({ caller = [], agent = [] }, rate) {
+  if (!Number.isInteger(rate) || rate <= 0 || rate > 192000) {
+    throw new TypeError("call audio rate must be a positive integer <=192000");
+  }
+  const schedules = [];
+  let end = 0;
+  let queuedChunks = 0;
+  let maximumQueueMs = 0;
+  for (const [channel, chunks] of [caller, agent].entries()) {
+    if (!Array.isArray(chunks)) throw new TypeError("timeline channels must be arrays");
+    let laneEnd = 0;
+    let previousAt = -1;
+    for (const chunk of chunks) {
+      if (!Number.isFinite(chunk.atMs) || chunk.atMs < 0 || chunk.atMs < previousAt) {
+        throw new TypeError("chunk timestamps must be finite, nonnegative and ordered");
+      }
+      const pcm = asPcm16(chunk.pcm);
+      const requested = Math.round(chunk.atMs * rate / 1000);
+      const start = Math.max(requested, laneEnd);
+      const queueMs = (start - requested) * 1000 / rate;
+      if (queueMs > 0) queuedChunks++;
+      maximumQueueMs = Math.max(maximumQueueMs, queueMs);
+      laneEnd = start + pcm.length;
+      if (laneEnd > rate * 15 * 60) throw new RangeError("call timeline exceeds 15 minutes");
+      schedules.push({ channel, start, pcm });
+      end = Math.max(end, laneEnd);
+      previousAt = chunk.atMs;
+    }
+  }
+  if (!end) throw new TypeError("call timeline needs audio samples");
+  const pcm = new Int16Array(end * 2);
+  for (const segment of schedules) {
+    for (let i = 0; i < segment.pcm.length; i++) pcm[(segment.start + i) * 2 + segment.channel] = segment.pcm[i];
+  }
+  return { pcm, queuedChunks, maximumQueueMs };
+}
+
+export function writeCallTimelineWav(path, timeline, rate) {
+  const { pcm, queuedChunks, maximumQueueMs } = stitchCallTimeline(timeline, rate);
+  const wav = pcm16ToWav(pcm, rate, 2);
+  writeFileSync(path, wav);
+  return {
+    bytes: wav.length, duration_ms: Math.round(pcm.length / 2 / rate * 1000),
+    sha256: createHash("sha256").update(wav).digest("hex"),
+    channels: 2, channel_labels: ["caller", "agent"],
+    representation: "estimated-playout-stereo", queued_chunks: queuedChunks,
+    maximum_queue_ms: maximumQueueMs,
+  };
 }
 
 

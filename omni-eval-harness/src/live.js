@@ -14,20 +14,22 @@
 // Omni has no end-of-input control: after the caller utterance we keep sending
 // realtime silence until the agent has spoken and settled.
 
-import { writeCallWav } from "./call-audio.js";
+import { writeCallTimelineWav } from "./call-audio.js";
+import {
+  captureTiming, newAudioCapture, recordAudio, REALTIME_GAP_LIMIT_MS,
+  streamPcmRealtime, streamSilenceWhile, waitForAgentSettle, withTimeout,
+} from "./live-timing.js";
 
-
-const SETTLE_MS = 2000; // quiet after last agent audio before the turn is done
-const MIN_AGENT_AUDIO_MS = 350; // ignore a click / first-chunk blip
-const GREETING_DRAIN_MS = 4000;
-const TURN_TIMEOUT_MS = 25000;
+const GREETING_DRAIN_MS = 15000;
 const CONNECT_TIMEOUT_MS = 10000;
 const CONFIGURED_TIMEOUT_MS = 5000;
-const FRAME_MS = 20;
 const HEAR_RATE = 16000;
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const now = () => Number(process.hrtime.bigint() / 1000n) / 1000;
+const realClock = {
+  now: () => Number(process.hrtime.bigint() / 1000n) / 1000,
+  sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+  setTimeout: (fn, ms) => setTimeout(fn, ms),
+  clearTimeout: (id) => clearTimeout(id),
+};
 
 async function loadDeps() {
   let twilio;
@@ -51,6 +53,26 @@ function buildHint(pkg, dir, err) {
       `Build it once:\n  (cd ../../${dir} && npm install && npm run build)\n` +
       `then re-run with --live. Original error: ${err.message}`,
   );
+}
+
+export function safeConfiguredMetadata(ack) {
+  const result = {};
+  const fields = {
+    voice_id: (value) => typeof value === "string" && /^[a-zA-Z0-9_-]{1,100}$/.test(value),
+    voice_tier: (value) => typeof value === "string" && /^[a-z_]{1,32}$/.test(value),
+    language: (value) => typeof value === "string" && /^[a-z-]{2,12}$/.test(value),
+    language_active: (value) => typeof value === "string" && /^[a-z-]{2,12}$/.test(value),
+    language_fallback: (value) => typeof value === "boolean",
+    greeting: (value) => typeof value === "boolean",
+    kb: (value) => typeof value === "boolean",
+    tools: (value) => Number.isSafeInteger(value) && value >= 0,
+    endpointing_ms: (value) => Number.isFinite(value) && value >= 0,
+    audio_out: (value) => typeof value === "string" && /^pcm16@(8000|24000)$/.test(value),
+  };
+  for (const [key, accepts] of Object.entries(fields)) {
+    if (accepts(ack?.[key])) result[key] = ack[key];
+  }
+  return result;
 }
 
 /** PCM16 LE mono WAV, for Hear REST. */
@@ -127,23 +149,30 @@ export function kbFromQueryEvent(evt) {
  * @param {object} scenario validated scenario
  * @param {object} opts { apiKey, sessionLabel, mode, voice, baseURL, omniRate, tools, callerKey, captureAudioPath }
  */
-export async function runLive(scenario, opts) {
-  const { twilio, sdk } = await loadDeps();
+export async function runLive(scenario, opts, runtime = {}) {
+  // The explicit dependency seam keeps transport/timing regression tests offline.
+  const { twilio, sdk } = runtime.dependencies ?? await loadDeps();
+  const clock = runtime.clock ?? realClock;
   const { OmniClient, makeResampler } = twilio;
   const PyAI = sdk.PyAI ?? sdk.default;
-
   const omniRate = opts.omniRate ?? 24000;
   const mode = opts.mode === "text" ? "text" : "voice";
   if (opts.captureAudioPath && mode !== "voice") {
     throw new Error("call audio capture requires live voice mode");
   }
   const pyai = new PyAI({ apiKey: opts.apiKey, baseURL: opts.baseURL });
-  const toHear = makeResampler(omniRate, HEAR_RATE);
   const tools = opts.tools ?? toolsForScenario(scenario);
+  const issues = [];
+  const addIssue = (code, turnIndex = null, severity = "error") => {
+    if (!issues.some((i) => i.code === code && i.turnIndex === turnIndex)) {
+      issues.push({ code, turnIndex, severity });
+    }
+  };
 
+  // All caller synthesis and WER transcription happens BEFORE connecting.
   const prepared = [];
-  for (const spec of scenario.turns) {
-    const callerText = spec.caller_says;
+  for (let index = 0; index < scenario.turns.length; index++) {
+    const callerText = scenario.turns[index].caller_says;
     let callerPcm = null;
     let callerAudioMs = null;
     let asrHypothesis = null;
@@ -152,76 +181,95 @@ export async function runLive(scenario, opts) {
         callerPcm = quietStaticPcm(omniRate, 1200);
       } else {
         const buf = await pyai.audio.speech({
-          input: callerText,
-          voice: opts.voice,
-          response_format: "pcm",
-          sample_rate: omniRate,
+          input: callerText, voice: opts.voice,
+          response_format: "pcm", sample_rate: omniRate,
         });
         callerPcm = twilio.bytesToPcm16(new Uint8Array(buf));
       }
       callerAudioMs = Math.round((callerPcm.length / omniRate) * 1000);
+      // Resamplers carry filter state; each separate utterance needs a fresh one.
+      const toHear = makeResampler(omniRate, HEAR_RATE);
       const forHear = toHear ? toHear.process(callerPcm) : callerPcm;
-      asrHypothesis = await transcribePcm(pyai, forHear, HEAR_RATE, "caller.wav").catch((err) => {
-        console.error(`[live][hear] caller: ${err.message}`);
-        return null;
-      });
+      try {
+        asrHypothesis = await transcribePcm(pyai, forHear, HEAR_RATE, "caller.wav");
+      } catch {
+        addIssue("caller_transcription_failed", index);
+      }
+      if (!isNonSpeechCaller(callerText) && !asrHypothesis) {
+        addIssue("caller_transcription_missing", index);
+      }
     }
     prepared.push({ callerText, callerPcm, callerAudioMs, asrHypothesis });
   }
 
-  let turnCtx = newTurnCtx();
-  function newTurnCtx() {
-    return {
-      firstAudioAt: null,
-      lastAudioAt: null,
-      turnBeginAt: null,
-      eouMs: null,
-      pcm: [],
-      finals: [],
-      tools: [],
-      kb: null,
-      started: now(),
-    };
-  }
-
-  let onReadyResolve;
-  const ready = new Promise((res) => {
-    onReadyResolve = res;
-  });
-  let latestConfigured = null;
+  const sessionStartedAt = clock.now();
+  let turnIndex = null;
+  let turnCtx = newAudioCapture(sessionStartedAt);
+  const openingCtx = turnCtx;
+  const timeline = { caller: [], agent: [] };
+  let outputRate = omniRate === 8000 ? 8000 : 24000;
+  let rateConfirmed = false;
   let callId = null;
-  let onConfiguredResolve;
-  const configured = new Promise((res) => {
-    onConfiguredResolve = res;
-  });
+  let closed = false;
+  let closing = false;
+  let keepSilence = false;
+  let silencer = null;
+  let lastInputFrameEnd = null;
+  let maxInputGapMs = 0;
+  let resolveReady;
+  let resolveConfigured;
+  let resolveClosed;
   let configuredEvents = 0;
+  const ready = new Promise((resolve) => { resolveReady = resolve; });
+  const configured = new Promise((resolve) => { resolveConfigured = resolve; });
+  const closeComplete = new Promise((resolve) => { resolveClosed = resolve; });
   const configuredEventsNeeded = opts.callerKey ? 2 : 1;
 
+  function acceptOutputRate(value) {
+    if (typeof value !== "string") return;
+    const match = /^pcm16@(8000|24000)$/.exec(value);
+    if (!match) { addIssue("unsupported_output_format", turnIndex); return; }
+    const rate = Number(match[1]);
+    if (rate !== outputRate && timeline.agent.length) addIssue("output_rate_changed", turnIndex);
+    outputRate = rate;
+    rateConfirmed = true;
+  }
+  function observeInputFrame(pcm, at) {
+    if (lastInputFrameEnd != null) {
+      const gap = at - lastInputFrameEnd;
+      maxInputGapMs = Math.max(maxInputGapMs, gap);
+      if (gap > REALTIME_GAP_LIMIT_MS) addIssue("realtime_input_gap", turnIndex);
+    }
+    lastInputFrameEnd = at + (pcm.length / omniRate) * 1000;
+  }
+  function startSilence() {
+    keepSilence = true;
+    silencer = streamSilenceWhile(omni, omniRate, () => keepSilence && !closed, clock, observeInputFrame);
+  }
+  async function stopSilence() {
+    keepSilence = false;
+    await silencer;
+    silencer = null;
+  }
+
   const omni = new OmniClient({
-    apiKey: opts.apiKey,
-    sessionLabel: opts.sessionLabel,
-    baseURL: opts.baseURL,
-    rate: omniRate,
-    voice: opts.voice,
-    persona: scenario.persona,
-    tools,
+    apiKey: opts.apiKey, sessionLabel: opts.sessionLabel, baseURL: opts.baseURL,
+    rate: omniRate, voice: opts.voice, persona: scenario.persona, tools,
     onReady: () => {
-      // caller_key is an internal eval/telephony stamp, deliberately absent
-      // from the public SDK options. A second configure frame lets this harness
-      // prove product continuity without widening the customer-facing client.
-      if (opts.callerKey) {
-        omni.sendControl({ type: "configure", caller_key: opts.callerKey });
-      }
-      onReadyResolve();
+      if (opts.callerKey) omni.sendControl({ type: "configure", caller_key: opts.callerKey });
+      resolveReady();
     },
+    onHello: (audioOut) => acceptOutputRate(audioOut),
     onAudio: (pcm) => {
-      const t = now();
-      if (turnCtx.firstAudioAt == null) turnCtx.firstAudioAt = t;
-      turnCtx.lastAudioAt = t;
-      if (pcm && pcm.length) turnCtx.pcm.push(pcm);
+      const chunk = recordAudio(turnCtx, pcm, clock.now(), outputRate);
+      if (chunk) timeline.agent.push({ atMs: chunk.playbackAt - sessionStartedAt, pcm: chunk.pcm });
     },
     onTranscript: (tr) => {
-      if (tr.final && tr.role === "assistant" && tr.text) turnCtx.finals.push(tr.text);
+      // Engine text is useful telemetry, but only Hear of captured PCM is the
+      // speech actually graded. Do not substitute intended text for spoken audio.
+      if (tr.final && tr.role === "assistant" && tr.text) {
+        (turnCtx.assistantText ??= []).push(tr.text);
+      }
     },
     onTransfer: (evt) => {
       turnCtx.tools.push({ name: "transfer_to_human", args: evt ?? null });
@@ -229,140 +277,173 @@ export async function runLive(scenario, opts) {
     onEvent: (evt) => {
       const event = typeof evt.event === "string" ? evt.event : "";
       if (!callId && typeof evt.call_id === "string") callId = evt.call_id;
+      if (event === "hello") acceptOutputRate(evt.audio_out);
       if (event === "configured") {
-        latestConfigured = evt;
+        acceptOutputRate(evt.audio_out);
         configuredEvents += 1;
-        if (configuredEvents >= configuredEventsNeeded) onConfiguredResolve(evt);
+        if (configuredEvents >= configuredEventsNeeded) resolveConfigured(evt);
       }
       if (event === "tool_call") {
         const name = evt.name ?? evt.tool ?? evt.function?.name;
-        if (name) turnCtx.tools.push({ name, args: evt.arguments ?? evt.args ?? null });
+        if (name) turnCtx.tools.push({ name, callId: evt.call_id ?? null,
+          args: evt.arguments ?? evt.args ?? null });
       }
-      if (event === "kb_query") {
-        turnCtx.kb = kbFromQueryEvent(evt);
-      }
+      if (event === "kb_query") turnCtx.kb = kbFromQueryEvent(evt);
       if (event === "turn_begin") {
-        turnCtx.turnBeginAt = now();
-        if (typeof evt.since_caller_end_ms === "number") turnCtx.eouMs = evt.since_caller_end_ms;
+        const at = clock.now();
+        turnCtx.turnBeginAt ??= at;
+        turnCtx.turnBegins.push({ atMs: Math.round(at - sessionStartedAt), turn: evt.turn ?? null });
+        if (turnCtx.eouMs == null && typeof evt.since_caller_end_ms === "number") {
+          turnCtx.eouMs = evt.since_caller_end_ms;
+        }
       }
+      if (["idle_prompt", "flush", "barge_in", "end_call", "session_end"].includes(event)) {
+        turnCtx.events.push({ event, atMs: Math.round(clock.now() - sessionStartedAt) });
+      }
+      if (event === "error") addIssue("server_error_event", turnIndex);
     },
     onError: (err) => {
-      const msg = err?.message ?? String(err);
-      if (msg.includes("missing its event key")) return;
-      console.error(`[live][omni] ${msg}`);
+      const message = err?.message ?? String(err);
+      // Stable, credential-free flags; malformed frames are never suppressed.
+      addIssue(/frame|transcript|event key/i.test(message) ? "protocol_frame_error" : "transport_error", turnIndex);
+    },
+    onClose: () => {
+      closed = true;
+      resolveClosed();
+      if (!closing) addIssue("unexpected_session_close", turnIndex);
     },
   });
 
-  await withTimeout(ready, CONNECT_TIMEOUT_MS, "Omni connect timed out");
-  const configuredAck = await withTimeout(
-    configured,
-    CONFIGURED_TIMEOUT_MS,
-    "Omni configured ack timed out",
-  ).catch((err) => {
-    console.error(`[live][omni] ${err.message}`);
-    return latestConfigured;
-  });
-  if (configuredAck) {
-    console.error(
-      `[live] configured tools=${configuredAck.tools ?? "?"} greeting=${configuredAck.greeting ?? "?"}`,
-    );
+  const captures = [];
+  let configuredAck;
+  try {
+    await withTimeout(ready, CONNECT_TIMEOUT_MS, "Omni connect timed out", clock);
+    startSilence(); // Keep real-time input alive during configure AND the opening.
+    configuredAck = await withTimeout(configured, CONFIGURED_TIMEOUT_MS, "Omni configured ack timed out", clock);
+    if (!rateConfirmed) addIssue("output_rate_unconfirmed");
+    if (configuredAck.language_fallback === true) addIssue("configured_language_fallback");
+    if (typeof configuredAck.tools === "number" && configuredAck.tools !== tools.length) {
+      addIssue("configured_tools_mismatch");
+    }
+    // Keep the context created BEFORE configure: greeting chunks may precede
+    // its ack. Wait for audible playback to finish, not merely packet quiet.
+    const opening = await waitForAgentSettle(() => openingCtx, clock, {
+      allowEmpty: configuredAck.greeting === false,
+      timeoutMs: GREETING_DRAIN_MS,
+      isClosed: () => closed,
+    });
+    if (!["settled", "empty"].includes(opening.reason)) {
+      addIssue(`greeting_${opening.reason}`);
+    } else {
+      await stopSilence();
+      for (let i = 0; i < prepared.length && !closed; i++) {
+        turnIndex = i;
+        turnCtx = newAudioCapture(clock.now());
+        const preparedTurn = prepared[i];
+        let caller;
+        if (mode === "voice" && preparedTurn.callerPcm) {
+          caller = await streamPcmRealtime(omni, preparedTurn.callerPcm, omniRate, clock, (pcm, at) => {
+            observeInputFrame(pcm, at);
+            timeline.caller.push({ atMs: at - sessionStartedAt, pcm: pcm.slice() });
+          });
+          if (caller.maxFrameGapMs > REALTIME_GAP_LIMIT_MS) addIssue("caller_stream_gap", i);
+          if (!isNonSpeechCaller(preparedTurn.callerText) && caller.speechOffsetAt == null) {
+            addIssue("caller_audio_inaudible", i);
+          }
+          // Non-speech probes intentionally have no audible offset. Latency is
+          // measured from the end of that probe, explicitly labeled below.
+          if (caller.speechOffsetAt == null && isNonSpeechCaller(preparedTurn.callerText)) {
+            caller.speechOffsetAt = caller.streamEndAt;
+            caller.offsetBasis = "non-speech-probe-end";
+          }
+        } else {
+          const at = clock.now();
+          omni.sendControl({ type: "input_text", text: preparedTurn.callerText });
+          caller = { startedAt: at, speechOnsetAt: at, speechOffsetAt: at, streamEndAt: at,
+            maxFrameGapMs: 0, offsetBasis: "text-submit" };
+        }
+        startSilence(); // Continue through ALL agent playback and pauses.
+        const settled = await waitForAgentSettle(() => turnCtx, clock, { isClosed: () => closed });
+        await stopSilence();
+        if (settled.reason !== "settled") addIssue(`turn_${settled.reason}`, i);
+        if (turnCtx.firstAudioAt == null) addIssue("agent_audio_inaudible", i);
+        if (turnCtx.turnBegins.length > 1) addIssue("multiple_response_turns", i);
+        if (turnCtx.events.some((e) => e.event === "flush" || e.event === "barge_in")) {
+          addIssue("output_playback_interrupted", i);
+        }
+        captures.push({ preparedTurn, ctx: turnCtx, caller, settled });
+        // A timeout cannot define a reliable boundary for the next reply.
+        if (settled.reason !== "settled") break;
+      }
+    }
+  } finally {
+    try {
+      await stopSilence();
+    } finally {
+      closing = true;
+      omni.close(); // Always close, including configure/transport/stream errors.
+      try {
+        await withTimeout(closeComplete, 3000, "Omni close timed out", clock);
+      } catch {
+        addIssue("session_close_unconfirmed");
+      }
+    }
   }
 
-  // Drain turn-0 greeting so it is not scored as the first reply.
-  turnCtx = newTurnCtx();
-  await waitForAgentSettle(() => turnCtx, {
-    allowEmpty: true,
-    timeoutMs: GREETING_DRAIN_MS,
-    minAudioMs: MIN_AGENT_AUDIO_MS,
-  });
-
+  if (captures.length !== prepared.length) addIssue("incomplete_turn_capture");
+  // Offline processing starts only once the socket is closed. REST latency can
+  // no longer create dead air, trigger idle check-ins or bleed into the next turn.
   const turns = [];
-  const audioTurns = [];
-  for (let i = 0; i < prepared.length; i++) {
-    const { callerText, callerPcm, callerAudioMs, asrHypothesis } = prepared[i];
-    turnCtx = newTurnCtx();
-
-    let tCallerDone;
-    if (mode === "voice" && callerPcm) {
-      tCallerDone = await streamPcmRealtime(omni, callerPcm, omniRate);
-    } else {
-      omni.sendControl({ type: "input_text", text: callerText });
-      tCallerDone = now();
+  for (let i = 0; i < captures.length; i++) {
+    const { preparedTurn, ctx, caller, settled } = captures[i];
+    const agentPcm = concatPcm(ctx.pcm);
+    let agentText = "";
+    try {
+      agentText = await transcribePcm(pyai, agentPcm, outputRate, "agent.wav") ?? "";
+    } catch {
+      addIssue("agent_transcription_failed", i);
     }
-    let keepSilence = true;
-    const silencer = streamSilenceWhile(
-      omni,
-      omniRate,
-      () => keepSilence && turnCtx.firstAudioAt == null,
-    );
-    await waitForAgentSettle(() => turnCtx);
-    keepSilence = false;
-    await silencer;
-
-    const agentPcm = concatPcm(turnCtx.pcm);
-    const agentAudioMs =
-      turnCtx.firstAudioAt != null && turnCtx.lastAudioAt != null
-        ? Math.round(turnCtx.lastAudioAt - turnCtx.firstAudioAt)
-        : null;
-    let agentText = turnCtx.finals.join(" ").trim();
-    if (!agentText && agentPcm.length >= Math.round((omniRate * 80) / 1000)) {
-      agentText = await transcribePcm(pyai, agentPcm, omniRate, "agent.wav").catch((err) => {
-        console.error(`[live][hear] agent: ${err.message}`);
-        return "";
-      }) ?? "";
-    }
-
-    const ttfbRaw = turnCtx.firstAudioAt != null ? Math.round(turnCtx.firstAudioAt - tCallerDone) : null;
-    const turnRaw = turnCtx.lastAudioAt != null ? Math.round(turnCtx.lastAudioAt - tCallerDone) : null;
-    const ttfbMs = ttfbRaw != null && ttfbRaw >= 0 ? ttfbRaw : null;
-    const turnMs = turnRaw != null && turnRaw >= 0 ? turnRaw : null;
-    if (mode === "voice") {
-      audioTurns.push({
-        callerPcm: callerPcm ?? new Int16Array(),
-        agentPcm,
-        ttfbMs,
-      });
-    }
-    // Latency decomposition from the engine's turn_begin frame: EOU/STT
-    // (caller end -> turn_begin, measured server-side) and brain+TTS
-    // (turn_begin -> first agent audio). Null on engines without the frame.
-    const sttFinalMs = turnCtx.eouMs;
-    const brainTtsMs =
-      turnCtx.turnBeginAt != null && turnCtx.firstAudioAt != null
-        ? Math.max(0, Math.round(turnCtx.firstAudioAt - turnCtx.turnBeginAt))
-        : null;
-
+    if (!agentText) addIssue("agent_transcription_missing", i);
+    const timing = captureTiming(ctx, caller, sessionStartedAt);
+    timing.callerOffsetBasis = caller.offsetBasis ?? "energy-bound";
+    timing.settleReason = settled.reason;
+    const { callerPcm: _callerPcm, ...callerFields } = preparedTurn;
     turns.push({
-      index: i,
-      callerText,
-      callerAudioMs,
-      asrHypothesis,
-      agentText,
-      agentAudioMs,
-      ttfbMs,
-      turnMs,
-      sttFinalMs,
-      brainTtsMs,
-      toolCalls: turnCtx.tools,
-      bargeIn: null,
-      kb: turnCtx.kb,
+      index: i, ...callerFields, agentText,
+      agentAudioMs: Math.round((agentPcm.length / outputRate) * 1000),
+      ttfbMs: timing.ttfbMs, turnMs: timing.turnMs,
+      replyStartedAtMs: timing.agentSpeechOnsetMs,
+      sttFinalMs: ctx.eouMs,
+      brainTtsMs: ctx.turnBeginAt != null && ctx.firstPacketAt != null
+        ? Math.round(ctx.firstPacketAt - ctx.turnBeginAt) : null,
+      toolCalls: ctx.tools, toolResults: ctx.toolResults,
+      bargeIn: null, kb: ctx.kb, timing,
+      engineAssistantText: (ctx.assistantText ?? []).join(" "),
+      turnBegins: ctx.turnBegins, events: ctx.events,
     });
   }
 
-  omni.close();
-  const audio = opts.captureAudioPath
-    ? writeCallWav(opts.captureAudioPath, audioTurns, omniRate)
-    : null;
-
+  // Mixed input/output rates are normalized for the audio artifact only;
+  // capture timings and ASR retain their native negotiated rates.
+  if (omniRate !== outputRate) {
+    const resampler = makeResampler(omniRate, outputRate);
+    for (const chunk of timeline.caller) chunk.pcm = resampler.process(chunk.pcm);
+  }
+  const audio = opts.captureAudioPath && (timeline.caller.length || timeline.agent.length)
+    ? writeCallTimelineWav(opts.captureAudioPath, timeline, outputRate) : null;
+  const safeConfigured = safeConfiguredMetadata(configuredAck);
+  const toolsMatch = configuredAck?.tools === tools.length;
   return {
-    scenarioId: scenario.id,
-    callId,
-    sessionLabel: opts.sessionLabel,
+    scenarioId: scenario.id, callId, sessionLabel: opts.sessionLabel,
     mode: mode === "voice" ? "live-voice" : "live-text",
-    source: opts.baseURL ?? "api.pyai.com",
-    recordedAt: new Date().toISOString(),
-    audio,
-    turns,
+    source: opts.baseURL ?? "api.pyai.com", recordedAt: new Date().toISOString(),
+    audio, turns, configured: safeConfigured,
+    availableTools: toolsMatch ? tools.map((tool) => tool.name ?? tool.function?.name).filter(Boolean) : null,
+    availableToolsProvenance: toolsMatch ? "requested-declarations-and-configured-count" : "unverified",
+    captureIntegrity: { valid: !issues.some((issue) => issue.severity === "error"), issues },
+    captureMethod: { inputRate: omniRate, outputRate, agentTranscription: "post-session-hear",
+      timing: "client-monotonic-queued-playback-energy-bounds", settleQuietMs: 2000,
+      maxInputGapMs: Math.round(maxInputGapMs) },
   };
 }
 
@@ -375,57 +456,6 @@ function quietStaticPcm(rate, durationMs) {
   const pcm = new Int16Array(n);
   for (let i = 0; i < n; i++) pcm[i] = ((Math.random() * 120) | 0) - 60;
   return pcm;
-}
-
-function withTimeout(promise, ms, message) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
-  ]);
-}
-
-/** Stream PCM to Omni in real-time ~20ms frames; resolve at the last speech frame. */
-async function streamPcmRealtime(omni, pcm, rate) {
-  const frame = Math.max(1, Math.round((rate * FRAME_MS) / 1000));
-  for (let off = 0; off < pcm.length; off += frame) {
-    omni.sendAudio(pcm.subarray(off, Math.min(off + frame, pcm.length)));
-    await sleep(FRAME_MS);
-  }
-  return now();
-}
-
-/** Keep the engine's endpointer alive. Omni has no explicit end-of-input. */
-async function streamSilenceWhile(omni, rate, shouldContinue) {
-  const frame = Math.max(1, Math.round((rate * FRAME_MS) / 1000));
-  const silence = new Int16Array(frame);
-  while (shouldContinue()) {
-    omni.sendAudio(silence);
-    await sleep(FRAME_MS);
-  }
-}
-
-function waitForAgentSettle(getCtx, opts = {}) {
-  const settleMs = opts.settleMs ?? SETTLE_MS;
-  const timeoutMs = opts.timeoutMs ?? TURN_TIMEOUT_MS;
-  const minAudioMs = opts.minAudioMs ?? MIN_AGENT_AUDIO_MS;
-  const allowEmpty = opts.allowEmpty ?? false;
-  return new Promise((resolve) => {
-    const start = now();
-    const tick = () => {
-      const ctx = getCtx();
-      const elapsed = now() - start;
-      const audioMs =
-        ctx.firstAudioAt != null && ctx.lastAudioAt != null
-          ? ctx.lastAudioAt - ctx.firstAudioAt
-          : 0;
-      const quietFor = ctx.lastAudioAt != null ? now() - ctx.lastAudioAt : 0;
-      if (audioMs >= minAudioMs && quietFor >= settleMs) return resolve();
-      if (allowEmpty && ctx.firstAudioAt == null && elapsed >= 800) return resolve();
-      if (elapsed >= timeoutMs) return resolve();
-      setTimeout(tick, 50);
-    };
-    tick();
-  });
 }
 
 async function transcribePcm(pyai, pcm, sampleRate, filename) {

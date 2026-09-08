@@ -14,19 +14,21 @@ function fmtValue(m) {
 }
 
 function gateCell(m) {
+  if (m.verdict === "INVALID_CAPTURE") return "NOT SCORED";
   if (m.value == null) return "n/a";
   const op = m.lowerIsBetter ? "<=" : ">=";
   return `${m.gatePass ? "PASS" : "FAIL"} (${op}${m.gateLine}${m.unit})`;
 }
 
-function assertionLine(a) {
-  const tag = a.ok ? "PASS" : a.soft ? "WARN" : "FAIL";
+function assertionLine(a, invalidCapture = false) {
+  const tag = invalidCapture ? "UNVERIFIED" : a.ok ? "PASS" : a.soft ? "WARN" : "FAIL";
   return `  - [${tag}] ${a.type}${a.soft ? " (soft)" : ""}, ${a.detail}`;
 }
 
 /** Render a full markdown scorecard from an evaluate() result. */
 export function renderMarkdown(sc) {
   const lines = [];
+  const invalidCapture = sc.verdict === "INVALID_CAPTURE";
   lines.push(`# Omni Eval Scorecard, ${sc.scenarioId}`);
   lines.push("");
   lines.push(`- **Verdict:** ${sc.verdict}`);
@@ -40,12 +42,23 @@ export function renderMarkdown(sc) {
   );
   lines.push("");
 
+  if (invalidCapture) {
+    lines.push("**Capture integrity failed.** The measurements and transcripts below are diagnostic evidence, not an agent-quality score.");
+    for (const issue of sc.captureIntegrity?.issues ?? []) {
+      lines.push(`- ${issue.code}${issue.turnIndex == null ? "" : ` (turn ${issue.turnIndex + 1})`}`);
+    }
+    lines.push("");
+  } else if (sc.captureIntegrity?.status === "legacy-unverified") {
+    lines.push("Historical fixture replay: capture integrity was not recorded. Existing fixture checks are shown without certifying the recording.");
+    lines.push("");
+  }
+
   lines.push("## Aggregate metrics");
   lines.push("");
   lines.push("| Dimension | Value | Band | Gate |");
   lines.push("|---|---|---|---|");
   for (const m of Object.values(sc.metrics)) {
-    lines.push(`| ${m.label} | ${fmtValue(m)} | ${BAND_LABEL[m.band]} | ${gateCell(m)} |`);
+    lines.push(`| ${m.label} | ${fmtValue(m)} | ${invalidCapture ? "UNVERIFIED" : BAND_LABEL[m.band]} | ${gateCell(m)} |`);
   }
   lines.push("");
   lines.push(
@@ -59,7 +72,7 @@ export function renderMarkdown(sc) {
   lines.push("## Turns");
   lines.push("");
   for (const t of sc.turns) {
-    const verdict = !t.hardOk ? "FAIL" : !t.softOk ? "WARN" : "PASS";
+    const verdict = invalidCapture ? "NOT SCORED" : !t.hardOk ? "FAIL" : !t.softOk ? "WARN" : "PASS";
     lines.push(`### Turn ${t.index + 1}, ${verdict}`);
     lines.push(`- caller: "${t.callerText}"`);
     lines.push(`- agent: "${t.agentText}"`);
@@ -71,9 +84,10 @@ export function renderMarkdown(sc) {
     lines.push(`- ${bits.join(" · ")}`);
     if (t.assertions.length) {
       lines.push("- assertions:");
-      for (const a of t.assertions) lines.push(assertionLine(a));
+      for (const a of t.assertions) lines.push(assertionLine(a, invalidCapture));
     }
-    lines.push(`- judge ${t.judge.stub ? "[STUB]" : ""}: ${t.judge.pass ? "pass" : "fail"} score ${t.judge.score}, ${t.judge.rationale}`);
+    lines.push(invalidCapture ? "- judge: not evaluated because capture integrity failed."
+      : `- judge ${t.judge.stub ? "[STUB]" : ""}: ${t.judge.pass ? "pass" : "fail"} score ${t.judge.score}, ${t.judge.rationale}`);
     lines.push("");
   }
 
@@ -82,7 +96,8 @@ export function renderMarkdown(sc) {
   lines.push(`- Overall: **${sc.verdict}**`);
   lines.push(`- Turns: ${sc.counts.turns} (hard failures ${sc.counts.hardFailures}, soft misses ${sc.counts.softMisses})`);
   const failingGates = Object.values(sc.metrics).filter((m) => !m.gatePass).map((m) => m.label);
-  lines.push(`- Failing gates: ${failingGates.length ? failingGates.join(", ") : "none"}`);
+  lines.push(invalidCapture ? "- Quality gates: not scored until capture integrity is verified."
+    : `- Failing gates: ${failingGates.length ? failingGates.join(", ") : "none"}`);
   lines.push("");
 
   return lines.join("\n");

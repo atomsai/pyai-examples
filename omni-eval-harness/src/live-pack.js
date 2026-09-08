@@ -32,6 +32,7 @@ export function runResultToFixture(run, scenarioId) {
     session_label: run.sessionLabel ?? null,
     mode: run.mode ?? "live-voice",
     recorded_at: run.recordedAt ?? new Date().toISOString(),
+    ...(Object.hasOwn(run, "captureIntegrity") ? { capture_integrity: run.captureIntegrity } : {}),
     note: "Layer C live Omni recording. Do not tune prompts or guards on holdout copies.",
     turns: (run.turns || []).map((t) => ({
       caller_says: t.callerText ?? t.caller_says ?? "",
@@ -97,14 +98,25 @@ export function listenRubric(scenario, run) {
     .filter((w) => w.length > 3)
     .some((w) => agent.toLowerCase().includes(w));
   return {
-    heard: Boolean(agent.trim()) && !generic && contentHit,
-    remembered: /128|thursday|gaurav|after four|4412/i.test(agent),
-    no_form: (agent.match(/\?/g) || []).length <= 1,
-    kept_promise: tools.length > 0 || /thursday|connect you|call you/i.test(agent),
-    left_space: !/\b(are you still there|still there\?)\b/i.test(agent),
-    would_call_again: Boolean(agent.trim()) && !generic,
-    rater: "engineering-single",
-    note: "Not Layer E. One unblinded rater on the transcript. Needs a second blinded human.",
+    heard: null,
+    remembered: null,
+    no_form: null,
+    kept_promise: null,
+    left_space: null,
+    would_call_again: null,
+    rater: "automated-transcript-heuristic",
+    humanRaters: 0,
+    humanReviewRequired: true,
+    basis: "last-turn-transcript-only",
+    observations: {
+      nonemptyTranscript: Boolean(agent.trim()),
+      genericValidationPhrase: generic,
+      callerWordOverlap: contentHit,
+      questionMarkCount: (agent.match(/\?/g) || []).length,
+      toolCallCount: tools.length,
+      idleCheckInPhrase: /\b(are you still there|still there\?)\b/i.test(agent),
+    },
+    note: "No human has rated this recording. Transcript observations do not establish listening quality or completed actions; tool calls alone do not prove success. Use blinded human review for Layer E.",
   };
 }
 
@@ -161,6 +173,7 @@ async function main() {
   mkdirSync(outDir, { recursive: true });
   mkdirSync(holdoutDir, { recursive: true });
 
+  const failedIds = new Set();
   for (const id of pack) {
     console.error(`[live-pack] starting ${id}`);
     let lastErr = null;
@@ -181,6 +194,7 @@ async function main() {
       }
     }
     if (lastErr) {
+      failedIds.add(id);
       writeFileSync(
         resolve(holdoutDir, `${id}.error.json`),
         `${JSON.stringify({ id, error: lastErr.message, at: new Date().toISOString() }, null, 2)}\n`,
@@ -189,10 +203,14 @@ async function main() {
     await sleep(2500);
   }
 
-  const rows = LIVE_C_PACK.map((id) => rowFromHoldout(id, holdoutDir));
+  const rows = pack.map((id) => failedIds.has(id)
+    ? { id, verdict: "ERROR", error: "capture failed during this invocation" }
+    : rowFromHoldout(id, holdoutDir));
   const summary = writeSummary(outDir, holdoutDir, rows);
   console.log(JSON.stringify(summary, null, 2));
-  if (rows.some((r) => r.verdict === "ERROR")) process.exit(2);
+  if (rows.some((r) => ["ERROR", "INVALID_CAPTURE"].includes(r.verdict))) process.exit(2);
+  if (rows.some((r) => r.verdict === "FAIL")) process.exit(1);
+  process.exit(3); // Automated checks complete; human listening review remains.
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

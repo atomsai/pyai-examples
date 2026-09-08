@@ -37,6 +37,13 @@ export function roleForScenario(id) {
   return "support";
 }
 
+/** A completed automated run always still requires listening/review. */
+export function productExitCode(rows) {
+  if (!rows.length || rows.some(row => ["ERROR", "INVALID_CAPTURE"].includes(row.verdict))) return 2;
+  if (rows.some(row => row.verdict === "FAIL" || row.content_verdict === "FAIL")) return 1;
+  return 3;
+}
+
 const KB_SCENARIOS = new Set(["kb-price-hit", "kb-price-miss-honest"]);
 const KB_TEXT =
   "Pro plan pricing: the Pro plan costs forty-nine dollars per month. " +
@@ -209,6 +216,7 @@ async function main() {
     return null;
   });
 
+  const failedScenarioIds = new Set();
   for (const id of pack) {
     console.error(`[live-product] starting ${id}`);
     const audioPath = resolve(holdoutDir, `${id}.wav`);
@@ -243,6 +251,7 @@ async function main() {
       }
     }
     if (lastErr) {
+      failedScenarioIds.add(id);
       writeFileSync(
         resolve(holdoutDir, `${id}.error.json`),
         `${JSON.stringify({ id, error: lastErr.message, at: new Date().toISOString() }, null, 2)}\n`,
@@ -253,6 +262,10 @@ async function main() {
 
   const rows = [];
   for (const id of pack) {
+    if (failedScenarioIds.has(id)) {
+      rows.push({ id, verdict: "ERROR", error: "current recording attempt failed" });
+      continue;
+    }
     const path = resolve(holdoutDir, `${id}.offline.json`);
     if (!existsSync(path)) {
       rows.push({ id, verdict: "ERROR", error: "missing recording" });
@@ -262,10 +275,13 @@ async function main() {
     const run = loadFixture(path);
     rows.push(scoreLiveRow(scenario, run, runResultToFixture(run, id)));
   }
+  const exitCode = productExitCode(rows);
   const summary = {
     system: "omni-live-product",
     recorded_at: new Date().toISOString(),
-    note: "verdict includes production TTFB/turn gates. content_verdict opens those gates. listenRubric is not Layer E. Agent profiles + bound KB; do not tune on this.",
+    status: exitCode === 2 ? "INCOMPLETE" : exitCode === 1 ? "FAIL" : "REVIEW",
+    humanReviewRequired: true,
+    note: "verdict includes production TTFB/turn gates. content_verdict opens those gates. Automated checks do not replace human listening. Agent profiles + bound KB; do not tune on this.",
     rows,
   };
   writeFileSync(resolve(outDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
@@ -275,7 +291,7 @@ async function main() {
     "Frozen product-surface holdout. Do not tune prompts, guards, or fixtures against these recordings.\n",
   );
   console.log(JSON.stringify(summary, null, 2));
-  if (rows.some((r) => r.verdict === "ERROR")) process.exit(2);
+  process.exitCode = exitCode;
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

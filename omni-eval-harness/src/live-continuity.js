@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { runLive } from "./live.js";
-import { runResultToFixture } from "./live-pack.js";
+import { runResultToFixture, scoreLiveRow } from "./live-pack.js";
 
 const BASE_DIR = fileURLToPath(new URL("..", import.meta.url));
 const PERSONA =
@@ -24,6 +24,13 @@ const RESUME_TTL_MS = Number(
 const SETTLE_MS = Number(
   process.env.PYAI_EVAL_CONTINUITY_SETTLE_MS || RESUME_TTL_MS + 10_000,
 );
+
+/** No transcript-only continuity probe is a human listening certification. */
+export function continuityExitCode(rows) {
+  if (!rows.length || rows.some(row => ["ERROR", "INVALID_CAPTURE"].includes(row.verdict))) return 2;
+  if (rows.some(row => row.verdict === "FAIL" || row.content_verdict === "FAIL")) return 1;
+  return 3;
+}
 
 function sleep(ms) {
   return new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
@@ -89,7 +96,7 @@ async function call(agentId, callerKey, id, callerText) {
   fixture.call_id = run.callId;
   const reply = fixture.turns?.[0]?.agent_text || "";
   console.error(`[live-continuity] ${id} reply=${JSON.stringify(reply)}`);
-  return fixture;
+  return { fixture, row: scoreLiveRow(scenario, run, fixture) };
 }
 
 async function main() {
@@ -135,14 +142,25 @@ async function main() {
   if (!phases.length) throw new Error("no continuity phases selected");
 
   const fixtures = [];
+  const rows = [];
   for (const [id, text] of phases) {
-    fixtures.push(await call(agentId, callerKey, id, text));
+    try {
+      const result = await call(agentId, callerKey, id, text);
+      fixtures.push(result.fixture);
+      rows.push(result.row);
+    } catch (error) {
+      // Preserve preceding phases without saving raw errors that might embed
+      // transport URLs or authorization details.
+      rows.push({ id, verdict: "ERROR", errorType: error.name });
+      break;
+    }
     // Terminal ingest feeds the next call's card only after the reconnect hold.
     // Wait after the final phase too so a selected one-phase probe leaves an
     // immediately inspectable durable card.
     await sleep(SETTLE_MS);
   }
 
+  const exitCode = continuityExitCode(rows);
   const summary = {
     system: "omni-live-continuity",
     recorded_at: new Date().toISOString(),
@@ -152,10 +170,17 @@ async function main() {
     settle_ms: SETTLE_MS,
     expected_final_name: "Victoria",
     expected_appointment_status: "not booked",
+    status: exitCode === 2 ? "INCOMPLETE" : exitCode === 1 ? "FAIL" : "REVIEW",
+    humanReviewRequired: true,
+    note: "Automated rows cover capture and configured assertions. Expected recall values are review targets, not validated semantic outcomes; human transcript and audio review is still required.",
+    expectedPhases: phases.length,
+    attemptedPhases: rows.length,
+    rows,
     fixtures,
   };
   writeFileSync(resolve(outDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
   console.log(JSON.stringify(summary, null, 2));
+  process.exitCode = exitCode;
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
