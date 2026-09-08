@@ -15,6 +15,7 @@
     "live-creator": "node src/live-creator.js",
     "live-product": "node --env-file=.env src/live-product.js",
     "live-continuity": "node --env-file=.env src/live-continuity.js",
+    "live-interruption": "node src/live-interruption.js",
     "score-holdout": "node src/score-holdout.js",
     "bakeoff": "node src/bakeoff-cli.js",
     "bakeoff:in-region": "bash scripts/run-in-region-bakeoff.sh",

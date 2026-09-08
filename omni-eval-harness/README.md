@@ -396,6 +396,60 @@ Calls with disagreement on two or more dimensions are emitted as
 `needs_adjudication`; pass a third blinded sheet with another `--rater` to
 complete the result. `n/a` is excluded rather than silently counted as a yes.
 
+## Focused caller interruption pack
+
+`npm run live-interruption -- --key-stdin --out /absolute/new-directory` is an
+explicit three-call synthetic probe. Supply the opaque key through protected
+stdin; do not put a key in command arguments or commit an output directory.
+The runner accepts optional `--base-url`, `--voice` and `--label`. A label does
+not select or prove a backend version. Build the existing local SDK packages
+before using live mode, as described above.
+
+The cases cover a mid-sentence pause, a slowly spoken number correction, and
+speech resumed after a pause before a possible delayed first output packet.
+Caller fragments are synthesized before connecting and retained byte-for-byte,
+with the specified digital silence inserted between fragments. Actual energy
+bounds include each fragment's own leading and trailing silence. The last case
+reports whether the timing race actually occurred; it cannot force or identify
+a server cue.
+
+Every output packet is retained, including cues. The automated floor check
+fails audible packets received between the caller's first and final energy,
+including intentional pauses. It separately reports signed timing, estimated
+voiced overlap and overlap during pauses. Playback is an estimated FIFO lane:
+flush/barge-in cancellation and physical speaker output are not observed, so
+estimated playback overlap is a review finding rather than a certified acoustic
+measurement. This isolated synthetic input has no microphone echo path.
+Frame gaps retain their signs. Up to 2 ms of early delivery is permitted for
+client timer rounding; a frame gap over 100 ms or earlier than that tolerance
+invalidates the capture. These bounds do not replace or shift recorded times.
+
+Critical details must first be recognized by pre-call Hear of the actual caller
+PCM. The scorer then checks their literal retention in the serving engine's raw
+caller transcript and their occurrence in post-call Hear of the agent PCM.
+It preserves raw deltas, replacements and repeated tokens. It never feeds
+expected fixture words back into Omni or repairs a transcript. Literal matches
+do not establish that the final correction was interpreted correctly in context.
+
+The explicit response budget is 2500 ms from final caller energy to the first
+audio after the latest subsequent `turn_begin`. That event does not prove the
+audio is substantive, and the existing two-second quiet completion heuristic
+can still mistake a long intra-reply pause for completion. Human listening and
+backend attribution remain required even when every automated check passes.
+
+Each new output directory contains a source-hashed manifest, three JSON records,
+stereo caller/agent WAVs with hashes, a summary and status. Exit `2` means an
+incomplete or invalid capture, `1` means a captured failure, and `3` means all
+automated checks completed and human review is required. This runner never
+returns success as a naturalness certification. It does not change ordinary
+`runLive` behavior unless its explicit interruption profile is selected.
+
+Run the offline transport/scorer regressions with:
+
+```bash
+node --test test/interruption.test.js test/live-timing.test.js
+```
+
 ## Fully functional vs stubbed
 
 **Fully functional (deterministic, tested, offline):**

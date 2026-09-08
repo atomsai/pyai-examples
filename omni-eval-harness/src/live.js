@@ -15,6 +15,7 @@
 // realtime silence until the agent has spoken and settled.
 
 import { writeCallTimelineWav } from "./call-audio.js";
+import { newInterruptionCapture, prepareInterruptionCaller } from "./interruption-capture.js";
 import {
   captureTiming, newAudioCapture, recordAudio, recordTurnBegin, REALTIME_GAP_LIMIT_MS,
   streamPcmRealtime, streamSilenceWhile, waitForAgentSettle, withTimeout,
@@ -157,6 +158,12 @@ export async function runLive(scenario, opts, runtime = {}) {
   const PyAI = sdk.PyAI ?? sdk.default;
   const omniRate = opts.omniRate ?? 24000;
   const mode = opts.mode === "text" ? "text" : "voice";
+  // Dormant profile used only by the standalone interruption pack. Ordinary
+  // callers retain the existing capture rules and whole-utterance synthesis.
+  const interruption = runtime.interruptionCapture === true ? newInterruptionCapture(omniRate) : null;
+  if (interruption && (mode !== "voice" || scenario.turns.length !== 1)) {
+    throw new Error("Interruption capture requires one voice utterance per call");
+  }
   if (opts.captureAudioPath && mode !== "voice") {
     throw new Error("call audio capture requires live voice mode");
   }
@@ -176,8 +183,17 @@ export async function runLive(scenario, opts, runtime = {}) {
     let callerPcm = null;
     let callerAudioMs = null;
     let asrHypothesis = null;
+    let callerAudioPlan;
     if (mode === "voice") {
-      if (isNonSpeechCaller(callerText)) {
+      if (interruption) {
+        const plan = await prepareInterruptionCaller(scenario.turns[index].caller_segments, omniRate, async (text) => {
+          const buf = await pyai.audio.speech({ input: text, voice: opts.voice,
+            response_format: "pcm", sample_rate: omniRate });
+          return twilio.bytesToPcm16(new Uint8Array(buf));
+        });
+        callerPcm = plan.pcm;
+        callerAudioPlan = { layout: plan.layout, pcmSha256: plan.pcmSha256 };
+      } else if (isNonSpeechCaller(callerText)) {
         callerPcm = quietStaticPcm(omniRate, 1200);
       } else {
         const buf = await pyai.audio.speech({
@@ -199,7 +215,8 @@ export async function runLive(scenario, opts, runtime = {}) {
         addIssue("caller_transcription_missing", index);
       }
     }
-    prepared.push({ callerText, callerPcm, callerAudioMs, asrHypothesis });
+    prepared.push({ callerText, callerPcm, callerAudioMs, asrHypothesis,
+      ...(callerAudioPlan ? { callerAudioPlan } : {}) });
   }
 
   const sessionStartedAt = clock.now();
@@ -262,8 +279,13 @@ export async function runLive(scenario, opts, runtime = {}) {
     },
     onHello: (audioOut) => acceptOutputRate(audioOut),
     onAudio: (pcm) => {
-      const chunk = recordAudio(turnCtx, pcm, clock.now(), outputRate);
-      if (chunk) timeline.agent.push({ atMs: chunk.playbackAt - sessionStartedAt, pcm: chunk.pcm });
+      const at = clock.now();
+      const chunk = recordAudio(turnCtx, pcm, at, outputRate);
+      if (chunk) {
+        timeline.agent.push({ atMs: chunk.playbackAt - sessionStartedAt, pcm: chunk.pcm });
+        interruption?.agentPacket(chunk.pcm, at - sessionStartedAt,
+          chunk.playbackAt - sessionStartedAt, outputRate, turnIndex);
+      }
     },
     onTranscript: (tr) => {
       // Engine text is useful telemetry, but only Hear of captured PCM is the
@@ -360,6 +382,7 @@ export async function runLive(scenario, opts, runtime = {}) {
           caller = await streamPcmRealtime(omni, preparedTurn.callerPcm, omniRate, clock, (pcm, at) => {
             observeInputFrame(pcm, at);
             timeline.caller.push({ atMs: at - sessionStartedAt, pcm: pcm.slice() });
+            interruption?.callerFrame(pcm, at - sessionStartedAt, i);
           });
           if (caller.maxFrameGapMs > REALTIME_GAP_LIMIT_MS) addIssue("caller_stream_gap", i);
           if (!isNonSpeechCaller(preparedTurn.callerText) && caller.speechOffsetAt == null) {
@@ -387,9 +410,11 @@ export async function runLive(scenario, opts, runtime = {}) {
         if (turnCtx.firstAudioAt == null) addIssue("agent_audio_inaudible", i);
         if (requireTurnBegin && turnCtx.latestTurnBeginAt == null) addIssue("response_turn_begin_missing", i);
         else if (requireTurnBegin && turnCtx.postTurnBeginFirstAudioAt == null) addIssue("response_audio_missing_after_turn_begin", i);
-        if (turnCtx.turnBegins.length > 1) addIssue("multiple_response_turns", i);
+        if (turnCtx.turnBegins.length > 1) addIssue("multiple_response_turns", i, interruption ? "warning" : "error");
         if (turnCtx.events.some((e) => e.event === "flush" || e.event === "barge_in")) {
-          addIssue("output_playback_interrupted", i);
+          // The interruption profile scores received output while preserving
+          // cancellations. It never certifies the estimated playback lane.
+          addIssue("output_playback_interrupted", i, interruption ? "warning" : "error");
         }
         captures.push({ preparedTurn, ctx: turnCtx, caller, settled });
         // A timeout cannot define a reliable boundary for the next reply.
@@ -459,6 +484,8 @@ export async function runLive(scenario, opts, runtime = {}) {
     ? writeCallTimelineWav(opts.captureAudioPath, timeline, outputRate) : null;
   const safeConfigured = safeConfiguredMetadata(configuredAck);
   const toolsMatch = configuredAck?.tools === tools.length;
+  const interruptionEvidence = interruption?.finish();
+  for (const code of interruptionEvidence?.issues ?? []) addIssue(`interruption_${code}`);
   return {
     scenarioId: scenario.id, callId, sessionLabel: opts.sessionLabel,
     mode: mode === "voice" ? "live-voice" : "live-text",
@@ -467,6 +494,7 @@ export async function runLive(scenario, opts, runtime = {}) {
     availableTools: toolsMatch ? tools.map((tool) => tool.name ?? tool.function?.name).filter(Boolean) : null,
     availableToolsProvenance: toolsMatch ? "requested-declarations-and-configured-count" : "unverified",
     captureIntegrity: { valid: !issues.some((issue) => issue.severity === "error"), issues },
+    ...(interruptionEvidence ? { interruptionCapture: interruptionEvidence } : {}),
     captureMethod: { inputRate: omniRate, outputRate, agentTranscription: "post-session-hear",
       callerTranscription: "pre-session-hear",
       engineCallerTranscription: "server-0x02-observed-deltas-with-client-turn-timestamps",
