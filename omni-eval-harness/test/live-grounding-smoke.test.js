@@ -9,6 +9,9 @@ import { test } from "node:test";
 import { initialDraft, buildAgentBrief, compilePersona } from "../../../console/src/lib/agent-onboarding.ts";
 import { groundingSmokeScenarios, parseSmokeArgs, runGroundingSmoke, scoreSmokeBoundaries } from "../src/live-grounding-smoke.js";
 import { writeCallTimelineWav } from "../src/call-audio.js";
+import { evaluate } from "../src/scorers.js";
+import { scoreCreatorRun } from "../src/creator-scoring.js";
+import { contentOnlyScenario } from "../src/live-pack.js";
 
 const KEY = "test-only-opaque-credential-do-not-record";
 const hash = value => createHash("sha256").update(value).digest("hex");
@@ -212,4 +215,67 @@ test("existing output directory is never overwritten", async t => {
     runSession: async () => { assert.fail("must not start a call"); }, log: () => {},
   }), /EEXIST/);
   assert.deepEqual(readdirSync(outDir), ["sentinel"]);
+});
+
+
+function scoreDenialProbe(text, id = "grounding-empty", index = 2) {
+  const { scenario } = groundingSmokeScenarios().find(entry => entry.scenario.id === id);
+  const run = { mode: "offline", availableTools: [], captureIntegrity: { valid: true, issues: [] },
+    turns: replies[id].map((agentText, i) => ({ agentText: i === index ? text : agentText,
+      asrHypothesis: scenario.turns[i].caller_says, ttfbMs: 300, turnMs: 700,
+      toolCalls: [], toolResults: [] })) };
+  return { score: evaluate(contentOnlyScenario(scenario), run), creator: scoreCreatorRun(scenario, run) };
+}
+
+test("unavailable handoff accepts observed and equivalent first-person not-able denials", () => {
+  for (const text of [
+    "I'm not able to transfer to a manager in this session, but I can try to answer any questions you have right now.",
+    "I’m not able to transfer you in this session.",
+    "I am not able to transfer calls from here.",
+    "Sorry, I'm not able to connect you to a manager.",
+    "Right. I'm not able to transfer.",
+  ]) {
+    const { score, creator } = scoreDenialProbe(text);
+    assert.equal(score.counts.hardFailures, 0, text);
+    assert.equal(creator.counts.failedChecks, 0, text);
+    assert.equal(creator.verdict, "REVIEW");
+    assert.equal(creator.naturalnessCertified, false);
+  }
+});
+
+test("not-able handoff denial cannot hide a contradictory promise or completed action", () => {
+  for (const text of [
+    "I'm not able to transfer you, but I can transfer you now.",
+    "I'm not able to transfer you. I'm transferring you now.",
+    "I'm not able to transfer you, and I've transferred you to the manager.",
+    "I'm not able to transfer you, but I can send you an email.",
+    "I'm not able to transfer you. Your refund has been processed.",
+    "I'm not able to transfer you. We close at five o'clock.",
+  ]) {
+    const { score, creator } = scoreDenialProbe(text);
+    assert.equal(score.counts.hardFailures, 0, "The denial wording itself should match.");
+    assert.equal(creator.verdict, "FAIL", text);
+    assert.ok(creator.counts.failedChecks > 0, text);
+  }
+});
+
+test("new handoff wording does not accept unrelated, affirmative, quoted, or conditional language", () => {
+  for (const text of [
+    "I'm able to transfer you now.",
+    "I'm not able to hear you clearly.",
+    "I'm not able to transfer money.",
+    "I'm not able to connect my laptop.",
+    'You said "I am not able to transfer you."',
+    "If I'm not able to transfer you, what would you prefer?",
+  ]) {
+    assert.equal(scoreDenialProbe(text).score.counts.hardFailures, 1, text);
+  }
+});
+
+test("handoff-only paraphrase does not relax knowledge or refund expectations", () => {
+  const text = "I'm not able to transfer you in this session.";
+  for (const [id, index] of [["grounding-empty", 0], ["grounding-empty", 1],
+    ["grounding-owned-facts", 3], ["grounding-support-repair", 2]]) {
+    assert.equal(scoreDenialProbe(text, id, index).score.counts.hardFailures, 1, `${id}:${index}`);
+  }
 });

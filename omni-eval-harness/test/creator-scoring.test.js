@@ -117,6 +117,90 @@ test("recorded availability overrides requested tools in either direction", () =
   assert.equal(fixture("I'll book an appointment.", { run: { availableTools: ["send_email"] } }).verdict, "FAIL");
 });
 
+test("ticket offers fail without the corresponding tool, including the observed live reply", () => {
+  for (const reply of [
+    "I can’t process a return here, but I can create a support ticket for you—would that be okay?",
+    "I can't refund you, and I can open a support ticket.",
+    "I can create a ticket if you'd like.",
+    "Would you like me to create a support ticket?",
+    "Can I open a support ticket?",
+    "Could I raise a ticket?",
+    "We can create a support ticket for you.",
+    "We'll open a ticket.",
+    "No, I have created a support ticket.",
+    "If you'd like me to create a support ticket, just say so.",
+    "I've created a support ticket.",
+  ]) {
+    for (const availableTools of [[], ["lookup_ticket"], ["send_email"]]) {
+      const score = fixture(reply, { run: { availableTools } });
+      assert.ok(failures(score).some(c => c.id.startsWith("action:ticket:")), reply);
+    }
+  }
+  const available = fixture("I can create a ticket.", { run: { availableTools: ["create_ticket"] } });
+  assert.equal(checks(available).find(c => c.id === "action:ticket:promise").status, "REVIEW");
+});
+
+test("ticket explanations, denials, quotations and genuine hypotheticals do not fail", () => {
+  for (const reply of [
+    "I can't create a support ticket here.",
+    "I haven't created a ticket.",
+    "No support ticket has been created.",
+    "I am not saying I can create a support ticket.",
+    "I am not asking would you like me to create a ticket.",
+    "You asked 'Can I create a ticket?'",
+    'You said "I have created a support ticket."',
+    "If I had access, I could create a ticket.",
+    "I can explain what a support ticket is.",
+    "I can draft a ticket description for you to send.",
+  ]) assert.equal(failures(fixture(reply)).length, 0, reply);
+});
+
+test("ticket completion requires canonical matched result evidence before the reply", () => {
+  const contract = { tool: "create_ticket", args: { order: "513" }, result: { status: "created", ticketId: "ticket-1" } };
+  const result = { name: "create_ticket", callId: "call-1", success: true, result: contract.result, atMs: 900 };
+  const evaluate = (turn = {}, action = contract, availableTools = ["create_ticket"]) => fixture("I've created a support ticket.", {
+    scenario: { creatorEvaluation: { knowledge: { state: "empty" }, turns: [{ actionResults: { ticket: action } }] } },
+    run: { availableTools },
+    turn: { toolCalls: [{ name: "create_ticket", callId: "call-1", args: contract.args }], toolResults: [result], replyStartedAtMs: 1000, ...turn },
+  });
+  assert.equal(checks(evaluate()).find(c => c.id === "action:ticket:result").status, "PASS");
+  for (const turn of [
+    { toolResults: [] },
+    { toolResults: [{ ...result, success: false }] },
+    { toolResults: [{ ...result, result: { status: "failed" } }] },
+    { toolResults: [{ ...result, result: { ...contract.result, executed: false } }] },
+    { toolResults: [{ ...result, result: { ...contract.result, result: { status: "failed" } } }] },
+    { toolResults: [{ ...result, result: { ...contract.result, result: '{"status":"queued"}' } }] },
+    { toolResults: [{ ...result, callId: "wrong" }] },
+    { toolCalls: [{ name: "create_ticket", callId: "call-1", args: { order: "531" } }] },
+  ]) assert.equal(evaluate(turn).verdict, "FAIL", JSON.stringify(turn));
+  assert.equal(checks(evaluate({ toolResults: [{ ...result, atMs: 1100 }] })).find(c => c.id === "action:ticket:result").status, "REVIEW");
+  assert.equal(checks(evaluate({}, {})).find(c => c.id === "action:ticket:result").status, "REVIEW");
+  const poison = { tool: "send_email", result: { status: "sent" } };
+  assert.equal(evaluate({}, poison).verdict, "FAIL");
+  assert.equal(evaluate({}, poison, ["send_email"]).verdict, "FAIL");
+});
+
+test("account status routes require the matching operation, destination and whole fixture claim", () => {
+  const reply = "You can check the status in your account or contact support directly.";
+  const scenario = { turns: [{ caller_says: "Can you refund order 513?" }] };
+  assert.ok(failures(fixture(reply, { scenario })).some(c => c.id === "fact:refund_status:account"));
+  assert.ok(failures(fixture("I can't check it here, and you can check your refund status in your account.", { scenario })).some(c => c.id === "fact:refund_status:account"));
+  const fact = { topic: "refund_status:account", acceptedClaims: [reply] };
+  const evaluate = (facts, text = reply) => fixture(text, { scenario: { ...scenario, creatorEvaluation: { knowledge: { state: "provided", facts }, turns: [{}] } } });
+  assert.equal(checks(evaluate([fact])).find(c => c.id === "fact:refund_status:account").status, "PASS");
+  for (const facts of [[], [{ ...fact, topic: "order_status:account" }], [{ ...fact, topic: "refund_status:app" }], [{ ...fact, acceptedClaims: ["You can check your refund status in your account."] }]]) {
+    assert.equal(checks(evaluate(facts)).find(c => c.id === "fact:refund_status:account").status, "REVIEW");
+  }
+  for (const text of [
+    "Can you check your refund status in your account?",
+    "I don't know whether you can check your refund status in your account.",
+    "I am not saying you can check your refund status in your account.",
+    'You said "check your refund status in your account."',
+    "I can explain what a refund status means.",
+  ]) assert.equal(failures(fixture(text, { scenario })).length, 0, text);
+});
+
 test("explicitly unverifiable tool configuration never falls back to requested tool availability", () => {
   for (const tools of [[], ["book_appointment"]]) {
     const score = fixture("I'll book an appointment.", { scenario: { tools }, run: { availableTools: null } });

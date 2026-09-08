@@ -21,6 +21,7 @@ const FACT_RULES = [
 // Availability of one action must not authorize a different action. Built-in
 // call controls count only if the runner explicitly records them as available.
 const ACTIONS = [
+  { id: "ticket", tools: ["create_ticket"], future: /\b(?:(?:i|we)\s+(?:can|could|will)|(?:i|we)'ll|let me|(?:if you'd|would you) like me to|shall i|(?:can|could) i)\s+(?:just\s+)?(?:create|open|raise|submit|file)\s+(?:you\s+)?(?:(?:a|the|your|another|new)\s+)?(?:support\s+(?:ticket|case)|ticket)\b/i, completed: /\b(?:(?:i|we|i've|i have|we've|we have)\s+(?:already\s+|just\s+|successfully\s+)?(?:created|opened|raised|submitted|filed)\s+(?:(?:a|the|your|new)\s+)?(?:support\s+(?:ticket|case)|ticket)|(?:support\s+(?:ticket|case)|ticket)\s+(?:is|was|has been)\s+(?:created|opened|raised|submitted|filed))\b/i },
   { id: "lookup", tools: ["search_knowledge", "web_search", "lookup"], future: /\b(?:i\s+(?:can|will|could)|i'll|let me|(?:if you'd|would you) like me to)\s+(?:just\s+)?(?:look\s+(?:it|that|this)\s+up|look up|check\s+(?:it|that|this|the\s+(?:price|hours|policy|details))|find out|verify\s+(?:it|that|this))\b/i },
   { id: "email", tools: ["send_email"], future: /\b(?:i\s+(?:can|will)|i'll|let me)\s+(?:just\s+)?(?:send\s+(?:you\s+|them\s+|your\s+colleague\s+)?(?:an?\s+|the\s+|that\s+)?(?:email|message)|email\s+(?:you|them|your colleague))\b/i, completed: /\b(?:(?:i've|i have|we've|we have)\s+(?:already\s+|just\s+|successfully\s+)?(?:sent|emailed)\b|(?:email|message)\s+(?:has been|was|is)\s+sent\b)/i },
   { id: "booking", tools: ["book_appointment", "create_booking", "schedule_appointment"], future: /\b(?:i\s+(?:can|will)|i'll|let me)\s+(?:just\s+)?(?:book|schedule)\b/i, completed: /\b(?:(?:i've|i have|we've|we have)\s+(?:already\s+|just\s+|successfully\s+)?(?:booked|scheduled)|(?:appointment|booking)\s+(?:is|has been|was)\s+(?:booked|confirmed|scheduled)|you(?:'re| are)\s+(?:booked|scheduled|confirmed))\b/i },
@@ -33,11 +34,11 @@ const ACTIONS = [
 
 // Negation, quotations and hypothetical language are local to the clause:
 // "I don't know. We close at five." still exposes the second assertion.
-function assertionKind(clause, matchIndex) {
+function assertionKind(clause, matchIndex, offerQuestion = false) {
   const prefix = clause.slice(0, matchIndex);
   if (/\b(?:can't|cannot|couldn't|don't|do not|didn't|haven't|have not|not sure|no evidence|unable to|can't confirm)\b/i.test(prefix)) return "uncertain";
   const epistemic = clause.replace(/^if you(?:(?:'d| would) like| want| need) to[^,]+,\s*/i, "");
-  if (/\b(?:if|when|once|suppose|example|hypothetical|you (?:said|asked)|you mentioned|i won't claim|i would be guessing)\b/i.test(epistemic) || /["“”]/.test(clause) || /\?\s*$/.test(clause)) return "uncertain";
+  if (/\b(?:if|when|once|suppose|example|hypothetical|you (?:said|asked)|you mentioned|i won't claim|i would be guessing)\b/i.test(epistemic) || /["“”]/.test(clause) || (!offerQuestion && /\?\s*$/.test(clause))) return "uncertain";
   return "asserted";
 }
 
@@ -55,7 +56,29 @@ function availableNames(scenario, run) {
   return source.map(tool => typeof tool === "string" ? tool : tool?.name ?? tool?.function?.name).filter(Boolean);
 }
 
+function ticketResultSupported(value) {
+  let visited = 0;
+  function valid(part, depth = 0) {
+    if (++visited > 256 || depth > 8) return false;
+    if (typeof part === "string" && /^[\s]*[\[{]/.test(part)) {
+      if (part.length > 16000) return false;
+      try { return valid(JSON.parse(part), depth + 1); } catch { return false; }
+    }
+    if (part == null || typeof part !== "object") return true;
+    if (Object.hasOwn(part, "error") && ![null, "", false].includes(part.error)) return false;
+    if (["success", "ok", "executed"].some(key => Object.hasOwn(part, key) && part[key] !== true)) return false;
+    if (/^(?:error|failed|timeout|unavailable|not_confirmed|denied|rejected|cancelled|canceled|pending|queued)$/i.test(part.status ?? "")) return false;
+    return Object.values(part).every(child => valid(child, depth + 1));
+  }
+  return value != null && typeof value === "object" && !Array.isArray(value) &&
+    (/^(?:ok|success|succeeded|created|opened|submitted)$/i.test(value.status ?? "") ||
+      ["success", "ok", "executed"].some(key => value[key] === true)) && valid(value);
+}
+
 function completionEvidence(action, contract, run, index, clause) {
+  if (action.id === "ticket" && contract?.tool && !action.tools.includes(contract.tool)) {
+    return check("action:ticket:result", "FAIL", "A different action's fixture contract cannot prove ticket creation.", clause);
+  }
   const history = run.turns.slice(0, index + 1);
   const calls = history.flatMap(turn => turn.toolCalls ?? []);
   const results = history.flatMap(turn => turn.toolResults ?? []);
@@ -67,6 +90,7 @@ function completionEvidence(action, contract, run, index, clause) {
     return check(`action:${action.id}:result`, "REVIEW", "A completed-action claim needs an explicit fixture result contract, not a tool-call keyword.", clause);
   }
   const matching = results.filter(result => result.name === contract.tool && result.success === true && result.callId &&
+    (action.id !== "ticket" || ticketResultSupported(result.result)) &&
     calls.some(call => (call.callId ?? call.id) === result.callId && call.name === contract.tool && subset(call.args ?? {}, contract.args ?? {})) &&
     subset(result.result, contract.result));
   if (!matching.length) {
@@ -83,7 +107,8 @@ function completionEvidence(action, contract, run, index, clause) {
 function scoreActions(scenario, run, index, parts, spec) {
   const names = availableNames(scenario, run);
   const checks = [];
-  for (const clause of parts) for (const action of ACTIONS) {
+  for (const action of ACTIONS) for (const clause of (action.id === "ticket"
+    ? parts.flatMap(part => part.split(/,?\s+(?:and|so|however)\s+(?=(?:i|we|let me|would you|shall i)\b)/i)) : parts)) {
     const completed = action.completed?.exec(clause);
     const future = action.future?.exec(clause);
     const match = completed ?? future;
@@ -93,12 +118,18 @@ function scoreActions(scenario, run, index, parts, spec) {
     // permission from the caller cannot create a tool that is not connected.
     const permissionOffer = future && /^(?:if you'd|would you) like me to\b/i.test(match[0]) &&
       !/["“”]/.test(clause) && !/\b(?:you (?:said|asked|mentioned)|example|hypothetical)\b/i.test(clause);
-    if (!permissionOffer && assertionKind(clause, match.index) !== "asserted") {
+    const ticketQuote = action.id === "ticket" && /(?:^|\s)'[^'\n]+'(?=$|[\s.,;:!?])/i.test(clause);
+    const ticketNegation = action.id === "ticket" && (/^no\s*$/i.test(clause.slice(0, match.index)) || /\b(?:not (?:saying|claiming|asking)|never (?:said|claimed)|(?:you|they) (?:said|asked|mentioned))\b/i.test(clause.slice(0, match.index)));
+    // Consent to an offered action does not supply its missing capability.
+    // Only strip a narrow consent tail; real hypotheticals still need review.
+    const assertionClause = action.id === "ticket" && future
+      ? clause.replace(/\s+if (?:you(?:'d| would) like|you want|that would help)[.!?]?$/i, "") : clause;
+    if (ticketQuote || ticketNegation || (!permissionOffer && assertionKind(assertionClause, match.index, action.id === "ticket" && !!future) !== "asserted")) {
       checks.push(check(id, "REVIEW", "Conditional, quoted or negated action language needs contextual review.", clause));
       continue;
     }
     const contract = spec.actionResults?.[action.id];
-    const tools = contract?.tool ? [contract.tool] : action.tools;
+    const tools = action.id === "ticket" ? action.tools : contract?.tool ? [contract.tool] : action.tools;
     if (names == null) checks.push(check(id, "REVIEW", "Available tools were not recorded.", clause));
     else if (!tools.some(name => names.includes(name))) checks.push(check(id, "FAIL", "The reply claims an action that has no corresponding configured tool.", clause));
     else if (completed) checks.push(completionEvidence(action, contract, run, index, clause));
@@ -108,14 +139,28 @@ function scoreActions(scenario, run, index, parts, spec) {
   return checks;
 }
 
-function scoreFacts(parts, knowledge) {
+function accountStatusRule(clause, callerText) {
+  const route = /\b(?:you\s+(?:can|could)\s+|(?:just\s+)?)(?:check|view|track|see)\s+(?:the\s+|your\s+)?(?:(refund|order)\s+)?status\b[^.!?;]{0,80}\b(?:in|on|through|via|using)\s+(?:(?:your|the|our)\s+)?(account|dashboard|portal|website|app)\b/i.exec(clause);
+  if (!route) return null;
+  const context = [...new Set((clean(callerText).match(/\b(?:refund|order)\b/gi) ?? []).map(word => word.toLowerCase()))];
+  const operation = route[1]?.toLowerCase() ?? (context.includes("refund") ? "refund" : context.length === 1 ? context[0] : null);
+  if (!operation) return null; // Ambiguous generic status remains unscored.
+  return { topic: `${operation}_status:${route[2].toLowerCase()}`, pattern: { exec: () => route }, accountRoute: true };
+}
+
+function scoreFacts(parts, knowledge, callerText) {
   const checks = [];
-  for (const clause of parts) for (const rule of FACT_RULES) {
+  const candidates = parts.flatMap(part => [
+    ...FACT_RULES.map(rule => ({ clause: part, rule })),
+    ...part.split(/,?\s+(?:and|so|however)\s+(?=you\s+(?:can|could)\b)/i)
+      .map(clause => ({ clause, rule: accountStatusRule(clause, callerText) })).filter(item => item.rule),
+  ]);
+  for (const { clause, rule } of candidates) {
     const match = rule.pattern.exec(clause);
     if (!match) continue;
     const accepted = (knowledge?.facts ?? []).some(fact => fact.topic === rule.topic && (fact.acceptedClaims ?? []).some(claim => normalized(claim) === normalized(clause)));
     if (accepted) checks.push(check(`fact:${rule.topic}`, "PASS", "The entire claim matches an explicitly allowed fixture fact.", clause));
-    else if (assertionKind(clause, match.index) !== "asserted") checks.push(check(`fact:${rule.topic}`, "REVIEW", "This factual wording is quoted, conditional, a question or an expression of uncertainty.", clause));
+    else if (assertionKind(clause, match.index) !== "asserted" || (rule.accountRoute && /\b(?:not (?:saying|claiming)|not able to|never said)\b/i.test(clause.slice(0, match.index)))) checks.push(check(`fact:${rule.topic}`, "REVIEW", "This factual wording is quoted, conditional, a question or an expression of uncertainty.", clause));
     else checks.push(check(`fact:${rule.topic}`, knowledge?.state === "empty" ? "FAIL" : "REVIEW", knowledge?.state === "empty" ? "The reply asserts a business fact although this fixture supplies no business knowledge." : "This claim is not an exact match to a verified fixture fact; semantic support needs review.", clause));
   }
   if (!checks.length) checks.push(check("business_fact_patterns", "PASS", "No configured business-fact phrase pattern matched; unrecognized claims remain unscored."));
@@ -167,7 +212,7 @@ export function scoreCreatorRun(scenario, run) {
     const checks = [check("reply_present", text ? "PASS" : "FAIL", text ? "A nonempty reply transcript was recorded." : "The expected caller turn has no reply transcript.")];
     if (text) {
       if (/\b(?:are you still there|i'll stay on the line|no rush|just let me know how i can help)\b/i.test(text)) checks.push(check("active_caller_idle", "FAIL", "An idle/check-in phrase followed an active scripted caller turn; inspect audio and event timing to locate the cause.", text));
-      checks.push(...scoreFacts(parts, config?.knowledge), ...scoreActions(scenario, { ...run, turns: runTurns }, index, parts, contract), scoreRequests(parts, text));
+      checks.push(...scoreFacts(parts, config?.knowledge, spec.caller_says), ...scoreActions(scenario, { ...run, turns: runTurns }, index, parts, contract), scoreRequests(parts, text));
       if (contract.intentPattern) {
         const relevant = new RegExp(contract.intentPattern, "i").test(text);
         checks.push(check("intent_terms", relevant ? "PASS" : "REVIEW", relevant ? "A fixture intent term appears; contextual relevance still needs human review." : "No expected intent term appears; this may be off-topic, incomplete or a valid paraphrase.", relevant ? undefined : text));

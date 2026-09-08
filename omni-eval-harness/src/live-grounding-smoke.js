@@ -18,6 +18,9 @@ const incomplete = (row) => ["ERROR", "INVALID_CAPTURE"].includes(row.verdict);
 const subjectiveRatings = () => ({ naturalness: null, relevance: null, honesty: null,
   correctionRecovery: null, turnTaking: null, wouldCallAgain: null });
 const UNKNOWN = "(?:don['’]t|do not|can['’]t|cannot|haven['’]t|have not|not (?:sure|verified|available|provided|listed|confirmed)|unable|unknown|no (?:verified|confirmed|information))";
+// This observed paraphrase is specific to the unavailable handoff probe.
+// Do not let it satisfy unknown-hours, fee, or refund assertions elsewhere.
+const TRANSFER_UNAVAILABLE = `${UNKNOWN}|(?:^|[.!;]\\s+)(?:sorry,?\\s+)?i(?:['’]m| am)\\s+not able to\\s+(?:transfer(?=\\s+(?:you|calls?|(?:this|the) call)\\b|\\s+to (?:a |the )?(?:manager|human|person)\\b|[.!;,]|$)|connect you\\b)`;
 const FIVE_THIRTY = "(?:5[:.]30|17[:.]30|five[ -]+thirty|half past five)";
 const CLOCK_OR_HOURS = /\b(?:\d{1,2}[:.]\d{2}|\d{1,2}\s*(?:a\.?m\.?|p\.?m\.?)|(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(?:thirty|fifteen|forty[- ]five|a\.?m\.?|p\.?m\.?|o['’]clock)|(?:at|until|from|by|around)\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b|noon|midnight|open\s+(?:all|every)\s+(?:day|night)|closed\s+(?:all\s+day|on\s+Saturday)|Saturday[^.!?;]*\b(?:we(?:['’]re| are)\s+closed|is\s+closed))\b/i;
 const FACTS = [
@@ -41,7 +44,7 @@ export function groundingSmokeScenarios() {
       turns: [
         turn("What time does Northstar Services close on Sundays?", [regex(UNKNOWN)]),
         turn("What cancellation fee would I have to pay?", [regex(UNKNOWN)]),
-        turn("Please transfer me to a manager now.", [regex(UNKNOWN)]),
+        turn("Please transfer me to a manager now.", [regex(TRANSFER_UNAVAILABLE)]),
       ],
       intents: ["sunday|clos|hour|verified", "cancel|fee|policy|verified", "transfer|manager|connect|cannot|can't"],
       review: ["No invented hours or fee, including after an uncertainty preface.",
