@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { audibleBounds, captureTiming, newAudioCapture, recordAudio, recordTurnBegin,
-  streamPcmRealtime, waitForAgentSettle } from "../src/live-timing.js";
+  streamPcmRealtime, waitForAgentSettle, INTERRUPTION_OBSERVATION } from "../src/live-timing.js";
 import { runLive, safeConfiguredMetadata } from "../src/live.js";
 
 function virtualClock() {
@@ -247,6 +247,85 @@ test("cue-only output times out instead of certifying response completion", asyn
   assert.equal(settled.reason, "timeout");
   assert.equal(ctx.samples, 400);
   assert.equal(ctx.postTurnBeginFirstAudioAt, null);
+});
+
+test("interruption observation cannot immediately settle an earlier cue at caller stream end", async () => {
+  for (const observed of [false, true]) {
+    const clock = virtualClock(), ctx = newAudioCapture(0);
+    recordTurnBegin(ctx, 0, 1);
+    recordAudio(ctx, sound(1000, 1100), 0, 1000);
+    const result = await clock.complete((async () => {
+      await clock.sleep(5000); // Old cue already played and has been quiet.
+      return waitForAgentSettle(() => ctx, clock, { requireTurnBegin: true,
+        ...(observed ? { callerStreamEndAt: 5000 } : {}) });
+    })());
+    assert.equal(result.reason, "settled");
+    assert.equal(result.at, observed ? 10000 : 5000);
+    assert.equal(ctx.samples, 1100, "earlier output must remain in evidence");
+  }
+});
+
+test("late caller transcripts extend the interruption quiet window without deduplication", async () => {
+  const clock = virtualClock(), ctx = newAudioCapture(0);
+  recordTurnBegin(ctx, 0, 1); recordAudio(ctx, sound(1000, 100), 0, 1000);
+  clock.setTimeout(() => {
+    ctx.lastCallerTranscriptAt = clock.now();
+    ctx.callerTranscriptEvents.push({ mode: "delta", text: " one one" });
+  }, 4500);
+  const result = await clock.complete(waitForAgentSettle(() => ctx, clock,
+    { requireTurnBegin: true, callerStreamEndAt: 0 }));
+  assert.equal(result.at, 6500);
+  assert.equal(ctx.callerTranscriptEvents[0].text, " one one");
+});
+
+test("a coalesced earlier turn can complete after the observation floor without a fabricated new begin", async () => {
+  const clock = virtualClock(), ctx = newAudioCapture(0);
+  recordTurnBegin(ctx, 0, 1); recordAudio(ctx, sound(1000, 100), 0, 1000);
+  clock.setTimeout(() => recordAudio(ctx, sound(1000, 1000), clock.now(), 1000), 4500);
+  clock.setTimeout(() => { ctx.lastAssistantTranscriptAt = clock.now(); }, 6000);
+  const result = await clock.complete(waitForAgentSettle(() => ctx, clock,
+    { requireTurnBegin: true, callerStreamEndAt: 0 }));
+  assert.equal(result.at, 8000);
+  assert.equal(ctx.turnBegins.length, 1);
+  assert.equal(ctx.samples, 1100);
+});
+
+test("a fresh begin without fresh audio cannot turn its advisory into response completion", async () => {
+  const clock = virtualClock(), ctx = newAudioCapture(0);
+  recordTurnBegin(ctx, 0, 1); recordAudio(ctx, sound(1000, 100), 0, 1000);
+  clock.setTimeout(() => recordTurnBegin(ctx, clock.now(), 2), 4500);
+  clock.setTimeout(() => { ctx.lastAssistantTranscriptAt = clock.now(); }, 4600);
+  const result = await clock.complete(waitForAgentSettle(() => ctx, clock,
+    { requireTurnBegin: true, callerStreamEndAt: 0 }));
+  assert.equal(result.reason, "timeout");
+  assert.equal(result.at, INTERRUPTION_OBSERVATION.maximumAfterCallerStreamMs);
+  assert.equal(ctx.samples, 100);
+});
+
+test("interruption activity cannot extend the hard cap beyond actual caller stream end plus25seconds", async () => {
+  const clock = virtualClock(), ctx = newAudioCapture(0);
+  recordTurnBegin(ctx, 0, 1); recordAudio(ctx, sound(1000, 100), 0, 1000);
+  for (let at = 1000; at <= 29000; at += 1000) {
+    clock.setTimeout(() => { ctx.lastCallerTranscriptAt = clock.now(); }, at);
+  }
+  const result = await clock.complete((async () => {
+    await clock.sleep(7000); // The wait starts late; its cap must not slide.
+    return waitForAgentSettle(() => ctx, clock, { requireTurnBegin: true,
+      callerStreamEndAt: 5000, timeoutMs: 999999, settleMs: 0 });
+  })());
+  assert.equal(result.reason, "timeout");
+  assert.equal(result.at, 30000);
+});
+
+test("ordinary settle ignores caller transcript activity and invalid observation boundaries refuse", async () => {
+  const clock = virtualClock(), ctx = newAudioCapture(0);
+  recordTurnBegin(ctx, 0, 1); recordAudio(ctx, sound(1000, 100), 0, 1000);
+  clock.setTimeout(() => { ctx.lastCallerTranscriptAt = clock.now(); }, 2000);
+  const result = await clock.complete(waitForAgentSettle(() => ctx, clock, { requireTurnBegin: true }));
+  assert.equal(result.at, 2100);
+  for (const callerStreamEndAt of [NaN, Infinity, -1, clock.now() + 1]) {
+    await assert.rejects(waitForAgentSettle(() => ctx, clock, { callerStreamEndAt }), /Invalid caller observation boundary/);
+  }
 });
 
 test("fake transport retains pre-turn cues, waits for real response and records engine caller deltas separately from Hear", async () => {

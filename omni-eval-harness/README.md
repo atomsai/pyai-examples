@@ -401,9 +401,13 @@ complete the result. `n/a` is excluded rather than silently counted as a yes.
 `npm run live-interruption -- --key-stdin --out /absolute/new-directory` is an
 explicit three-call synthetic probe. Supply the opaque key through protected
 stdin; do not put a key in command arguments or commit an output directory.
-The runner accepts optional `--base-url`, `--voice` and `--label`. A label does
-not select or prove a backend version. Build the existing local SDK packages
-before using live mode, as described above.
+The runner accepts optional `--base-url`, `--voice`, `--agent-voice` and `--label`.
+`--voice` selects caller synthesis through Speak (default `alloy`);
+`--agent-voice` selects the Omni voice (default `stock_felix_en`). Use a stock
+or cloned voice ID supported by Omni. The capture requires an exact configured
+voice acknowledgement, which does not itself prove successful synthesis.
+A label does not select or prove a backend version. Build the existing local
+SDK packages before using live mode, as described above.
 
 The cases cover a mid-sentence pause, a slowly spoken number correction, and
 speech resumed after a pause before a possible delayed first output packet.
@@ -433,9 +437,14 @@ do not establish that the final correction was interpreted correctly in context.
 
 The explicit response budget is 2500 ms from final caller energy to the first
 audio after the latest subsequent `turn_begin`. That event does not prove the
-audio is substantive, and the existing two-second quiet completion heuristic
-can still mistake a long intra-reply pause for completion. Human listening and
-backend attribution remain required even when every automated check passes.
+audio is substantive. Recording continues for at least five seconds after
+caller transmission, then requires two seconds of quiet across transcript and
+output activity, with a fixed 25-second maximum from caller transmission end.
+This bounded observation can still miss a later reply; it is not a server
+reply-end marker. An earlier coalesced turn can speak after the caller ends
+without satisfying the scorer's stricter subsequent-`turn_begin` criterion.
+Human listening and backend attribution remain required even when every
+automated check passes.
 
 Each new output directory contains a source-hashed manifest, three JSON records,
 stereo caller/agent WAVs with hashes, a summary and status. Exit `2` means an

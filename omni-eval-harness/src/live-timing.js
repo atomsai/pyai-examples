@@ -2,6 +2,12 @@
 // a single packet may contain seconds of audio and must finish before settling.
 export const FRAME_MS = 20;
 export const REALTIME_GAP_LIMIT_MS = 100;
+// Interruption tests need an observation window after caller transmission,
+// even when an earlier cue/response already finished. These are test bounds,
+// not an inferred engine reply-end or a naturalness threshold.
+export const INTERRUPTION_OBSERVATION = Object.freeze({
+  minimumAfterCallerStreamMs: 5000, quietMs: 2000, maximumAfterCallerStreamMs: 25000,
+});
 
 /** Approximate audible bounds; this is energy detection, not a speech/VAD claim. */
 export function audibleBounds(pcm, rate, rmsFloor = 160) {
@@ -26,7 +32,7 @@ export function newAudioCapture(started) {
     firstAudioAt: null, lastAudioAt: null, playbackEndAt: null,
     samples: 0, pcm: [], turnBeginAt: null, eouMs: null,
     latestTurnBeginAt: null, postTurnBeginFirstPacketAt: null,
-    postTurnBeginFirstAudioAt: null, lastAssistantTranscriptAt: null,
+    postTurnBeginFirstAudioAt: null, lastAssistantTranscriptAt: null, lastCallerTranscriptAt: null,
     callerTranscriptEvents: [], assistantTranscriptEvents: [],
     turnBegins: [], tools: [], toolResults: [], kb: null, events: [],
   };
@@ -133,27 +139,39 @@ export async function streamSilenceWhile(omni, rate, shouldContinue, clock, onFr
 
 export async function waitForAgentSettle(getCtx, clock, opts = {}) {
   const started = clock.now();
-  const timeoutMs = opts.timeoutMs ?? 25000;
-  const settleMs = opts.settleMs ?? 2000;
+  const observation = opts.callerStreamEndAt != null;
+  if (observation && (!Number.isFinite(opts.callerStreamEndAt)
+      || opts.callerStreamEndAt < 0 || opts.callerStreamEndAt > started)) {
+    throw new Error("Invalid caller observation boundary");
+  }
+  const timeoutMs = observation ? INTERRUPTION_OBSERVATION.maximumAfterCallerStreamMs : opts.timeoutMs ?? 25000;
+  const settleMs = observation ? INTERRUPTION_OBSERVATION.quietMs : opts.settleMs ?? 2000;
+  const deadlineAt = (observation ? opts.callerStreamEndAt : started) + timeoutMs;
+  const minimumAt = observation ? opts.callerStreamEndAt + INTERRUPTION_OBSERVATION.minimumAfterCallerStreamMs : -Infinity;
   while (true) {
     const ctx = getCtx();
     const at = clock.now();
     if (opts.isClosed?.()) return { reason: "closed", at };
+    if (observation && at >= deadlineAt) return { reason: "timeout", at };
     const hasResponseAudio = !opts.requireTurnBegin || (ctx.latestTurnBeginAt != null
       && ctx.postTurnBeginFirstAudioAt != null);
     // Synthesis text is progress, not a completion event. It can arrive after
     // early/final audio, so extend the quiet floor without demanding another
     // packet after every advisory. The protocol still has no reply-end marker.
     const activityEnd = Math.max(ctx.playbackEndAt ?? -Infinity,
-      ctx.latestTurnBeginAt ?? -Infinity, ctx.lastAssistantTranscriptAt ?? -Infinity);
-    if (ctx.firstPacketAt != null && hasResponseAudio && at >= activityEnd + settleMs) {
+      ctx.latestTurnBeginAt ?? -Infinity, ctx.lastAssistantTranscriptAt ?? -Infinity,
+      observation ? ctx.lastCallerTranscriptAt ?? -Infinity : -Infinity);
+    // Do not demand a new post-caller turn_begin: an earlier turn can be
+    // coalesced and speak later. This records a bounded quiet observation;
+    // downstream response-timing checks can impose a stricter begin boundary.
+    if (ctx.firstPacketAt != null && hasResponseAudio && at >= minimumAt && at >= activityEnd + settleMs) {
       return { reason: "settled", at };
     }
-    if (opts.allowEmpty && ctx.firstPacketAt == null && at - started >= (opts.emptyWaitMs ?? 800)) {
+    if (opts.allowEmpty && ctx.firstPacketAt == null && at >= minimumAt && at - started >= (opts.emptyWaitMs ?? 800)) {
       return { reason: "empty", at };
     }
     if (at - started >= timeoutMs) return { reason: "timeout", at };
-    await clock.sleep(20);
+    await clock.sleep(observation ? Math.min(20, deadlineAt - at) : 20);
   }
 }
 

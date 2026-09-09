@@ -17,7 +17,7 @@
 import { writeCallTimelineWav } from "./call-audio.js";
 import { newInterruptionCapture, prepareInterruptionCaller } from "./interruption-capture.js";
 import {
-  captureTiming, newAudioCapture, recordAudio, recordTurnBegin, REALTIME_GAP_LIMIT_MS,
+  captureTiming, newAudioCapture, recordAudio, recordTurnBegin, REALTIME_GAP_LIMIT_MS, INTERRUPTION_OBSERVATION,
   streamPcmRealtime, streamSilenceWhile, waitForAgentSettle, withTimeout,
 } from "./live-timing.js";
 
@@ -161,6 +161,9 @@ export async function runLive(scenario, opts, runtime = {}) {
   // Dormant profile used only by the standalone interruption pack. Ordinary
   // callers retain the existing capture rules and whole-utterance synthesis.
   const interruption = runtime.interruptionCapture === true ? newInterruptionCapture(omniRate) : null;
+  // Caller Speak aliases and Omni catalog IDs are distinct contracts. Keep
+  // legacy callers unchanged unless they explicitly select an agent voice.
+  const agentVoice = opts.agentVoice ?? opts.voice;
   if (interruption && (mode !== "voice" || scenario.turns.length !== 1)) {
     throw new Error("Interruption capture requires one voice utterance per call");
   }
@@ -272,7 +275,7 @@ export async function runLive(scenario, opts, runtime = {}) {
 
   const omni = new OmniClient({
     apiKey: opts.apiKey, sessionLabel: opts.sessionLabel, baseURL: opts.baseURL,
-    rate: omniRate, voice: opts.voice, persona: scenario.persona, tools,
+    rate: omniRate, voice: agentVoice, persona: scenario.persona, tools,
     onReady: () => {
       if (opts.callerKey) omni.sendControl({ type: "configure", caller_key: opts.callerKey });
       resolveReady();
@@ -301,12 +304,14 @@ export async function runLive(scenario, opts, runtime = {}) {
         // These are the serving engine's observed caller deltas, not the
         // standalone Hear hypothesis prepared before this call. Keep raw
         // timing/mode so late pieces and replacements remain inspectable.
-        const event = { atMs: Math.round(clock.now() - sessionStartedAt),
+        const transcriptAt = clock.now();
+        const event = { atMs: Math.round(transcriptAt - sessionStartedAt),
           clientTurnIndex: turnIndex, text: tr.text, final: tr.final === true,
           mode: tr.mode === "replace" ? "replace" : "delta",
           ...(Number.isSafeInteger(tr.sequence) ? { sequence: tr.sequence } : {}) };
         engineCallerTranscriptEvents.push(event);
         turnCtx.callerTranscriptEvents.push(event);
+        if (interruption) turnCtx.lastCallerTranscriptAt = transcriptAt;
       }
     },
     onTransfer: (evt) => {
@@ -362,6 +367,8 @@ export async function runLive(scenario, opts, runtime = {}) {
     if (typeof configuredAck.tools === "number" && configuredAck.tools !== tools.length) {
       addIssue("configured_tools_mismatch");
     }
+    if (interruption && (typeof agentVoice !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(agentVoice)
+        || configuredAck.voice_id !== agentVoice)) addIssue("configured_agent_voice_mismatch");
     // Keep the context created BEFORE configure: greeting chunks may precede
     // its ack. Wait for audible playback to finish, not merely packet quiet.
     const opening = await waitForAgentSettle(() => openingCtx, clock, {
@@ -404,6 +411,7 @@ export async function runLive(scenario, opts, runtime = {}) {
         const requireTurnBegin = !isNonSpeechCaller(preparedTurn.callerText);
         const settled = await waitForAgentSettle(() => turnCtx, clock, {
           isClosed: () => closed, requireTurnBegin,
+          ...(interruption ? { callerStreamEndAt: caller.streamEndAt } : {}),
         });
         await stopSilence();
         if (settled.reason !== "settled") addIssue(`turn_${settled.reason}`, i);
@@ -452,6 +460,13 @@ export async function runLive(scenario, opts, runtime = {}) {
     const timing = captureTiming(ctx, caller, sessionStartedAt);
     timing.callerOffsetBasis = caller.offsetBasis ?? "energy-bound";
     timing.settleReason = settled.reason;
+    if (interruption) timing.postCallerObservation = {
+      startedMs: Math.round(caller.streamEndAt - sessionStartedAt),
+      minimumEndMs: Math.round(caller.streamEndAt - sessionStartedAt + INTERRUPTION_OBSERVATION.minimumAfterCallerStreamMs),
+      endedMs: Math.round(settled.at - sessionStartedAt),
+      elapsedMs: Math.round(settled.at - caller.streamEndAt),
+      lastCallerTranscriptMs: ctx.lastCallerTranscriptAt == null ? null : Math.round(ctx.lastCallerTranscriptAt - sessionStartedAt),
+    };
     const { callerPcm: _callerPcm, ...callerFields } = preparedTurn;
     turns.push({
       index: i, ...callerFields, agentText,
@@ -502,6 +517,11 @@ export async function runLive(scenario, opts, runtime = {}) {
       turnBoundary: "audio-after-latest-turn-begin-plus-playout-and-advisory-quiet",
       postTurnBeginTiming: "First audible PCM received after latest turn_begin; not a semantic claim that the audio is substantive.",
       completionLimitation: "No server reply-end marker; an intra-reply silence longer than the quiet window can still be mistaken for completion.",
+      ...(interruption ? { postCallerObservation: { ...INTERRUPTION_OBSERVATION,
+        activity: "queued playback, turn_begin, assistant advisory and raw caller transcript arrival",
+        completion: "bounded quiet observation; does not require a new turn_begin after caller end",
+        scoringLimitation: "The interruption latency scorer separately requires a post-caller-end turn_begin. Audio on an earlier coalesced turn remains captured but may fail that stricter timing check.",
+      } } : {}),
       maxInputGapMs: Math.round(maxInputGapMs) },
   };
 }
