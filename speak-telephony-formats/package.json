@@ -11,7 +11,7 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@pyai/sdk": "^0.6.0",
+    "@pyai/sdk": "^0.7.0",
     "@pyai/twilio": "^0.4.0"
   }
 }
