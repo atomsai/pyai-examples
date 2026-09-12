@@ -6,6 +6,10 @@ description: Build applications with PyAI Hear, Speak, Omni, and the official SD
 
 # Build with PyAI
 
+Speech and calling decision tree: https://pyai.com/agents/speech-calling.md
+Omni frame contract: https://api.pyai.com/omni-frames.json
+
+
 ## Connect through MCP
 
 Use https://api.pyai.com/mcp with browser OAuth. Setup: https://pyai.com/mcp. Agent handbook: https://pyai.com/mcp-agent-guide.md. Tool schemas: https://pyai.com/mcp-tools.json. Start with `get_started`, `whoami`, and `discover_tools`. Local stdio reuses `pyai login`.
