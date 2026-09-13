@@ -7,7 +7,7 @@ This server-side example uses a synthetic read-only office-hours tool. Read
 
 <!-- omni-install:start -->
 ```sh
-npm install @pyai/sdk@0.7.0
+npm install @pyai/sdk@0.7.1
 npx pyai init voice-demo --template omni
 cd voice-demo
 npm install
@@ -42,6 +42,10 @@ Omni evaluation harness's timing utilities.
 The new private `omni-run-*` folder contains `session.wav`, `reply.wav`, and
 `report.json`. The report separates received audio, an office-hours answer
 recovered by Hear from captured audio, and physical playback (not tested).
+The office-hours check accepts formatting such as `opens@9a.m`, `9 a.m.` and
+`nine in the morning` in a complete affirmative opening-time sentence. Wrong
+times, negation, conflicting or truncated text remain unverified. This is a
+conservative check for the example fact, not a general answer-quality score.
 A synthesis transcript is advisory; it is not evidence that speech arrived.
 Capture ends after the simulated queue drains and two seconds of quiet. Omni
 has no protocol reply-end marker, so this is a bounded capture heuristic.
@@ -59,3 +63,10 @@ An interrupted answer can correctly fail the full-answer check;
 inspect the separate interruption evidence. This is not a physical speaker test.
 For a real playback adapter, cancel both queued and currently playing audio.
 Replace the example lookup with authorized application data before product use.
+
+On a session error, the program exits with JSON containing a recognized machine
+`code` (for example `media_dead` or `invalid_configure`). Unknown server codes
+become `unrecognized_server_error`; transport or decoding errors without a
+recognized transport code become `transport_or_protocol_error`. Raw error text,
+call IDs and unknown code values are omitted. No automatic retry is attempted;
+inspect the code and your authorized diagnostics before deciding to retry.

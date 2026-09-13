@@ -36,5 +36,5 @@ async function main() {
 
 main().catch(error => {
   const message = String(error.message).replaceAll(process.env.PYAI_API_KEY || "\0", "[REDACTED]");
-  console.error(JSON.stringify({ error: message })); process.exitCode = 1;
+  console.error(JSON.stringify({ error: message, ...(error.omni_code ? { code: error.omni_code } : {}) })); process.exitCode = 1;
 });

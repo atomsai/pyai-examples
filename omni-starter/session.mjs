@@ -5,6 +5,21 @@ export const realClock = {
   sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
 };
 
+// Only recognized machine codes may leave the example. Error messages, call
+// IDs and arbitrary code values can contain credentials or customer content.
+const publicErrorCodes = new Set([
+  "invalid_configure", "unsupported_tool_transport", "tool_configuration_locked",
+  "media_dead", "unauthorized", "insufficient_scope", "rate_limit_exceeded",
+  "concurrency_limit_exceeded", "daily_cap_exceeded", "credit_exhausted",
+]);
+const transportErrorCodes = new Set(["ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "ENOTFOUND", "EAI_AGAIN"]);
+export function omniFailure(error) {
+  const code = error instanceof Error
+    ? (transportErrorCodes.has(error.code) ? error.code : "transport_or_protocol_error")
+    : (publicErrorCodes.has(error?.code) ? error.code : "unrecognized_server_error");
+  return Object.assign(new Error(`Omni failed (${code}); no automatic retry was attempted`), { omni_code: code });
+}
+
 /** One bounded, server-side example. Its playback queue is simulated. */
 export async function runSession({ pyai, webSocket, caller, interruption, clock = realClock, timeoutMs = 60000 }) {
   const rate = 24000, frameSize = 480, silence = new Int16Array(frameSize);
@@ -63,7 +78,7 @@ export async function runSession({ pyai, webSocket, caller, interruption, clock 
         // A real speaker adapter must cancel scheduled and currently playing audio.
         queueEnd = now; all.playbackEndAt = now; reply.playbackEndAt = now;
       },
-      onError: () => fail("Omni reported an error; inspect authorized server diagnostics"),
+      onError: error => { failure ??= omniFailure(error); },
       onClose: () => { closed = true; },
     });
     while (clock.now() - started < timeoutMs) {

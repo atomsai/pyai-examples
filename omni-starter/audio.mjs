@@ -33,13 +33,16 @@ export function writeWav(chunks, rate) {
 }
 
 export function assessAnswer(report, capturedTranscript) {
-  // This checks this example's fixture, not general speech correctness.
-  const text = String(capturedTranscript ?? "").toLowerCase();
-  const expected = /\boffice\b/.test(text) && /\b(?:nine|9)\b/.test(text)
-    && /\bopen(?:s|ing)?\b/.test(text) && /\b(?:a\.?\s*m\.?|morning)\b/.test(text);
+  // Conservative fixture check, not a general semantic evaluator. Normalize
+  // Hear's formatting without accepting negated, conflicting or partial claims.
+  const text = String(capturedTranscript ?? "").normalize("NFKC").toLowerCase()
+    .replace(/@/g, " at ")
+    .replace(/(?<![a-z])([ap])\s*\.?\s*m\b\.?/g, " $1m ")
+    .replace(/[.,!…]/g, " ").replace(/\s+/g, " ").trim();
+  const expected = /^(?:(?:sure|yes|okay|ok|certainly) )?(?:(?:the|our) )?office (?:opens|(?:is )?opening|will open) (?:at )?(?:nine|9(?::00)?) (?:am|in the morning)(?: today)?$/.test(text);
   return {
     audio_received: report.reply_audio_bytes > 0,
-    captured_answer: report.end_reason === "quiet_window" && report.tool_executions === 1 && expected ? "verified_by_hear" : "not_verified",
+    captured_answer: report.reply_audio_bytes > 0 && report.end_reason === "quiet_window" && report.tool_executions === 1 && expected ? "verified_by_hear" : "not_verified",
     capture_boundary: "bounded_quiet_window_no_protocol_reply_end",
     physical_playback: "not_tested",
     interruption: report.interruption_requested ? (report.flushes_after_interruption > 0 && report.cleared_queue_ms > 0 ? "simulated_queue_cleared" : "not_verified") : "not_tested",
