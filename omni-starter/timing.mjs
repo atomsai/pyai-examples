@@ -34,11 +34,23 @@ export function newAudioCapture(started) {
     latestTurnBeginAt: null, postTurnBeginFirstPacketAt: null,
     postTurnBeginFirstAudioAt: null, lastAssistantTranscriptAt: null, lastCallerTranscriptAt: null,
     callerTranscriptEvents: [], assistantTranscriptEvents: [],
-    turnBegins: [], tools: [], toolResults: [], kb: null, events: [],
+    turnBegins: [], unheardCancellations: [], unheardSupersededTurns: [], tools: [], toolResults: [], kb: null, events: [],
   };
 }
 
 export function recordTurnBegin(ctx, at, turn, origin = 0) {
+  const prior = ctx.turnBegins.at(-1);
+  const cancellation = ctx.unheardCancellations.at(-1);
+  if (prior && cancellation && !cancellation.admitted
+      && cancellation.turn === prior.turn && cancellation.turnBeginIndex === ctx.turnBegins.length - 1
+      && Number.isSafeInteger(turn) && turn > prior.turn && at > cancellation.at
+      && ctx.samples === 0 && ctx.assistantTranscriptEvents.length === 0
+      && ctx.tools.length === 0 && ctx.toolResults.length === 0) {
+    cancellation.admitted = true;
+    ctx.unheardSupersededTurns.push({ turn: prior.turn, beginAtMs: prior.atMs,
+      cancelledAtMs: cancellation.atMs, cancellationEventIndex: cancellation.eventIndex,
+      replacementTurn: turn, outputPacketsBeforeReplacement: 0 });
+  }
   ctx.turnBeginAt ??= at;
   ctx.latestTurnBeginAt = at;
   // Earlier PCM can be a listening cue. A new reply is still pending even
@@ -46,6 +58,19 @@ export function recordTurnBegin(ctx, at, turn, origin = 0) {
   ctx.postTurnBeginFirstPacketAt = null;
   ctx.postTurnBeginFirstAudioAt = null;
   ctx.turnBegins.push({ atMs: Math.round(at - origin), turn: turn ?? null });
+}
+
+export function recordUnheardCancellation(ctx, event, at, origin, eventIndex) {
+  const prior = ctx.turnBegins.at(-1);
+  if (event.event !== "flush" || event.reason !== "turn_merge"
+      || !Number.isSafeInteger(event.cancelled_turn) || event.cancelled_turn <= 0
+      || prior?.turn !== event.cancelled_turn || at < ctx.latestTurnBeginAt
+      || ctx.samples !== 0 || ctx.assistantTranscriptEvents.length
+      || ctx.tools.length || ctx.toolResults.length
+      || ctx.unheardCancellations.some(c => c.turnBeginIndex === ctx.turnBegins.length - 1)) return;
+  ctx.unheardCancellations.push({ turn: event.cancelled_turn, at,
+    atMs: Math.round(at - origin), eventIndex, turnBeginIndex: ctx.turnBegins.length - 1,
+    admitted: false });
 }
 
 export function recordAudio(ctx, pcm, at, rate) {

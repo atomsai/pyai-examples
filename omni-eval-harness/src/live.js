@@ -17,7 +17,7 @@
 import { writeCallTimelineWav } from "./call-audio.js";
 import { newInterruptionCapture, prepareInterruptionCaller } from "./interruption-capture.js";
 import {
-  captureTiming, newAudioCapture, recordAudio, recordTurnBegin, REALTIME_GAP_LIMIT_MS, INTERRUPTION_OBSERVATION,
+  captureTiming, newAudioCapture, recordAudio, recordTurnBegin, recordUnheardCancellation, REALTIME_GAP_LIMIT_MS, INTERRUPTION_OBSERVATION,
   streamPcmRealtime, streamSilenceWhile, waitForAgentSettle, withTimeout,
 } from "./live-timing.js";
 
@@ -340,7 +340,11 @@ export async function runLive(scenario, opts, runtime = {}) {
         }
       }
       if (["idle_prompt", "flush", "barge_in", "end_call", "session_end"].includes(event)) {
-        turnCtx.events.push({ event, atMs: Math.round(clock.now() - sessionStartedAt) });
+        const at = clock.now();
+        turnCtx.events.push({ event, atMs: Math.round(at - sessionStartedAt),
+          ...(typeof evt.reason === "string" ? { reason: evt.reason } : {}),
+          ...(Number.isSafeInteger(evt.cancelled_turn) ? { cancelled_turn: evt.cancelled_turn } : {}) });
+        recordUnheardCancellation(turnCtx, evt, at, sessionStartedAt, turnCtx.events.length - 1);
       }
       if (event === "error") addIssue("server_error_event", turnIndex);
     },
@@ -418,8 +422,12 @@ export async function runLive(scenario, opts, runtime = {}) {
         if (turnCtx.firstAudioAt == null) addIssue("agent_audio_inaudible", i);
         if (requireTurnBegin && turnCtx.latestTurnBeginAt == null) addIssue("response_turn_begin_missing", i);
         else if (requireTurnBegin && turnCtx.postTurnBeginFirstAudioAt == null) addIssue("response_audio_missing_after_turn_begin", i);
-        if (turnCtx.turnBegins.length > 1) addIssue("multiple_response_turns", i, interruption ? "warning" : "error");
-        if (turnCtx.events.some((e) => e.event === "flush" || e.event === "barge_in")) {
+        if (turnCtx.turnBegins.length - turnCtx.unheardSupersededTurns.length > 1) {
+          addIssue("multiple_response_turns", i, interruption ? "warning" : "error");
+        }
+        const unheardCancellationEvents = new Set(turnCtx.unheardSupersededTurns.map(c => c.cancellationEventIndex));
+        if (turnCtx.events.some((e, index) => (e.event === "flush" || e.event === "barge_in")
+            && !unheardCancellationEvents.has(index))) {
           // The interruption profile scores received output while preserving
           // cancellations. It never certifies the estimated playback lane.
           addIssue("output_playback_interrupted", i, interruption ? "warning" : "error");
@@ -485,7 +493,7 @@ export async function runLive(scenario, opts, runtime = {}) {
       engineCallerText: ctx.callerTranscriptEvents.reduce((text, event) =>
         event.mode === "replace" ? event.text : text + event.text, ""),
       engineCallerTranscriptEvents: ctx.callerTranscriptEvents,
-      turnBegins: ctx.turnBegins, events: ctx.events,
+      turnBegins: ctx.turnBegins, unheardSupersededTurns: ctx.unheardSupersededTurns, events: ctx.events,
     });
   }
 

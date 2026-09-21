@@ -37,6 +37,7 @@ const replyFor = spec => spec.id.includes("correction") ? "The corrected number 
 
 function fixture(spec = interruptionScenarios()[0], { cueAt = null, cueMs = 100,
   flush = false, earlyBegin = false, transcript, responseDelay = 400, responseBeginDelay = 200,
+  cancellationAt = null, cancelledTurn = 1, cancellationReason = "turn_merge", earlyAssistantAt = null, earlyToolAt = null,
   lateCallerTranscripts = [], profile = true, leadingMsBySegment = [], configuredVoice = "stock_felix_en" } = {}) {
   const clock = virtualClock(), state = { connected: false, closed: false, inputs: [], synthesis: [], callerVoices: [], agentVoice: null };
   const end = profile ? spec.segments.length * 500 + spec.segments.reduce((n, s) => n + s.pauseAfterMs, 0) : 500;
@@ -65,6 +66,12 @@ function fixture(spec = interruptionScenarios()[0], { cueAt = null, cueMs = 100,
       if (this.started || !pcm.some(x => x)) return;
       this.started = true;
       if (earlyBegin) clock.setTimeout(() => this.options.onEvent({ event: "turn_begin", turn: 1 }), 520);
+      if (cancellationAt != null) clock.setTimeout(() => this.options.onEvent({
+        event: "flush", reason: cancellationReason, cancelled_turn: cancelledTurn }), cancellationAt);
+      if (earlyAssistantAt != null) clock.setTimeout(() => this.options.onTranscript({
+        role: "assistant", final: true, text: "Obsolete draft." }), earlyAssistantAt);
+      if (earlyToolAt != null) clock.setTimeout(() => this.options.onEvent({
+        event: "tool_call", name: "book_appointment", arguments: {} }), earlyToolAt);
       if (cueAt != null) clock.setTimeout(() => {
         this.options.onAudio(tone(cueMs));
         if (flush) this.options.onEvent({ event: "flush" });
@@ -345,3 +352,43 @@ for (const type of ["invalid", "failure", "error", "voice-mismatch", "voice-evid
     assert.equal(text.includes("raw backend error"), false);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+
+test("ordinary capture retains a revoked unheard generation without inventing a second spoken reply", async () => {
+  const f = fixture(undefined, { profile: false, earlyBegin: true, cancellationAt: 600 });
+  const run = await f.run(), turn = run.turns[0];
+  assert.equal(run.captureIntegrity.valid, true);
+  assert.equal(turn.turnBegins.length, 2, "raw generation boundaries remain available");
+  assert.equal(turn.unheardSupersededTurns.length, 1);
+  const receipt = turn.unheardSupersededTurns[0];
+  assert.equal(receipt.turn, 1);
+  assert.equal(receipt.replacementTurn, 2);
+  assert.equal(receipt.outputPacketsBeforeReplacement, 0);
+  assert.deepEqual(turn.events[receipt.cancellationEventIndex], {
+    event: "flush", atMs: receipt.cancelledAtMs, reason: "turn_merge", cancelled_turn: 1 });
+  assert.equal(turn.agentAudioMs, 200);
+  assert.equal(turn.engineAssistantText, replyFor(f.spec));
+  assert.ok(turn.ttfbMs > 0);
+});
+
+for (const [name, options] of Object.entries({
+  no_receipt: { cancellationAt: null },
+  wrong_turn: { cancelledTurn: 2 },
+  wrong_reason: { cancellationReason: "energy" },
+  before_begin: { cancellationAt: 500 },
+  after_replacement: { cancellationAt: 800 },
+  audible_before_cancel: { cueAt: 550 },
+  audio_after_cancel: { cueAt: 650 },
+  transcript_before_cancel: { earlyAssistantAt: 550 },
+  transcript_after_cancel: { earlyAssistantAt: 650 },
+  action_before_cancel: { earlyToolAt: 550 },
+  action_after_cancel: { earlyToolAt: 650 },
+})) {
+  test(`unheard cancellation never hides output or invalid evidence: ${name}`, async () => {
+    const f = fixture(undefined, { profile: false, earlyBegin: true, cancellationAt: 600, ...options });
+    const run = await f.run();
+    assert.equal(run.captureIntegrity.valid, false);
+    assert.equal(run.turns[0].unheardSupersededTurns.length, 0);
+    assert.ok(run.captureIntegrity.issues.some(i => i.code === "multiple_response_turns" && i.severity === "error"));
+  });
+}
