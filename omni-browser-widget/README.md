@@ -1,14 +1,14 @@
-# Hosted Omni browser widget v11
+# Hosted Omni browser widget v12
 
-v11 is the current runtime. v1-v10 remain immutable for existing embeds. It
-keeps v9's protected opening and v10's browser-valid protocol close while
-handling the deployed playback-position advisory.
+v12 is the current runtime. v1-v11 remain immutable for existing embeds. It
+keeps the protected opening and browser-valid protocol close, handles the
+playback-position advisory, and corrects interrupted assistant transcripts.
 
 Publish a website widget from **Agents → Website & phone**, then paste one
 script tag:
 
 ```html
-<script src="https://cdn.pyai.com/widget/v11/pyai-widget.js"
+<script src="https://cdn.pyai.com/widget/v12/pyai-widget.js"
   data-widget="wdgt_public_x" async></script>
 ```
 
@@ -23,13 +23,13 @@ Server messages must use binary native framing:
 - `0x02` + `{ "event":"transcript", "role", "text", "final" }`
 - `0x03` + JSON control keyed on `event`
 
-Text WebSocket frames, unknown binary tags, and transcript controls outside
-`0x02` are rejected. The sole type-keyed server exception is the validated
+Text WebSocket frames and unknown binary tags are rejected. `0x03` also
+accepts strictly validated native assistant transcripts as described below. The sole type-keyed server exception is the validated
 legacy `audio_position` advisory, normalized to canonical event semantics.
 Every other type-keyed server control remains invalid. Client audio/control remains
 `0x01` PCM16 and `0x03` JSON keyed on `type`.
 
-v11 protects the turn-0 consent line and greeting from browser self-barge:
+v12 protects the turn-0 consent line and greeting from browser self-barge:
 it buffers server PCM until the shared playback graph is running, sends
 real-time digital silence instead of microphone or speaker energy through the
 opening drain, and restores normal caller barge-in after a short warm-up on
@@ -65,7 +65,7 @@ widget record. The runtime exposes `window.PyAIWidget.open/close/toggle/destroy`
 and emits versioned `pyai:widget:*` lifecycle, transcript, state, and error
 events.
 
-## v12 release candidate
+## Interrupted replies
 
 v12 adds native assistant transcript controls on `0x03`, alongside the
 existing `0x02` caller deltas and structured transcripts. Assistant controls
@@ -80,6 +80,5 @@ measurement of what reached the listener. The current event has no turn ID
 and caps its prefix at 500 code points, so arbitrarily delayed ambiguous
 corrections cannot be resolved by the browser.
 
-Publish through **Publish widget CDN v12** before switching generated embeds.
-The publisher verifies the exact source hash and refuses to overwrite an
+The **Publish widget CDN v12** workflow verifies the exact source hash and refuses to overwrite an
 existing v12 object. v1-v11 stay immutable.
