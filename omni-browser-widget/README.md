@@ -64,3 +64,22 @@ Presentation, consent, action, and agent behavior come from the published
 widget record. The runtime exposes `window.PyAIWidget.open/close/toggle/destroy`
 and emits versioned `pyai:widget:*` lifecycle, transcript, state, and error
 events.
+
+## v12 release candidate
+
+v12 adds native assistant transcript controls on `0x03`, alongside the
+existing `0x02` caller deltas and structured transcripts. Assistant controls
+must contain exactly `event`, `role: "assistant"`, `text`, and boolean `final`.
+Malformed transcript controls and arbitrary type-keyed controls are rejected.
+
+On `assistant_interrupted`, the displayed reply is reduced to the server's
+reported spoken prefix; a zero-length prefix removes that assistant row.
+Caller messages remain visible, cancelled tails are ignored, and the next
+`turn_begin` restores normal assistant text. This is a server estimate, not a
+measurement of what reached the listener. The current event has no turn ID
+and caps its prefix at 500 code points, so arbitrarily delayed ambiguous
+corrections cannot be resolved by the browser.
+
+Publish through **Publish widget CDN v12** before switching generated embeds.
+The publisher verifies the exact source hash and refuses to overwrite an
+existing v12 object. v1-v11 stay immutable.
