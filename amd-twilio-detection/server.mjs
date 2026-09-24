@@ -57,13 +57,15 @@ function twiml() {
   // before processing any audio, and drops connections that never present one.
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Connect>
+  <Start>
     <Stream url="wss://api.pyai.com/v1/amd/stream">
       <Parameter name="api_key" value="${escapeXml(API_KEY)}"/>
       <Parameter name="aggressiveness" value="${AGGRESSIVENESS}"/>
       <Parameter name="webhook" value="${BASE_URL}/amd-events"/>
     </Stream>
-  </Connect>
+  </Start>
+  <!-- Standalone test: replace this pause with your existing call flow. -->
+  <Pause length="30"/>
 </Response>`;
 }
 
@@ -97,7 +99,7 @@ const server = createServer(async (req, res) => {
     const route = routeCall(event);
     console.log(
       `[AMD] call=${event.call_id} answered_by=${event.answered_by} ` +
-        `(twilio=${event.answered_by_twilio}) in ${event.decision_ms}ms, ${event.reason ?? ""}` +
+        `(twilio=${event.answered_by_twilio}) audio=${event.decision_ms}ms, ${event.reason ?? ""}` +
         ` -> ${route.action}`,
     );
     // `route.action` is where your dialer takes over: connect the agent, start a

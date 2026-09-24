@@ -10,12 +10,24 @@ Twilio's exact `AnsweredBy` enum, so your existing routing logic doesn't change.
 
 ## What it does
 
-- `GET/POST /twiml`, returns the `<Connect><Stream>` TwiML that points the call's
+- `GET/POST /twiml`, returns the `<Start><Stream>` TwiML that points the call's
   media at `wss://api.pyai.com/v1/amd/stream`. Point your Twilio number's Voice
   webhook here.
 - `POST /amd-events`, receives the `amd.call.completed` decision PyAI posts once
   it classifies the call.
 - On boot it sets the account-default operating point via `POST /v1/amd/config`.
+
+## Keep the call flow running
+
+AMD only listens. Use `<Start><Stream>` to fork audio while Twilio continues
+with the next TwiML verb. `<Connect><Stream>` blocks subsequent TwiML until the
+socket closes and is intended for a two-way voice agent.
+
+The standalone example follows `</Start>` with `<Pause length="30"/>` to keep
+a test call open while the webhook arrives. The pause does not delay the AMD
+result. Replace it with your existing call flow for an integration; omitting
+all following verbs makes Twilio disconnect immediately. The example logs the
+recommended action; your application must perform any call redirect or routing.
 
 ## What to do with each verdict
 
@@ -43,10 +55,33 @@ subtypes above are machines, and a message dropped into two of them is simply lo
 
 ### When to expect the decision
 
-Measured over ~1,850 real answered calls: `human` typically ~1.4 s (~3.0 s at the
-90th percentile), `machine` ~2.2 s (~3.2 s). There is a hard deadline at 6 s — if
-nothing is decisive by then you get a verdict anyway. Size any fallback timer past
-6 s rather than past the typical case.
+For an elapsed decision budget, add
+`<Parameter name="decision_timeout_ms" value="3000"/>` inside `<Stream>` in
+`twiml()`. Use `5000` for five seconds; the supported range is 1000–15000 ms.
+The option is per stream and omitted from the example by default.
+
+The clock begins when PyAI accepts the authenticated `start` frame and its
+parameters. A decisive result can arrive earlier. At the cutoff, AMD uses only
+evidence already available; if it is inconclusive, the result is `unknown` with
+`rule_id: "decision_timeout"`. Shorter budgets can increase unknown results.
+
+Recognition startup, idle input, and the final recognition wait share this
+budget. Webhook delivery takes additional time, so allow transport time in your
+fallback timer. The existing `decision_window_ms` counts processed audio; it
+does not guarantee a six-second wall-clock response on a stalled stream.
+Omitting the elapsed timeout preserves existing behavior.
+
+`decision_ms` reports processed audio, not elapsed latency. With a timeout set,
+callbacks also include `decision_elapsed_ms` and `decision_timeout_ms`; stored
+call details include them at the top level and under `meta.decision`.
+
+### Carry your identifiers through the callback
+
+Add parameters such as `<Parameter name="lead_id" value="lead-42"/>` or
+`campaign_id` inside `<Stream>`. They return under `custom_parameters` in both
+callback types and stored call details. They stay separate from AMD result
+fields. Do not include secrets. See the [guide](https://docs.pyai.com/guides/amd-answering-machine-detection#return-your-own-correlation-parameters)
+for field limits and validation errors.
 
 ## Run it
 
@@ -67,9 +102,9 @@ curl -sX POST https://api.pyai.com/v1/sandbox/keys
 
 ## The one dial: `aggressiveness`
 
-`AMD_AGGRESSIVENESS` (0-1) is the whole tuning surface:
+`AMD_AGGRESSIVENESS` (0-1) controls the classification operating point:
 
-- **0.0-0.25, human-safe (default):** never hang up on a person. For predictive
+- **0.0-0.25, human-safe (default):** prioritizes avoiding false machine decisions. For predictive
   dialers with live agents.
 - **0.6-1.0, machine-aggressive:** fire `machine` fast, for voicemail-drop bots.
 
@@ -89,7 +124,7 @@ TwiML `<Parameter name="aggressiveness">`).
   "answered_by_twilio": "machine_start",
   "confidence": 0.96,
   "decision_ms": 720,
-  "reason": "machine phrase: 'please leave a message' at 1.2s",
+  "reason": "machine phrase: 'please leave a message' @720ms",
   "created_at": 1786000000000
 }
 ```
