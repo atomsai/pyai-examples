@@ -28,6 +28,6 @@
   "license": "MIT",
   "dependencies": {
     "@pyai/twilio": "^0.4.0",
-    "@pyai/sdk": "^0.7.0"
+    "@pyai/sdk": "^0.8.0"
   }
 }

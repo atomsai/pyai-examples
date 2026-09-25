@@ -10,7 +10,7 @@
     "start": "node main.mjs"
   },
   "dependencies": {
-    "@pyai/sdk": "^0.7.0",
+    "@pyai/sdk": "^0.8.0",
     "ws": "^8.18.3"
   }
 }
