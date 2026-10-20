@@ -203,6 +203,7 @@ app.get("/voice", { websocket: true }, (browser, request) => {
     kbEndpoint: groundingOn ? kbPublicUrl : undefined,
     kbToken: groundingOn ? KB_TOKEN : undefined,
     rate: 24000,
+    playbackAck: request.query?.playback_ack === "1",
 
     onReady: () => sendEvent(browser, { event: "ready", grounding: groundingOn }),
     // Agent speech: forward the raw PCM16 bytes to the browser as a binary frame.
@@ -231,12 +232,16 @@ app.get("/voice", { websocket: true }, (browser, request) => {
     try {
       const msg = JSON.parse(data.toString());
       if (msg?.type === "dtmf" && typeof msg.digit === "string") omni.sendDtmf(msg.digit);
+      else if (msg?.type === "playback_progress") omni.sendPlaybackProgress(msg);
     } catch {
       /* ignore malformed control frames */
     }
   });
 
+  let cleaned = false;
   const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
     omni.close();
     liveSessions = Math.max(0, liveSessions - 1);
   };

@@ -1,0 +1,9 @@
+# For this example folder after publishing to pyai-examples; SDK 0.4.4 must exist on npm.
+FROM node:24-bookworm-slim
+WORKDIR /app
+COPY package*.json ./
+RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
+COPY *.mjs index.html ./
+ENV NODE_ENV=production PORT=8080
+USER node
+CMD ["node", "server.mjs"]

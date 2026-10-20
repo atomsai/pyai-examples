@@ -1,0 +1,11 @@
+# Public pyai-examples clone: run with this example directory as build context
+# after @pyai/twilio@0.4.5 is published. The public mirror rewrites package.json
+# to the published SDK; it intentionally omits monorepo lockfiles and sdk/.
+FROM node:24-bookworm-slim
+WORKDIR /app
+COPY package.json ./
+RUN npm install --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean --force
+COPY *.mjs index.html ./
+ENV NODE_ENV=production PORT=8080
+USER node
+CMD ["node", "server.mjs"]

@@ -33,33 +33,32 @@ both ways, transcripts, barge-in, and DTMF.
   (`configure`, `dtmf`) are `0x03`-prefixed too. A client that treats all binary
   as audio plays the control/transcript frames as a glitch and misses every
   event, the same way it fails against prod.
-- **One transcript body:** `0x02` carries exactly
-  `{"event":"transcript","role":"user|assistant","text":"…","final":false}`;
-  there are no scalar, nested, or alternate-field forms.
-- **Handshake:** `hello` → `session_started` (0x03), then a `config_ack` (0x03)
-  after your `configure` frame (server frames keyed on `event`).
-- **Audio:** send `0x01`-prefixed PCM16 at the `?rate=` you connect with; after
-  a short silence the mock "replies" with a tone (streamed in 150 ms chunks).
-- **Barge-in:** send audio while the mock is talking and it emits `flush` and
-  stops, exactly the event your client must handle.
-- **DTMF & lifecycle:** `{"type":"dtmf","digit":"5"}` is echoed;
-  `{"type":"session_ending"}` closes with `session_end`.
+- **Native transcripts:** caller `0x02` frames contain plain UTF-8 text deltas.
+  Assistant synthesis text is a `0x03` JSON advisory with exactly
+  `{"event":"transcript","role":"assistant","text":"…","final":true}`.
+  Neither transcript proves that audio has played.
+- **Handshake:** `hello` → `session_started` (0x03), then `configured` (0x03)
+  after your `configure` frame. Server frames use `event`; client frames use `type`.
+- **Audio:** send `0x01`-prefixed PCM16 at 8000, 16000, or 24000 Hz.
+  Output is 8000 Hz for 8000 Hz input, otherwise 24000 Hz, as advertised in
+  `hello.audio_out`. The mock replies after a gap in incoming packets.
+- **Barge-in:** a new audio packet while the mock is talking emits `flush`
+  and stops the tone. This is a packet-driven simulation, not voice detection.
+- **DTMF & lifecycle:** `{"type":"dtmf","digit":"5"}` receives
+  `dtmf_received`; `{"type":"session_ending"}` closes with `session_end`.
+- **Playback receipts:** unsupported here; `configured.playback_ack` is false.
+  Test actual rendering and receipt negotiation against a capable server.
 
-## The conformance check (why this beats a dumb echo)
+## The client-envelope check
 
-The #1 Omni bug is sending an **event-keyed** configure
-(`{"event":"configure",…}`) instead of a **type-keyed** one
-(`{"type":"configure",…}`). Against production this is silent: the transparent
-gateway ACKs it, the engine drops your `persona`, and you get a clean handshake
-with **zero turns and no error**. omni-mock catches it and tells you:
+Client frames use `type`, for example `{"type":"configure",…}`. The mock
+warns and ignores an event-only client envelope so integrations use the
+canonical contract. Some engine versions also accept an `event` alias;
+this stricter mock check is not a claim that the engine drops that alias.
 
-```
-[BUG] client sent event-keyed frame {"event":"configure"}, real engine drops this
-silently. Use {"type":"configure"}.
-```
-
-It also warns on audio-before-`configure`, a missing `persona`, and a non-`pcm16`
-format, the things that "work" in a mock but bite you in prod.
+It warns and ignores audio before `configure`, warns on a missing `persona`,
+and rejects unsupported formats and sample rates. Run `npm test` for the
+offline handler and native-frame contract checks.
 
 ## Limitations (by design)
 

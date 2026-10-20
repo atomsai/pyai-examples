@@ -1,0 +1,9 @@
+{
+  "name": "pyai-example-trace-dashboard",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A customizable Trace dashboard and server adapter, with an offline sample mode.",
+  "engines": { "node": ">=22" },
+  "scripts": { "start": "node server.mjs", "live": "node --env-file=.env server.mjs --live" }
+}

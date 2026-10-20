@@ -1,23 +1,27 @@
 # Twilio → PyAI Omni voice agent
 
 A real phone number that talks to a [PyAI Omni](https://pyai.com/models/omni)
-agent, built on [`@pyai/twilio`](../../sdk/twilio). The whole bridge is one line:
+agent, built on [`@pyai/twilio`](https://www.npmjs.com/package/@pyai/twilio). The whole bridge is one line:
 
 ```js
 OmniAgent.bridge(twilioWS, { apiKey, sessionLabel, voice, persona, knowledge });
 ```
 
 `@pyai/twilio` handles mu-law↔PCM16 transcoding, resampling, the Omni handshake,
-barge-in, and DTMF, so this example is just an HTTP route for TwiML and a
+barge-in, negotiated playback receipts, and DTMF, so this example is just an HTTP route for TwiML and a
 WebSocket route for the media stream.
 
 ## Run it
 
 ```bash
-# 1) Build the local package this example depends on (one time).
-cd ../../sdk/twilio && npm install && npm run build && cd -
+# Build the SDK only when running from the monorepo.
+# Public example clones install the published package below.
+if [ -f ../../sdk/twilio/package.json ]; then
+  npm --prefix ../../sdk/twilio ci
+  npm --prefix ../../sdk/twilio run build
+fi
 
-# 2) Configure and start.
+# Configure and start.
 cp .env.example .env        # then edit PYAI_API_KEY (a pyai_test_ key is fine)
 npm install
 npm start
@@ -51,3 +55,9 @@ off; press a key to confirm DTMF flows through.
 - Uses `node --env-file=.env`, so create `.env` first (copy the example).
 - This bridge is stateless; run as many concurrent calls as your plan's
   realtime concurrency allows.
+
+The monorepo uses its built local SDK; the public example requires the published
+`@pyai/twilio` 0.4.3 or later. It credits completed segments from Twilio mark echoes
+and discards marks returned by a clear. Generation completion does not prove
+playback; see the [SDK playback contract](https://www.npmjs.com/package/@pyai/twilio#playback-receipts).
+Version 0.4.2 does not provide these receipts.

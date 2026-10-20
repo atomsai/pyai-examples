@@ -26,78 +26,16 @@ import WebSocket from "ws";
 const DEFAULT_BASE = "https://api.pyai.com";
 const TAG_AUDIO = Buffer.from([0x01]);
 const TAG_CONTROL = Buffer.from([0x03]);
-const MAX_TRANSCRIPT_BYTES = 16_384;
-const MAX_TRANSCRIPT_CHARS = 4_000;
-
-function transcriptText(value) {
-  return typeof value === "string" &&
-    value.length > 0 &&
-    value.length <= MAX_TRANSCRIPT_CHARS &&
-    !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)
-    ? value
-    : null;
-}
-
-/** The sole parser for the exact event-keyed JSON body carried by 0x02. */
-export function normalizeOmniTranscriptBody(body) {
-  if (!body?.length || body.length > MAX_TRANSCRIPT_BYTES) return null;
-  let decoded;
-  try {
-    decoded = new TextDecoder("utf-8", { fatal: true }).decode(body);
-  } catch {
-    return null;
-  }
-  let value;
-  try {
-    value = JSON.parse(decoded);
-  } catch {
-    return null;
-  }
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const keys = Object.keys(value);
-  if (keys.length !== 4 || !["event", "role", "text", "final"].every((key) => keys.includes(key))) return null;
-  if (value.event !== "transcript") return null;
-  if (value.role !== "user" && value.role !== "assistant") return null;
-  const text = transcriptText(value.text);
-  if (!text || typeof value.final !== "boolean") return null;
-  return {
-    event: "transcript",
-    role: value.role,
-    text,
-    final: value.final,
-  };
-}
-
-export function normalizeOmniServerControl(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  if (typeof value.event === "string" && value.event && value.event !== "transcript") {
-    return value;
-  }
-  const allowedKeys = new Set(["type", "call_id", "sent_ms", "realtime_ms"]);
-  if (
-    value.type !== "audio_position"
-    || !Object.keys(value).every((key) => allowedKeys.has(key))
-    || typeof value.sent_ms !== "number"
-    || !Number.isFinite(value.sent_ms)
-    || value.sent_ms < 0
-    || typeof value.realtime_ms !== "number"
-    || !Number.isFinite(value.realtime_ms)
-    || value.realtime_ms < 0
-    || (
-      value.call_id !== undefined
-      && (typeof value.call_id !== "string" || !value.call_id)
-    )
-  ) {
-    return null;
-  }
-  return { ...value, event: "audio_position" };
-}
+import { normalizeOmniTranscriptBody, normalizeOmniServerControl } from "../public/omni-wire.mjs";
+export { normalizeOmniTranscriptBody, normalizeOmniServerControl };
 
 /**
  * @typedef {Object} OmniSessionOptions
  * @property {string}  apiKey        pyai_live_ / pyai_test_ key (server-side only).
  * @property {string}  [sessionLabel] Optional opaque tag echoed to your kb_endpoint.
  * @property {string}  [baseURL]     Defaults to https://api.pyai.com.
+ * @property {boolean} [playbackAck] Opt in only when the downstream player reports rendered chunks.
+ * @property {"text" | "legacy-json"} [transcriptFormat] Native raw caller text by default; legacy JSON requires explicit opt-in.
  * @property {number}  [rate]        Sample rate (Hz). Default 24000.
  * @property {string}  [voice]       voice_id for the configure frame.
  * @property {string}  [persona]     System prompt for the brain.
@@ -116,10 +54,14 @@ export class OmniSession {
   /** @param {OmniSessionOptions} opts */
   constructor(opts) {
     if (!opts.apiKey) throw new Error("OmniSession: apiKey is required");
+    if (opts.transcriptFormat !== undefined && !["text", "legacy-json"].includes(opts.transcriptFormat)) {
+      throw new Error("OmniSession: invalid transcriptFormat");
+    }
     this.opts = opts;
     this.rate = opts.rate ?? 24000;
     this.open = false;
     this.closed = false;
+    this.playbackAck = false;
     /** @type {Buffer[]} audio that arrived before the socket opened */
     this.backlog = [];
 
@@ -152,6 +94,7 @@ export class OmniSession {
     // is stored, so everything the agent needs is in this one frame.
     // Client control is keyed on `type`; server control is keyed on `event`.
     const configure = { type: "configure" };
+    if (this.opts.playbackAck === true) configure.playback_ack = true;
     if (this.opts.voice) configure.voice_id = this.opts.voice;
     if (this.opts.persona) configure.persona = this.opts.persona;
     if (this.opts.greeting) configure.greeting = this.opts.greeting;
@@ -181,7 +124,7 @@ export class OmniSession {
     }
     let evt;
     if (tag === 0x02) {
-      evt = normalizeOmniTranscriptBody(buf.subarray(1));
+      evt = normalizeOmniTranscriptBody(buf.subarray(1), this.opts.transcriptFormat);
       if (!evt) {
         this.opts.onError?.(new Error("Unparseable Omni transcript frame"));
         return;
@@ -204,13 +147,10 @@ export class OmniSession {
       this.opts.onError?.(new Error("Omni server control frame is missing its event key"));
       return;
     }
-    if (tag === 0x03 && evt.event === "transcript") {
-      this.opts.onError?.(new Error("Omni transcript events must use a binary 0x02 frame"));
-      return;
-    }
-    this.opts.onEvent?.(evt);
     const event = evt.event;
-    if (event === "barge_in" || event === "flush") this.opts.onBargeIn?.();
+    if (event === "configured") this.playbackAck = this.opts.playbackAck === true && evt.playback_ack === true;
+    this.opts.onEvent?.(evt);
+    if (["barge_in", "flush", "reply_interrupted", "reply_failed"].includes(event)) this.opts.onBargeIn?.();
     else if (event === "session_end") this.close();
   }
 
@@ -233,15 +173,31 @@ export class OmniSession {
     else this.backlog.push(frame);
   }
 
-  /** Forward a DTMF digit (e.g. from an on-screen keypad). */
-  sendDtmf(digit) {
-    this.#sendControl({ type: "dtmf", digits: digit });
+  /** Forward a nonempty DTMF sequence as ordered single-key controls. */
+  sendDtmf(digits) {
+    if (typeof digits !== "string" || digits.length === 0 || /[^0-9*#A-Da-d]/.test(digits)) {
+      throw new TypeError("Invalid DTMF sequence");
+    }
+    for (const digit of digits.toUpperCase()) {
+      this.#sendControl({ type: "dtmf", digit });
+    }
+  }
+
+  /** Relay a downstream player's receipt; receiving or forwarding PCM is not playback. */
+  sendPlaybackProgress(frame) {
+    if (!this.playbackAck || this.closed || !this.open || !frame || frame.type !== "playback_progress"
+        || typeof frame.reply_id !== "string" || !/^[a-f0-9]{32}$/.test(frame.reply_id)
+        || typeof frame.segment_id !== "string" || !/^[1-9][0-9]{0,5}$/.test(frame.segment_id)
+        || !Number.isSafeInteger(frame.played_samples) || frame.played_samples < 0) return;
+    this.#sendControl({ type: "playback_progress", reply_id: frame.reply_id,
+      segment_id: frame.segment_id, played_samples: frame.played_samples });
   }
 
   close(code = 1000, reason = "client_closed") {
     if (this.closed) return;
     this.closed = true;
     this.open = false;
+    this.playbackAck = false;
     try {
       this.ws.close(code, reason);
     } catch {

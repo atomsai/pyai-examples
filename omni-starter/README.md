@@ -7,7 +7,7 @@ This server-side example uses a synthetic read-only office-hours tool. Read
 
 <!-- omni-install:start -->
 ```sh
-npm install @pyai/sdk@0.8.0
+npm install @pyai/sdk@0.9.2
 npx pyai init voice-demo --template omni
 cd voice-demo
 npm install
@@ -47,8 +47,8 @@ The office-hours check accepts formatting such as `opens@9a.m`, `9 a.m.` and
 times, negation, conflicting or truncated text remain unverified. This is a
 conservative check for the example fact, not a general answer-quality score.
 A synthesis transcript is advisory; it is not evidence that speech arrived.
-Capture ends after the simulated queue drains and two seconds of quiet. Omni
-has no protocol reply-end marker, so this is a bounded capture heuristic.
+This starter does not negotiate playback receipts. Capture ends after the
+simulated queue drains and two seconds of quiet, a bounded capture heuristic.
 Listen to the saved file when qualifying actual sound quality or completeness.
 
 To exercise interruption, supply a second WAV saying “Stop speaking now”:

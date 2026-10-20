@@ -1,0 +1,138 @@
+import { createServer } from 'node:http';
+import { timingSafeEqual } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { WebSocketServer } from 'ws';
+import { TranslationHost } from './host.mjs';
+import { createPreviewRoomBudget } from './preview.mjs';
+import { createCallRetirer } from './retirement.mjs';
+
+const here = dirname(fileURLToPath(import.meta.url)), require = createRequire(import.meta.url);
+const env = { ...process.env, ...(process.env.CONFIG_PATH ? JSON.parse(await readFile(process.env.CONFIG_PATH, 'utf8')) : {}) };
+const config = { publicOrigin: env.PUBLIC_ORIGIN, authId: env.PLIVO_AUTH_ID, authToken: env.PLIVO_AUTH_TOKEN,
+  applicationId: env.PLIVO_APP_ID, pyaiKey: env.PYAI_API_KEY,
+  endpointUsernames: { customer: env.PLIVO_CUSTOMER_USERNAME, agent: env.PLIVO_AGENT_USERNAME, replacement: env.PLIVO_REPLACEMENT_USERNAME } };
+const deadline = Date.parse(env.TEST_DEADLINE ?? '');
+const consolePreview = env.CONSOLE_PREVIEW === '1';
+if (!env.ADMIN_TOKEN || env.ADMIN_TOKEN.length < 32 || !/^[a-z0-9][a-z0-9._-]{2,62}$/.test(env.JOURNAL_BUCKET ?? '')
+    || !/^[\w/-]{1,160}$/.test(env.JOURNAL_PREFIX ?? '') || !Number.isFinite(deadline)
+    || deadline <= Date.now() || deadline > Date.now() + (consolePreview ? 86_400_000 : 1_800_000)
+    || (consolePreview && (!/^[a-z0-9-]{8,80}$/.test(env.PREVIEW_ID ?? '')
+      || !/^[a-z0-9-]{1,100}$/.test(env.K_REVISION ?? '')))) throw new Error('invalid_bounded_test_config');
+const carrierAuthorization = 'Basic ' + Buffer.from(`${config.authId}:${config.authToken}`).toString('base64');
+const carrierBase = `https://api.plivo.com/v1/Account/${config.authId}`;
+let adc = { value: '', expires: 0 };
+async function cloudToken() {
+  if (adc.expires > Date.now() + 30_000) return adc.value;
+  const response = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token',
+    { headers: { 'Metadata-Flavor': 'Google' }, signal: AbortSignal.timeout(1500) });
+  if (!response.ok) throw new Error('journal_identity_failed');
+  const value = await response.json(); adc = { value: value.access_token, expires: Date.now() + value.expires_in * 1000 };
+  return adc.value;
+}
+const previewBudget = consolePreview ? createPreviewRoomBudget({ bucket: env.JOURNAL_BUCKET, prefix: env.JOURNAL_PREFIX,
+  previewId: env.PREVIEW_ID, deadline, token: cloudToken }) : null;
+const host = new TranslationHost(config, {
+  maxRooms: consolePreview ? 12 : 2, absoluteDeadline: deadline,
+  reserveRoom: previewBudget ? room => previewBudget.reserve(room) : async () => {},
+  mintToken: async claims => {
+    const response = await fetch(`${carrierBase}/JWT/Token/`, { method: 'POST', headers: {
+      Authorization: carrierAuthorization, 'Content-Type': 'application/json' },
+      body: JSON.stringify(claims), signal: AbortSignal.timeout(4000) });
+    if (!response.ok) throw new Error('carrier_token_failed');
+    return (await response.json()).token;
+  },
+  retire: createCallRetirer(config),
+  record: async entry => {
+    const token = await cloudToken();
+    const name = `${env.JOURNAL_PREFIX}/${entry.host_room_id}/${String(entry.host_sequence).padStart(6, '0')}.json`;
+    const response = await fetch(`https://storage.googleapis.com/upload/storage/v1/b/${env.JOURNAL_BUCKET}/o?uploadType=media&ifGenerationMatch=0&name=${encodeURIComponent(name)}`,
+      { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry), signal: AbortSignal.timeout(1700) });
+    if (!response.ok) throw new Error('journal_write_failed');
+    if (entry.event === 'host.room.closed' && entry.cleanup === 'calls_terminal_verified') previewBudget?.retired(entry.host_room_id);
+  },
+});
+const assets = new Map([
+  ['/', ['text/html; charset=utf-8', await readFile(join(here, 'index.html'))]],
+  ['/browser.mjs', ['application/javascript; charset=utf-8', await readFile(join(here, 'browser.mjs'))]],
+  ['/plivo-browser.js', ['application/javascript', await readFile(require.resolve('plivo-browser-sdk'))]],
+  ['/plivobrowsersdk.js.LICENSE.txt', ['text/plain; charset=utf-8', await readFile(require.resolve('plivo-browser-sdk') + '.LICENSE.txt')]],
+]);
+const equal = (a, b) => { const x = Buffer.from(a), y = Buffer.from(b); return x.length === y.length && timingSafeEqual(x, y); };
+const headers = { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff',
+  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.plivo.com wss://*.plivo.com https://*.plivocdn.com wss://*.plivocdn.com; media-src 'self' blob: mediastream: https://*.plivo.com https://*.plivocdn.com; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'" };
+let inFlight = 0;
+const webhookFailureCodes = new Set(['invalid_plivo_signature', 'invalid_call_binding', 'journal_write_failed',
+  'journal_identity_failed', 'journal_limit', 'body_limit', 'call_admission_failed']);
+async function body(req) {
+  const chunks = []; let size = 0;
+  for await (const chunk of req) { if ((size += chunk.length) > 8192) throw new Error('body_limit'); chunks.push(chunk); }
+  return Buffer.concat(chunks).toString('utf8');
+}
+const server = createServer(async (req, res) => {
+  const send = (code, value, type = 'application/json') => { res.writeHead(code, { ...headers, 'Content-Type': type }); res.end(type === 'application/json' ? JSON.stringify(value) : value); };
+  if (++inFlight > 12) { inFlight--; return send(429, { error: 'request_limit' }); }
+  try {
+    if (Date.now() >= deadline) return send(410, { error: 'test_expired' });
+    // Cloud Run reserves some paths ending in z; keep application readiness on /health.
+    if (req.method === 'GET' && req.url === '/health') return send(200, { status: 'ready', expires_at: new Date(deadline).toISOString() });
+    if (req.method === 'GET' && assets.has(req.url)) { const [type, value] = assets.get(req.url); return send(200, value, type); }
+    if (req.method === 'POST' && ['/plivo/voice', '/plivo/status'].includes(req.url)) {
+      if (!req.headers['content-type']?.startsWith('application/x-www-form-urlencoded')) return send(415, { error: 'invalid_content_type' });
+      const params = new URLSearchParams(await body(req));
+      if (new Set(params.keys()).size !== [...params.keys()].length) return send(400, { error: 'duplicate_parameter' });
+      const signature = String(req.headers['x-plivo-signature-v3'] ?? ''), nonce = String(req.headers['x-plivo-signature-v3-nonce'] ?? '');
+      if (req.url === '/plivo/status') { await host.status(Object.fromEntries(params), signature, nonce); return send(200, { accepted: true }); }
+      const xml = await host.answer(Object.fromEntries(params), signature, nonce);
+      return send(200, xml, 'text/xml');
+    }
+    if (req.headers.origin && req.headers.origin !== config.publicOrigin) return send(403, { error: 'origin_denied' });
+    if (consolePreview && (!equal(String(req.headers.authorization ?? ''), `Bearer ${env.ADMIN_TOKEN}`)
+        || req.headers['x-pyai-preview-id'] !== env.PREVIEW_ID || req.headers['x-pyai-preview-revision'] !== env.K_REVISION)) {
+      return send(401, { error: 'unauthorized' });
+    }
+    if (req.method === 'POST' && req.url === '/join') {
+      return send(200, await host.mint(JSON.parse(await body(req)).grant));
+    }
+    if (!equal(String(req.headers.authorization ?? ''), `Bearer ${env.ADMIN_TOKEN}`)) return send(401, { error: 'unauthorized' });
+    if (req.method === 'POST' && req.url === '/rooms') return send(201, await host.create(JSON.parse(await body(req))));
+    if (req.method === 'GET' && req.url === '/room') return send(200, host.snapshot());
+    if (req.method === 'POST' && req.url === '/end') {
+      if (consolePreview && JSON.parse(await body(req)).room_id !== host.room?.id) return send(409, { error: 'room_changed' });
+      await host.finish(); return send(200, host.snapshot());
+    }
+    if (req.method === 'POST' && req.url === '/commit') {
+      const { leg } = JSON.parse(await body(req));
+      if (!['customer', 'agent'].includes(leg) || !host.room?.interpretation) throw new Error('input_not_ready');
+      host.room.interpretation.commit(leg); return send(200, { accepted: true });
+    }
+    return send(404, { error: 'not_found' });
+  } catch (error) {
+    if (req.method === 'POST' && ['/plivo/voice', '/plivo/status'].includes(req.url)) {
+      console.warn(JSON.stringify({ event: 'carrier_webhook_rejected',
+        code: webhookFailureCodes.has(error?.message) ? error.message : 'request_rejected' }));
+    }
+    send(400, { error: 'request_rejected' });
+  }
+  finally { inFlight--; }
+});
+server.requestTimeout = 10_000; server.headersTimeout = 10_000;
+const sockets = new WebSocketServer({ noServer: true, maxPayload: 16384 });
+server.on('upgrade', (req, socket, head) => {
+  const endpoint = Date.now() < deadline && host.admit(req.url, String(req.headers['x-plivo-signature-v3'] ?? ''),
+    String(req.headers['x-plivo-signature-v3-nonce'] ?? ''));
+  if (!endpoint) { socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n'); socket.destroy(); return; }
+  sockets.handleUpgrade(req, socket, head, ws => host.attach(endpoint, ws));
+});
+async function stop() {
+  clearTimeout(expiry); await host.finish('test_deadline');
+  for (const client of sockets.clients) client.terminate();
+  server.close(); sockets.close();
+}
+const expiry = setTimeout(() => { void stop(); }, deadline - Date.now()); expiry.unref();
+process.once('SIGTERM', () => { void stop(); });
+await new Promise(resolve => server.listen(Number(env.PORT ?? 8080), '0.0.0.0', resolve));
+console.log(JSON.stringify({ event: 'test_host_ready', port: server.address().port, expires_at: new Date(deadline).toISOString() }));

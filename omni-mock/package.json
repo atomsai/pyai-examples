@@ -6,7 +6,8 @@
   "description": "Offline PyAI Omni server (wire protocol v2) to build and test your realtime client before you have a key, with a built-in conformance check for the event-vs-type footgun.",
   "scripts": {
     "start": "node --env-file=.env server.js",
-    "start:noenv": "node server.js"
+    "start:noenv": "node server.js",
+    "test": "node --test test/*.test.mjs"
   },
   "engines": {
     "node": ">=22"

@@ -1,0 +1,20 @@
+{
+  "name": "pyai-example-plivo-live-translation",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bounded two-human Live Translation test host with isolated Plivo browser endpoints.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@pyai/twilio": "^0.4.5",
+    "plivo": "4.79.0",
+    "plivo-browser-sdk": "2.2.21",
+    "ws": "^8.18.0"
+  }
+}

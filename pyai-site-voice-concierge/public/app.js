@@ -1,3 +1,8 @@
+import { OmniBrowserAudioContract } from "./audio-contract.mjs";
+import { normalizeOmniTranscriptBody as normalizeTranscriptBody, normalizeOmniServerControl as normalizeServerControl } from "./omni-wire.mjs";
+import { createAssistantTranscriptState, advanceAssistantTranscriptState, readAssistantInterruption, reconcileAssistantTranscript } from "./transcript-correction.mjs";
+import { OmniPlaybackReceipts } from "./playback-receipts.mjs";
+
 // Browser side of the "Talk to PyAI" concierge.
 //
 // Two connect patterns, chosen by the server's /config (CONNECT_MODE):
@@ -17,7 +22,7 @@
 // error) in broker mode, or Omni's native event frames in direct mode.
 
 const RATE = 24000;
-const MAX_BACKLOG_SECONDS = 1;
+const MAX_BACKLOG_SECONDS = 10;
 const FADE_SECONDS = 0.015;
 const STARTUP_AUDIO_WAIT_MS = 4000;
 const AGENT_BARGE_ARM_DELAY_MS = 350;
@@ -45,13 +50,38 @@ let agentPlayStartedAt = 0;
 let agentEndTimer = null;
 let protocolCloseRequested = false;
 let protocolCloseAttempts = 0;
+let transportEpoch = 0;
+let inboundChain = Promise.resolve();
+const playbackReceipts = new OmniPlaybackReceipts();
+const audioContract = new OmniBrowserAudioContract();
+
+function sendPlaybackProgress(frame) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(connectMode === "direct" ? frame03(frame) : JSON.stringify(frame));
+}
+
+function bindIncoming(socket) {
+  const epoch = ++transportEpoch;
+  inboundChain = Promise.resolve();
+  socket.onmessage = (event) => {
+    inboundChain = inboundChain.then(async () => {
+      if (ws !== socket || epoch !== transportEpoch) return;
+      const data = event.data instanceof Blob ? await event.data.arrayBuffer() : event.data;
+      if (ws !== socket || epoch !== transportEpoch) return;
+      onMessage({ data });
+    }).catch(() => {
+      if (ws === socket && epoch === transportEpoch) stop("Audio playback failed. Please try again.");
+    });
+  };
+}
 
 // Playback scheduling for the agent's audio.
 let nextPlayTime = 0;
 const playing = new Set(); // active AudioBufferSourceNodes (for barge-in cancel)
 
 // Transcript rendering.
-let lastAssistantTurn = null;
+let transcriptHistory = [];
+let assistantTranscriptState = createAssistantTranscriptState();
 
 function beginStartupAudioPhase(phase, nowMs, connectedAtMs) {
   if (phase !== "waiting") return phase;
@@ -117,11 +147,13 @@ async function loadMode() {
 
 function brokerWsUrl() {
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
-  return `${proto}//${location.host}/voice`;
+  return `${proto}//${location.host}/voice?playback_ack=1`;
 }
 
 async function start() {
   toggle.disabled = true;
+  playbackReceipts.reset();
+  audioContract.reset();
   try {
     micStream = await navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
@@ -164,7 +196,7 @@ async function connectDirect() {
   const res = await fetch("/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
   if (!res.ok) throw new Error("Could not start a session.");
   const session = await res.json();
-  pendingConfigure = session.configure || { type: "configure" };
+  pendingConfigure = { ...(session.configure || {}), type: "configure", playback_ack: true };
 
   protocolCloseRequested = false;
   protocolCloseAttempts = 0;
@@ -178,7 +210,7 @@ async function connectDirect() {
     setStatus("Connecting to the agent…");
     startCapture();
   };
-  ws.onmessage = onMessage;
+  bindIncoming(ws);
   ws.onerror = () => {
     stop("Connection error.");
     setStatus("Connection error.", "err");
@@ -197,7 +229,7 @@ function connectBroker() {
     setStatus("Connecting to the agent…");
     startCapture();
   };
-  ws.onmessage = onMessage;
+  bindIncoming(ws);
   ws.onerror = () => {
     stop("Connection error.");
     setStatus("Connection error.", "err");
@@ -309,60 +341,6 @@ function closeForProtocolViolation(reason) {
   return true;
 }
 
-function normalizeTranscriptBody(body) {
-  if (!body.length || body.length > 16_384) return null;
-  let decoded;
-  try {
-    decoded = new TextDecoder("utf-8", { fatal: true }).decode(body);
-  } catch {
-    return null;
-  }
-  const safeText = (value) =>
-    typeof value === "string" &&
-    value.length > 0 &&
-    value.length <= 4_000 &&
-    !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)
-      ? value
-      : null;
-  try {
-    const value = JSON.parse(decoded);
-    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-    const keys = Object.keys(value);
-    if (keys.length !== 4 || !["event", "role", "text", "final"].every((key) => keys.includes(key))) return null;
-    if (value.event !== "transcript") return null;
-    if (value.role !== "user" && value.role !== "assistant") return null;
-    const text = safeText(value.text);
-    if (!text || typeof value.final !== "boolean") return null;
-    return { event: "transcript", role: value.role, text, final: value.final };
-  } catch {
-    return null;
-  }
-}
-
-function normalizeServerControl(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  if (typeof value.event === "string" && value.event && value.event !== "transcript") {
-    return value;
-  }
-  const allowedKeys = new Set(["type", "call_id", "sent_ms", "realtime_ms"]);
-  const validNumber = (number) => (
-    typeof number === "number" && Number.isFinite(number) && number >= 0
-  );
-  if (
-    value.type !== "audio_position"
-    || !Object.keys(value).every((key) => allowedKeys.has(key))
-    || !validNumber(value.sent_ms)
-    || !validNumber(value.realtime_ms)
-    || (
-      value.call_id !== undefined
-      && (typeof value.call_id !== "string" || !value.call_id)
-    )
-  ) {
-    return null;
-  }
-  return { ...value, event: "audio_position" };
-}
-
 // First-byte demux for the engine's binary frames (direct mode). Treating every
 // binary frame as audio plays control/transcript frames as a glitch and drops
 // every event, the #1 Omni integration bug.
@@ -395,9 +373,22 @@ function onBinaryFrame(arrayBuffer) {
 }
 
 function handleEvent(evt) {
+  if (!audioContract.control(evt)) { stop("Unsupported audio format from the voice service. Please try again."); return; }
+  playbackReceipts.control(evt);
+  assistantTranscriptState = advanceAssistantTranscriptState(assistantTranscriptState, evt);
+  const correction = readAssistantInterruption(assistantTranscriptState, evt);
+  if (correction) {
+    const corrected = reconcileAssistantTranscript(transcriptHistory, correction);
+    if (corrected !== transcriptHistory) {
+      transcriptHistory = corrected;
+      assistantTranscriptState = { ...assistantTranscriptState, interrupted: true };
+      drawTranscript();
+    }
+  }
   const kind = typeof evt.event === "string" ? evt.event : "";
   switch (kind) {
-    case "config_ack":     // direct mode: ack for our configure
+    case "configured":     // negotiated engine configure acknowledgement
+    case "config_ack":     // older server acknowledgement
       setStatus("Listening, go ahead and ask.", "live");
       break;
     case "ready":            // broker mode: synthesized by our server
@@ -407,6 +398,8 @@ function handleEvent(evt) {
     case "transcript":
       renderTranscript(evt);
       break;
+    case "reply_interrupted":
+    case "reply_failed":
     case "barge_in":
     case "flush":
       stopPlayback(true, true); // fade, drop stale audio, and fail-open capture
@@ -424,7 +417,10 @@ function handleEvent(evt) {
 }
 
 function playAgentAudio(bytes) {
+  if (!audioContract.pcm(bytes.byteLength)) { stop("Unsupported audio format from the voice service. Please try again."); return; }
   if (!audioCtx || !outputGain) return;
+  // Broker WebSockets deliver ArrayBuffer; direct frames are Uint8Array views.
+  bytes = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   const sampleCount = Math.floor(bytes.byteLength / 2);
   if (!sampleCount) return;
   clearTimeout(agentEndTimer);
@@ -438,12 +434,12 @@ function playAgentAudio(bytes) {
       connectedAt,
     );
   }
-  if (
-    startupAudioPhase !== "playing" &&
-    Math.max(0, nextPlayTime - audioCtx.currentTime) > MAX_BACKLOG_SECONDS
-  ) {
-    stopPlayback(true);
+  if (Math.max(0, nextPlayTime - audioCtx.currentTime) + sampleCount / RATE > MAX_BACKLOG_SECONDS) {
+    stop("Audio playback could not keep up. Start a new call.");
+    return;
   }
+  // Bind each chunk at ingress; later segment controls cannot change its owner.
+  const played = playbackReceipts.chunk(sampleCount, sendPlaybackProgress);
   const buffer = audioCtx.createBuffer(1, sampleCount, RATE);
   const ch = buffer.getChannelData(0);
   const view = new DataView(bytes.buffer, bytes.byteOffset, sampleCount * 2);
@@ -460,6 +456,7 @@ function playAgentAudio(bytes) {
   playing.add(src);
   setOrb("speaking");
   src.onended = () => {
+    played();
     playing.delete(src);
     src.disconnect();
     if (playing.size === 0) {
@@ -477,6 +474,7 @@ function playAgentAudio(bytes) {
 }
 
 function stopPlayback(fade = false, completeOpening = false) {
+  playbackReceipts.flush(); // invalidate callbacks before AudioBufferSourceNode.stop
   const now = audioCtx ? audioCtx.currentTime : 0;
   const fadeEnd = fade && outputGain ? now + FADE_SECONDS : now;
   if (fade && outputGain) {
@@ -501,28 +499,41 @@ function stopPlayback(fade = false, completeOpening = false) {
 }
 
 function renderTranscript(evt) {
-  const text = (evt.text || "").trim();
-  if (!text) return;
-  const role = evt.role === "assistant" || evt.role === "agent" ? "assistant" : "user";
-
-  // Coalesce streaming assistant partials into one updating turn.
-  if (role === "assistant" && lastAssistantTurn && !lastAssistantTurn.dataset.final) {
-    lastAssistantTurn.querySelector(".text").textContent = text;
+  if (typeof evt.text !== "string" || !evt.text || evt.text.length > 4000) return;
+  const role = evt.role === "assistant" ? "assistant" : "user";
+  if (role === "assistant" && assistantTranscriptState.interrupted) return;
+  const active = transcriptHistory.at(-1);
+  if (active?.role === role && !active.final) {
+    const text = evt.mode === "delta" ? active.text + evt.text : evt.text;
+    if (text.length > 4000) return;
+    active.text = text;
+    active.final = evt.final === true;
   } else {
-    const turn = document.createElement("div");
-    turn.className = "turn " + role;
-    turn.innerHTML = `<div class="who">${role === "assistant" ? "PyAI" : "You"}</div><div class="text"></div>`;
-    turn.querySelector(".text").textContent = text;
-    transcriptEl.appendChild(turn);
-    if (role === "assistant") lastAssistantTurn = turn;
+    if (active) active.final = true;
+    transcriptHistory.push({ role, text: evt.text, final: evt.final === true,
+      ...(role === "assistant" ? {responseKey: assistantTranscriptState.responseKey} : {}) });
+    if (transcriptHistory.length > 200) transcriptHistory.shift();
   }
-  if (role === "assistant" && evt.final) lastAssistantTurn.dataset.final = "1";
-  if (role === "user") lastAssistantTurn = null;
+  drawTranscript();
+}
+
+function drawTranscript() {
+  transcriptEl.replaceChildren();
+  for (const row of transcriptHistory) {
+    const turn = document.createElement("div");
+    turn.className = "turn " + row.role;
+    turn.innerHTML = `<div class="who">${row.role === "assistant" ? "PyAI" : "You"}</div><div class="text"></div>`;
+    turn.querySelector(".text").textContent = row.text;
+    transcriptEl.appendChild(turn);
+  }
   transcriptEl.scrollTop = transcriptEl.scrollHeight;
 }
 
 function stop(reason = "Call ended.") {
   running = false;
+  transportEpoch++;
+  playbackReceipts.reset();
+  audioContract.reset();
   stopPlayback(false, true);
   try { if (processor) processor.onaudioprocess = null; } catch {}
   try { processor && processor.disconnect(); } catch {}
@@ -544,7 +555,8 @@ function stop(reason = "Call ended.") {
   outputGain = null;
   micStream = null;
   ws = null;
-  lastAssistantTurn = null;
+  transcriptHistory = [];
+  assistantTranscriptState = createAssistantTranscriptState();
   startupAudioPhase = "waiting";
   connectedAt = 0;
   responseAudioActive = false;

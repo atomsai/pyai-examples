@@ -1,0 +1,24 @@
+{
+  "revision": "559e6a41b8c53bfa57dfe93e1adc38963c2f7590",
+  "engine_sha256": "1a3979c3c3b9e98fb69ad2793a6597abba81324673e6f1c1cbf2b099606c941d",
+  "methods": {
+    "_send_transcript": 10602,
+    "_send_assistant_transcript": 10624,
+    "_send_control": 10639,
+    "_trace_agent_active": 16463,
+    "_trace_agent_text": 16469
+  },
+  "frames": [
+    {
+      "tag": 2,
+      "base64": "AkNhbGxlciB0ZXN0IHBocmFzZS4=",
+      "payload": "Caller test phrase."
+    },
+    {
+      "tag": 3,
+      "base64": "A3siZXZlbnQiOiAidHJhbnNjcmlwdCIsICJyb2xlIjogImFzc2lzdGFudCIsICJ0ZXh0IjogIkFzc2lzdGFudCB0ZXN0IHBocmFzZS4iLCAiZmluYWwiOiB0cnVlfQ==",
+      "payload": "{\"event\": \"transcript\", \"role\": \"assistant\", \"text\": \"Assistant test phrase.\", \"final\": true}"
+    }
+  ],
+  "scope": "Extracted actual methods; fake socket only; no models, media, providers or network"
+}

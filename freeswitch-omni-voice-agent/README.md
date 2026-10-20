@@ -1,13 +1,18 @@
-# FreeSWITCH → PyAI Omni voice agent (SIP, no transcode)
+# FreeSWITCH → PyAI Omni voice agent (SIP, linear PCM)
 
 Bridge a **FreeSWITCH** call to a [PyAI Omni](https://pyai.com/models/omni) agent
 over `mod_audio_stream`. This is the path for **SIP-trunk** customers who bring
 their own carrier (vs. the [Twilio example](../twilio-omni-voice-agent) for
 Programmable Voice).
 
-The key win: run FreeSWITCH at **L16 / 16 kHz** and connect Omni at
-**`rate=16000`** and there is **no μ-law, no resampling** anywhere, linear PCM16
-flows straight through both ways.
+Run FreeSWITCH's caller-audio stream at **L16 / 16 kHz** and connect Omni at
+**`rate=16000`**. That parameter describes caller input; Omni returns **24 kHz
+PCM16** for 16/24 kHz input and **8 kHz PCM16** for 8 kHz input. The bridge reads
+both native `hello.audio_in` and `hello.audio_out` before playback, rejects
+contradictory declarations or incomplete PCM16 samples, and labels playback
+with the declared output sample rate. It
+preserves audio bytes; FreeSWITCH or your media adapter must convert the output
+to the call's playback rate when those rates differ.
 
 ```
    SIP caller
@@ -31,7 +36,7 @@ flows straight through both ways.
 ## 1. FreeSWITCH side
 
 Load the module and start a stream from the dialplan. Run the channel at 16 kHz
-so the fork is L16/16k (matches Omni's `rate=16000`, zero conversion):
+so caller input is L16/16k (matches Omni's input `rate=16000`):
 
 ```xml
 <!-- dialplan/default/omni.xml -->
@@ -70,7 +75,7 @@ barge-in cuts it off.
 
 | Feature | Omni → bridge | bridge → FreeSWITCH |
 |---|---|---|
-| **Barge-in** | `flush` event (caller started talking) | `{"type":"killAudio"}` to stop playback immediately |
+| **Barge-in / cancelled reply** | `flush`, `barge_in`, `reply_interrupted`, or `reply_failed` | `{"type":"killAudio"}` to discard queued speech |
 | **Transfer to human** | `transfer_to_human` event | ESL `uuid_transfer <uuid> <dest>` (needs the channel `uuid` from the start metadata) |
 | **DTMF** |, | FreeSWITCH `DTMF` channel events → forward as `{"type":"dtmf","digit":"5"}` to Omni |
 
@@ -80,9 +85,17 @@ the channel `uuid` from the stream's start metadata (above) so it can issue
 
 ## Notes
 
-- **Why no transcode:** Omni at `rate=16000` speaks the same L16/16k FreeSWITCH
-  forks. For an 8 kHz G.711 leg use `rate=8000` instead, then the only step is
-  μ-law companding, still no resampling.
+- **Input and output rates:** the bridge does not resample. A 16 kHz caller
+  stream receives 24 kHz agent audio, passed to `streamAudio` as
+  `sampleRate: 24000`. Verify that your module build accepts this rate and
+  converts it for the call; otherwise add a real resampler in `FS_PROTOCOL`.
+  Changing the label to 16000 without conversion changes speed and pitch.
+  For `rate=8000`, both Omni directions use 8 kHz PCM16; FreeSWITCH still owns
+  any carrier codec conversion.
+- **Playback acknowledgement:** this bridge does not request `playback_ack`
+  or send `playback_progress`. `streamAudio` delivery is not evidence that the
+  caller heard the audio; a real downstream played-sample signal is required
+  before enabling acknowledgement mode.
 - **Auth:** the bridge holds the `pyai_*` key server-side and connects to Omni
   with it (subprotocol `pyai-key.<key>`). The key never touches the carrier or
   the caller.
@@ -91,3 +104,11 @@ the channel `uuid` from the stream's start metadata (above) so it can issue
   `src/persona` inline in `server.js`.
 - This example is **not** in the nightly live-smoke (it needs a FreeSWITCH box);
   the Omni client logic mirrors the verified [Twilio bridge](../twilio-omni-voice-agent).
+
+Run `npm test` for the offline transport-handler checks. They use opaque bytes,
+fake sockets, and transcript frames captured from the native engine methods.
+The bridge accepts caller UTF-8 deltas and the assistant synthesis-text advisory;
+neither establishes audible FreeSWITCH playback or generates a playback receipt.
+Caller braces and JSON-looking content always remain user text. Set
+`OMNI_LEGACY_JSON_TRANSCRIPTS=1` only when connecting to a known older bridge
+that sends JSON transcript objects; native Omni leaves this option unset.

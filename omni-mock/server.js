@@ -19,6 +19,7 @@
 // Run: cp .env.example .env  &&  npm install  &&  npm start
 import { WebSocketServer } from "ws";
 import { parse } from "node:url";
+import { randomUUID } from "node:crypto";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const TURN_GAP_MS = Number(process.env.TURN_GAP_MS ?? 700);
@@ -42,13 +43,17 @@ function tone(rate, ms = 900, freq = 440) {
 }
 
 const sendEvent = (ws, obj) => ws.readyState === ws.OPEN && ws.send(frame(TAG.CONTROL, obj)); // 0x03
-const sendTranscript = (ws, obj) =>
-  ws.readyState === ws.OPEN && ws.send(frame(TAG.TRANSCRIPT, { event: "transcript", ...obj })); // 0x02
+const sendCallerTranscript = (ws, text) =>
+  ws.readyState === ws.OPEN && ws.send(frame(TAG.TRANSCRIPT, Buffer.from(text, "utf8"))); // raw 0x02
+const sendAssistantTranscript = (ws, text) =>
+  sendEvent(ws, { event: "transcript", role: "assistant", text, final: true }); // exact 0x03 advisory
 
 wss.on("connection", (ws, req) => {
   const { pathname, query } = parse(req.url ?? "", true);
   const format = query.format || "pcm16";
-  const rate = Number(query.rate) || 24000;
+  const rate = query.rate === undefined ? 24000 : Number(query.rate);
+  const outputRate = rate === 8000 ? 8000 : 24000;
+  const callId = randomUUID();
   const label = query.session_label || null;
 
   console.log(`\n[conn] ${pathname}  format=${format} rate=${rate}${label ? ` session_label=${label}` : ""}`);
@@ -57,9 +62,17 @@ wss.on("connection", (ws, req) => {
     return;
   }
 
+  if (format !== "pcm16" || ![8000, 16000, 24000].includes(rate)) {
+    ws.close(1008, "pcm16 rate must be 8000, 16000, or 24000");
+    return;
+  }
+
   // Handshake (0x03 control frames).
-  sendEvent(ws, { event: "hello", protocol: 2, audio_in: `${format}@${rate}`, audio_out: `${format}@${rate}`, server: "omni-mock" });
-  sendEvent(ws, { event: "session_started", session_label: label, audio_in: format, audio_out: format });
+  sendEvent(ws, { event: "hello", protocol: 2, call_id: callId, audio_in: `pcm16@${rate}`, audio_out: `pcm16@${outputRate}`, tags: { audio: 1, transcript: 2, control: 3 } });
+  sendEvent(ws, { event: "session_started", call_id: callId, resumed: false });
+
+  let configured = false;
+  let turn = 0;
 
   let speaking = false;
   let playTimer = null;
@@ -70,12 +83,12 @@ wss.on("connection", (ws, req) => {
     speaking = false;
   };
 
-  // Agent turn: turn event + a 0x02 transcript + 0x01 audio streamed in 150ms chunks.
+  // Agent turn: native turn_begin + assistant 0x03 advisory + 0x01 audio.
   const speak = () => {
-    sendEvent(ws, { event: "turn", role: "assistant" });
-    sendTranscript(ws, { role: "assistant", final: true, text: "This is omni-mock. A real Omni agent would answer here." });
-    const pcm = tone(rate);
-    const chunk = Math.floor(rate * 0.15) * 2;
+    sendEvent(ws, { event: "turn_begin", call_id: callId, turn: ++turn });
+    sendAssistantTranscript(ws, "This is omni-mock. A real Omni agent would answer here.");
+    const pcm = tone(outputRate);
+    const chunk = Math.floor(outputRate * 0.15) * 2;
     let off = 0;
     speaking = true;
     playTimer = setInterval(() => {
@@ -93,27 +106,30 @@ wss.on("connection", (ws, req) => {
     }
     if (turnTimer) clearTimeout(turnTimer);
     turnTimer = setTimeout(() => {
-      sendTranscript(ws, { role: "user", final: true, text: "(mock heard your audio)" });
+      sendCallerTranscript(ws, "(mock heard your audio)");
       speak();
     }, TURN_GAP_MS);
   };
 
   function handleControl(msg) {
-    // CONFORMANCE: client → server frames are keyed on `type`. Catch the classic
-    // event-keyed configure the real engine ACKs and then silently drops.
+    // Enforce the documented client envelope. Some engine versions accept an
+    // event alias, but examples should send the canonical type field.
     if (msg.event && !msg.type) {
       sendEvent(ws, { event: "warning", code: "client_used_event_key", message: `Sent {"event":"${msg.event}"}; client→server frames are keyed on "type".` });
-      console.error(`[BUG] client sent event-keyed frame {"event":"${msg.event}"}, real engine drops this. Use {"type":"${msg.event}"}.`);
+      console.error(`[BUG] client sent event-keyed frame {"event":"${msg.event}"}, use the documented client field instead. Use {"type":"${msg.event}"}.`);
       return;
     }
     switch (msg.type) {
       case "configure":
         if (!msg.persona) console.warn('[warn] configure had no "persona"');
-        sendEvent(ws, { event: "config_ack", voice_id: msg.voice_id || "mock_voice", honored: Object.keys(msg).filter((k) => k !== "type"), ignored: [] });
-        console.log(`[cfg] config_ack voice_id=${msg.voice_id || "(default)"} persona=${msg.persona ? "set" : "MISSING"}`);
+        configured = true;
+        sendEvent(ws, { event: "configured", call_id: callId, voice_id: msg.voice_id || "mock_voice", audio_out: `pcm16@${outputRate}`, playback_ack: false });
+        console.log(`[cfg] configured voice_id=${msg.voice_id || "(default)"} persona=${msg.persona ? "set" : "MISSING"}`);
         break;
       case "dtmf":
-        sendEvent(ws, { event: "dtmf", digit: String(msg.digit ?? "") });
+        if (typeof msg.digit === "string" && /^[0-9*#a-d]$/i.test(msg.digit)) {
+          sendEvent(ws, { event: "dtmf_received", call_id: callId, digit: msg.digit.toUpperCase() });
+        }
         break;
       case "session_ending":
         sendEvent(ws, { event: "session_end" });
@@ -140,6 +156,10 @@ wss.on("connection", (ws, req) => {
       return;
     }
     if (buf[0] === TAG.AUDIO) {
+      if (!configured) {
+        console.warn("[warn] ignored audio before configure");
+        return;
+      }
       onCallerAudio();
       return;
     }

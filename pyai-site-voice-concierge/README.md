@@ -150,6 +150,13 @@ turn-0 greeting it sends real-time digital silence instead of microphone or
 speaker energy until the playback queue drains, then restores microphone audio.
 Later replies retain normal barge-in after a short echo-cancellation warm-up.
 
+Both connection modes request playback tracking and wait for the server to
+acknowledge support. Each naturally completed playback chunk reports its reply,
+segment and source sample count. Interruptions invalidate queued callbacks before
+stopping audio, including after generation has finished. Older servers continue
+without playback receipts. A backlog above ten seconds ends the call with a
+visible error rather than silently discarding speech.
+
 ## Wiring it into the real pyai.com
 
 This standalone server is the reference. To embed in the marketing site, host
@@ -174,3 +181,9 @@ component.
   the documented spellings and ignore unknown frames (forward-compatible).
 - **Cost.** Omni bills `omni.minutes` at $0.05/min per live session. The
   concurrency cap is your blast-radius guard for a public page.
+
+Native `0x02` transcripts are literal caller text, including braces or JSON-shaped
+speech. Assistant text comes from the validated `0x03` transcript event. The
+browser uses this native format. A custom broker connecting to an older JSON
+transcript transport must explicitly set `OmniSession`'s
+`transcriptFormat: "legacy-json"`; content never selects the format or role.

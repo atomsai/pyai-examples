@@ -6,7 +6,8 @@
   "description": "The 'Talk to PyAI' voice concierge for pyai.com: a browser widget bridged to a PyAI Omni agent through a server-side token broker, grounded on a customer-hosted kb_endpoint.",
   "scripts": {
     "start": "node --env-file=.env server.js",
-    "start:noenv": "node server.js"
+    "start:noenv": "node server.js",
+    "test": "node --test playback.test.mjs"
   },
   "engines": {
     "node": ">=22"

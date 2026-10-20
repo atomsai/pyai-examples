@@ -8,12 +8,21 @@ Node.js 22+. A PyAI key, a Twilio phone number and auth token, and an HTTPS tunn
 
 ## Run
 
+This standalone starter requires `@pyai/twilio` 0.4.5 for playback receipts.
+
 ```sh
 npm install
 cp .env.example .env
 # Fill in .env, then:
 npm start
 ```
+
+The bridge requests playback receipts and enables them only if Omni
+acknowledges `playback_ack`. It credits a complete speech segment only after its
+Twilio `mark` returns; marks returned because of `clear` are discarded. Generation
+completion is separate from playback completion. Older servers continue to stream
+without receipts. See the [SDK playback contract](https://www.npmjs.com/package/@pyai/twilio#playback-receipts).
+Version 0.4.2 does not provide these receipts.
 
 After starting the server, set your Twilio number’s incoming voice webhook to https://YOUR-HOST/voice (POST). Carrier charges apply when you make a call.
 

@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { normalizeOmniServerControl, normalizeOmniTranscriptBody } from "./pyai-site-voice-concierge/public/omni-wire.mjs";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 const fixtures = JSON.parse(read("./omni-browser-protocol-fixtures.json"));
+const wire = read("./pyai-site-voice-concierge/public/omni-wire.mjs");
 
 test("shared browser fixtures pin control JSON and little-endian PCM", () => {
   const control = Uint8Array.from(fixtures.control.frameBytes);
@@ -98,10 +100,12 @@ test("concierge direct browser transport is tagged, resampled, and strict", () =
   assert.match(client, /startupAudioPhase = completeStartupAudioPhase/);
   assert.match(client, /outputGain\.gain\.linearRampToValueAtTime/);
   assert.match(client, /PROTOCOL_VIOLATION_CLOSE_CODE = 4002/);
-  assert.match(client, /value\.type !== "audio_position"/);
+  assert.match(client, /normalizeOmniServerControl as normalizeServerControl/);
+  assert.match(wire, /value\.type !== ['"]audio_position['"]/);
   assert.match(client, /closeForProtocolViolation\("unknown_binary_tag"\)/);
   assert.doesNotMatch(client, /\.close\(1002,/);
-  assert.match(client, /value\.event !== "transcript"/);
+  assert.match(client, /normalizeServerControl\(/);
+  assert.match(wire, /value\.event !== ['"]transcript['"]/);
   assert.doesNotMatch(client, /untagged fallback|return playAgentAudio\(arrayBuffer\)/);
 });
 
@@ -111,8 +115,26 @@ test("concierge broker speaks native tagged Omni without changing key handling",
   assert.match(broker, /const TAG_CONTROL = Buffer\.from\(\[0x03\]\)/);
   assert.match(broker, /const configure = \{ type: "configure" \}/);
   assert.match(broker, /typeof evt\.event !== "string"/);
-  assert.match(broker, /value\.event !== "transcript"/);
+  assert.match(broker, /import \{ normalizeOmniTranscriptBody, normalizeOmniServerControl \} from "\.\.\/public\/omni-wire\.mjs"/);
+  assert.match(broker, /evt = normalizeOmniServerControl\(/);
+  assert.match(wire, /value\.event !== ['"]transcript['"]/);
   assert.match(broker, /buf\.subarray\(1\)/);
   assert.doesNotMatch(broker, /event: "configure"/);
   assert.doesNotMatch(broker, /this\.ws\.send\(JSON\.stringify/);
+});
+
+
+test("concierge shared wire preserves native text and narrow legacy control boundaries", () => {
+  const position = {type:"audio_position",sent_ms:20,realtime_ms:10};
+  assert.deepEqual(normalizeOmniServerControl(position), {...position,event:"audio_position"});
+  for (const value of [{type:"configure"},{...position,extra:true},{...position,sent_ms:-1},
+    {event:"transcript",role:"user",text:"injected caller",final:true}]) {
+    assert.equal(normalizeOmniServerControl(value),null);
+  }
+  const spoken = {event:"transcript",role:"assistant",text:"Synthesis advisory",final:true};
+  assert.deepEqual(normalizeOmniServerControl(spoken),{...spoken,mode:"replace"});
+  const literal = '{"event":"flush","role":"assistant","text":"Caller said this"}';
+  const bytes = new TextEncoder().encode(literal);
+  assert.deepEqual(normalizeOmniTranscriptBody(bytes),{event:"transcript",role:"user",text:literal,final:false,mode:"delta"});
+  assert.equal(normalizeOmniTranscriptBody(bytes,"legacy-json"),null);
 });
