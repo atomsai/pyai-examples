@@ -8,17 +8,23 @@ import { WebSocketServer } from 'ws';
 import { TranslationHost } from './host.mjs';
 import { createPreviewRoomBudget } from './preview.mjs';
 import { createCallRetirer } from './retirement.mjs';
+import { MultiRoomTranslationHost } from './multi-room.mjs';
+import { createFleetAllowance } from './fleet-allowance.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url)), require = createRequire(import.meta.url);
 const env = { ...process.env, ...(process.env.CONFIG_PATH ? JSON.parse(await readFile(process.env.CONFIG_PATH, 'utf8')) : {}) };
 const config = { publicOrigin: env.PUBLIC_ORIGIN, authId: env.PLIVO_AUTH_ID, authToken: env.PLIVO_AUTH_TOKEN,
   applicationId: env.PLIVO_APP_ID, pyaiKey: env.PYAI_API_KEY,
   endpointUsernames: { customer: env.PLIVO_CUSTOMER_USERNAME, agent: env.PLIVO_AGENT_USERNAME, replacement: env.PLIVO_REPLACEMENT_USERNAME } };
-const deadline = Date.parse(env.TEST_DEADLINE ?? '');
+const consolePermanent = env.CONSOLE_PERMANENT === '1';
+const deadline = consolePermanent ? Infinity : Date.parse(env.TEST_DEADLINE ?? '');
 const consolePreview = env.CONSOLE_PREVIEW === '1';
 if (!env.ADMIN_TOKEN || env.ADMIN_TOKEN.length < 32 || !/^[a-z0-9][a-z0-9._-]{2,62}$/.test(env.JOURNAL_BUCKET ?? '')
-    || !/^[\w/-]{1,160}$/.test(env.JOURNAL_PREFIX ?? '') || !Number.isFinite(deadline)
-    || deadline <= Date.now() || deadline > Date.now() + (consolePreview ? 86_400_000 : 1_800_000)
+    || !/^[\w/-]{1,160}$/.test(env.JOURNAL_PREFIX ?? '') || (consolePermanent && consolePreview)
+    || (!consolePermanent && (!Number.isFinite(deadline) || deadline <= Date.now()
+      || deadline > Date.now() + (consolePreview ? 86_400_000 : 1_800_000)))
+    || (consolePermanent && (!/^[a-z0-9-]{8,80}$/.test(env.SERVICE_ID ?? '')
+      || !/^[a-z0-9-]{1,100}$/.test(env.SERVICE_REVISION ?? '') || env.K_REVISION === undefined))
     || (consolePreview && (!/^[a-z0-9-]{8,80}$/.test(env.PREVIEW_ID ?? '')
       || !/^[a-z0-9-]{1,100}$/.test(env.K_REVISION ?? '')))) throw new Error('invalid_bounded_test_config');
 const carrierAuthorization = 'Basic ' + Buffer.from(`${config.authId}:${config.authToken}`).toString('base64');
@@ -34,9 +40,25 @@ async function cloudToken() {
 }
 const previewBudget = consolePreview ? createPreviewRoomBudget({ bucket: env.JOURNAL_BUCKET, prefix: env.JOURNAL_PREFIX,
   previewId: env.PREVIEW_ID, deadline, token: cloudToken }) : null;
-const host = new TranslationHost(config, {
-  maxRooms: consolePreview ? 12 : 2, absoluteDeadline: deadline,
-  reserveRoom: previewBudget ? room => previewBudget.reserve(room) : async () => {},
+const endpointPool = consolePermanent ? (typeof env.PLIVO_ENDPOINT_POOL === 'string'
+  ? JSON.parse(env.PLIVO_ENDPOINT_POOL) : env.PLIVO_ENDPOINT_POOL) : null;
+// Permanent storage/lifecycle owner provides CAS endpoint leases and exact-call recovery.
+const retire = createCallRetirer(config);
+const permanentAllowance = consolePermanent ? createFleetAllowance({ bucket: env.JOURNAL_BUCKET,
+  prefix: env.JOURNAL_PREFIX, serviceId: env.SERVICE_ID, token: cloudToken }) : null;
+const permanentLeases = consolePermanent ? (await import('./fleet-leases.mjs')).createFleetLeases({
+  bucket: env.JOURNAL_BUCKET, prefix: env.JOURNAL_PREFIX, serviceId: env.SERVICE_ID, token: cloudToken,
+  reserveAllowance: roomId => permanentAllowance.reserve(roomId),
+  recover: async ({ callIds }) => { await Promise.all(callIds.map(callId => retire(callId))); } }) : null;
+if (consolePermanent && ['reserveRoom', 'releaseRoom', 'recordEntry'].some(key => typeof permanentLeases?.[key] !== 'function')) {
+  throw new Error('permanent_durable_room_leases_required');
+}
+const Host = consolePermanent ? MultiRoomTranslationHost : TranslationHost;
+const host = new Host(config, {
+  ...(consolePermanent ? { endpointPool, reserveRoom: permanentLeases.reserveRoom, releaseRoom: permanentLeases.releaseRoom,
+    reconcileRoom: permanentLeases.reconcileRoom }
+    : { maxRooms: consolePreview ? 12 : 2, absoluteDeadline: deadline,
+      reserveRoom: previewBudget ? room => previewBudget.reserve(room) : async () => {} }),
   mintToken: async claims => {
     const response = await fetch(`${carrierBase}/JWT/Token/`, { method: 'POST', headers: {
       Authorization: carrierAuthorization, 'Content-Type': 'application/json' },
@@ -44,8 +66,9 @@ const host = new TranslationHost(config, {
     if (!response.ok) throw new Error('carrier_token_failed');
     return (await response.json()).token;
   },
-  retire: createCallRetirer(config),
+  retire,
   record: async entry => {
+    if (consolePermanent) await permanentLeases.recordEntry(entry);
     const token = await cloudToken();
     const name = `${env.JOURNAL_PREFIX}/${entry.host_room_id}/${String(entry.host_sequence).padStart(6, '0')}.json`;
     const response = await fetch(`https://storage.googleapis.com/upload/storage/v1/b/${env.JOURNAL_BUCKET}/o?uploadType=media&ifGenerationMatch=0&name=${encodeURIComponent(name)}`,
@@ -74,11 +97,13 @@ async function body(req) {
 }
 const server = createServer(async (req, res) => {
   const send = (code, value, type = 'application/json') => { res.writeHead(code, { ...headers, 'Content-Type': type }); res.end(type === 'application/json' ? JSON.stringify(value) : value); };
-  if (++inFlight > 12) { inFlight--; return send(429, { error: 'request_limit' }); }
+  if (++inFlight > (consolePermanent ? 64 : 12)) { inFlight--; return send(429, { error: 'request_limit' }); }
   try {
     if (Date.now() >= deadline) return send(410, { error: 'test_expired' });
     // Cloud Run reserves some paths ending in z; keep application readiness on /health.
-    if (req.method === 'GET' && req.url === '/health') return send(200, { status: 'ready', expires_at: new Date(deadline).toISOString() });
+    if (req.method === 'GET' && req.url === '/health') return send(200, consolePermanent
+      ? { status: 'ready', mode: 'permanent', maximum_active_rooms: 10 }
+      : { status: 'ready', expires_at: new Date(deadline).toISOString() });
     if (req.method === 'GET' && assets.has(req.url)) { const [type, value] = assets.get(req.url); return send(200, value, type); }
     if (req.method === 'POST' && ['/plivo/voice', '/plivo/status'].includes(req.url)) {
       if (!req.headers['content-type']?.startsWith('application/x-www-form-urlencoded')) return send(415, { error: 'invalid_content_type' });
@@ -90,22 +115,42 @@ const server = createServer(async (req, res) => {
       return send(200, xml, 'text/xml');
     }
     if (req.headers.origin && req.headers.origin !== config.publicOrigin) return send(403, { error: 'origin_denied' });
-    if (consolePreview && (!equal(String(req.headers.authorization ?? ''), `Bearer ${env.ADMIN_TOKEN}`)
-        || req.headers['x-pyai-preview-id'] !== env.PREVIEW_ID || req.headers['x-pyai-preview-revision'] !== env.K_REVISION)) {
+    if ((consolePreview || consolePermanent) && (!equal(String(req.headers.authorization ?? ''), `Bearer ${env.ADMIN_TOKEN}`)
+        || req.headers['x-pyai-preview-id'] !== (consolePermanent ? env.SERVICE_ID : env.PREVIEW_ID)
+        || req.headers['x-pyai-preview-revision'] !== (consolePermanent ? env.SERVICE_REVISION : env.K_REVISION))) {
       return send(401, { error: 'unauthorized' });
     }
+    const scope = { project: req.headers['x-pyai-room-project'], owner: req.headers['x-pyai-room-owner'] };
+    if (req.method === 'GET' && req.url === '/capacity' && consolePermanent) return send(200, host.capacity());
+    if (req.method === 'POST' && req.url === '/drain' && consolePermanent) {
+      const value = JSON.parse(await body(req));
+      if (Object.keys(value).length !== 1 || typeof value.paused !== 'boolean') throw new Error('invalid_drain_state');
+      const durable = await permanentLeases.setPaused(value.paused);
+      return send(200, { ...host.pauseAdmissions(value.paused), ...durable });
+    }
     if (req.method === 'POST' && req.url === '/join') {
-      return send(200, await host.mint(JSON.parse(await body(req)).grant));
+      const joined = JSON.parse(await body(req));
+      return send(200, await (consolePermanent ? host.mint(joined.grant, joined.room_id, scope) : host.mint(joined.grant)));
     }
     if (!equal(String(req.headers.authorization ?? ''), `Bearer ${env.ADMIN_TOKEN}`)) return send(401, { error: 'unauthorized' });
-    if (req.method === 'POST' && req.url === '/rooms') return send(201, await host.create(JSON.parse(await body(req))));
-    if (req.method === 'GET' && req.url === '/room') return send(200, host.snapshot());
+    if (req.method === 'POST' && req.url === '/rooms') return send(201, await host.create(JSON.parse(await body(req)), scope));
+    if (req.method === 'GET' && consolePermanent && req.url.startsWith('/room?')) {
+      const query = new URL(req.url, config.publicOrigin).searchParams;
+      if ([...query.keys()].length !== 1 || !query.has('room_id')) throw new Error('invalid_room_binding');
+      return send(200, host.snapshot(query.get('room_id'), scope));
+    }
+    if (req.method === 'GET' && req.url === '/room' && !consolePermanent) return send(200, host.snapshot());
     if (req.method === 'POST' && req.url === '/end') {
+      if (consolePermanent) {
+        const ended = JSON.parse(await body(req));
+        await host.finish('host_closed', ended.room_id, scope); return send(200, host.snapshot(ended.room_id, scope));
+      }
       if (consolePreview && JSON.parse(await body(req)).room_id !== host.room?.id) return send(409, { error: 'room_changed' });
       await host.finish(); return send(200, host.snapshot());
     }
     if (req.method === 'POST' && req.url === '/commit') {
-      const { leg } = JSON.parse(await body(req));
+      const { leg, room_id: roomId } = JSON.parse(await body(req));
+      if (consolePermanent) { host.commit(roomId, leg, scope); return send(200, { accepted: true }); }
       if (!['customer', 'agent'].includes(leg) || !host.room?.interpretation) throw new Error('input_not_ready');
       host.room.interpretation.commit(leg); return send(200, { accepted: true });
     }
@@ -115,7 +160,9 @@ const server = createServer(async (req, res) => {
       console.warn(JSON.stringify({ event: 'carrier_webhook_rejected',
         code: webhookFailureCodes.has(error?.message) ? error.message : 'request_rejected' }));
     }
-    send(400, { error: 'request_rejected' });
+    if (consolePermanent && ['rooms_at_capacity', 'test_allowance_exhausted', 'fleet_allowance_busy', 'host_draining'].includes(error?.message)) send(429, { error: error.message });
+    else if (consolePermanent && ['room_not_found', 'invalid_room_binding'].includes(error?.message)) send(404, { error: 'room_not_found' });
+    else send(400, { error: 'request_rejected' });
   }
   finally { inFlight--; }
 });
@@ -128,11 +175,12 @@ server.on('upgrade', (req, socket, head) => {
   sockets.handleUpgrade(req, socket, head, ws => host.attach(endpoint, ws));
 });
 async function stop() {
-  clearTimeout(expiry); await host.finish('test_deadline');
+  clearTimeout(expiry); await (consolePermanent ? host.finishAll('host_shutdown') : host.finish('test_deadline'));
   for (const client of sockets.clients) client.terminate();
   server.close(); sockets.close();
 }
-const expiry = setTimeout(() => { void stop(); }, deadline - Date.now()); expiry.unref();
+const expiry = consolePermanent ? null : setTimeout(() => { void stop(); }, deadline - Date.now()); expiry?.unref();
 process.once('SIGTERM', () => { void stop(); });
 await new Promise(resolve => server.listen(Number(env.PORT ?? 8080), '0.0.0.0', resolve));
-console.log(JSON.stringify({ event: 'test_host_ready', port: server.address().port, expires_at: new Date(deadline).toISOString() }));
+console.log(JSON.stringify({ event: consolePermanent ? 'carrier_host_ready' : 'test_host_ready', port: server.address().port,
+  ...(consolePermanent ? { mode: 'permanent', maximum_active_rooms: 10 } : { expires_at: new Date(deadline).toISOString() }) }));
