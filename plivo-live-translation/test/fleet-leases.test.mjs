@@ -8,7 +8,7 @@ const roomId = value => `test-${callId(value)}`;
 
 function fixture() {
   let clock = 1_800_000_000_000, generation = 0;
-  const objects = new Map(), history = new Map(), requests = [], recovered = [];
+  const objects = new Map(), history = new Map(), requests = [], recovered = [], delays = [];
   const name = slot => `qualification/fleet/fleet-${serviceId}/${slot}.json`;
   const store = (slot, value) => {
     const raw = typeof value === 'string' ? value : JSON.stringify(value);
@@ -40,11 +40,11 @@ function fixture() {
   };
   const make = (recover = async value => { recovered.push(value); }, reserveAllowance = async () => {}) => createFleetLeases({
     bucket: 'fixture-private', prefix: 'qualification/fleet', serviceId, token: async () => 'fixture-private-adc',
-    recover, reserveAllowance, fetchImpl, now: () => clock,
+    recover, reserveAllowance, fetchImpl, now: () => clock, sleep: async milliseconds => { delays.push(milliseconds); clock += milliseconds; },
   });
   const binding = (value, slotId = 'slot-01') => ({ roomId: roomId(value), slotId,
     project: 'proj-fixture', owner: 'user-fixture', expiresAt: clock + 480_000, leaseUntil: clock + 1_110_000 });
-  return { make, binding, objects, requests, recovered, store, name,
+  return { make, binding, objects, requests, recovered, delays, store, name, now: () => clock,
     item: slot => objects.get(name(slot)), advanceTo(value) { clock = value; },
     intercept(value) { intercept = value; } };
 }
@@ -227,14 +227,96 @@ test('metadata, retained-body and write-response reads are byte-bounded and malf
   }
 });
 
-test('an ambiguous committed claim is never retried or mistaken for an available slot', async () => {
+test('an ambiguous committed claim is recovered only from its exact state and never written twice', async () => {
   const f = fixture(); let committed = false;
   f.intercept((url, options) => {
     if (options.method === 'POST' && !committed) {
       committed = true; f.store('slot-01', options.body); return new Response('', { status: 500 });
     }
   });
-  await assert.rejects(f.make().reserveRoom(f.binding(1)), /fleet_lease_storage_failed/);
+  const binding = f.binding(1), lease = await f.make().reserveRoom(binding);
+  assert.equal(JSON.parse(f.item('slot-01').raw).lease, lease);
   await assert.rejects(f.make().reserveRoom(f.binding(2)), /fleet_slot_busy/);
   assert.equal(f.objects.size, 1); assert.equal(f.requests.filter(row => row.method === 'POST').length, 1);
+  assert.deepEqual(f.delays, []);
+});
+
+test('transient claim throttling retries the same conditional state with bounded backoff', async () => {
+  const f = fixture(); let attempts = 0;
+  f.intercept((_url, options) => {
+    if (options.method === 'POST' && ++attempts <= 2) return new Response('', { status: 429 });
+  });
+  const binding = f.binding(1); await f.make().reserveRoom(binding);
+  assert.equal(attempts, 3); assert.deepEqual(f.delays, [100, 200]);
+  assert.deepEqual(f.requests.filter(row => row.method === 'POST').map(row => row.condition), ['0', '0', '0']);
+  assert.equal(JSON.parse(f.item('slot-01').raw).room_id, binding.roomId);
+});
+
+test('admitted and terminal call mutations recover throttling and lost committed acknowledgements exactly once', async () => {
+  for (const event of ['host.call.admitted', 'host.room.closed']) {
+    const f = fixture(), leases = f.make(), binding = f.binding(1); await leases.reserveRoom(binding);
+    if (event === 'host.room.closed') await leases.recordEntry({ event: 'host.call.admitted', host_room_id: binding.roomId, provider_call_id: callId(1) });
+    let attempts = 0;
+    f.intercept((_url, options) => {
+      if (options.method !== 'POST') return;
+      if (++attempts === 1) return new Response('', { status: 429 });
+      f.store('slot-01', options.body); throw new TypeError('lost committed acknowledgement');
+    });
+    await leases.recordEntry({ event, host_room_id: binding.roomId, provider_call_id: callId(1), cleanup: 'calls_terminal_verified' });
+    const retained = JSON.parse(f.item('slot-01').raw);
+    assert.equal(attempts, 2); assert.deepEqual(f.delays, [100]);
+    assert.deepEqual(retained.call_ids, [callId(1)]);
+    assert.equal(retained.terminal_verified, event === 'host.room.closed');
+  }
+});
+
+test('ambiguous writes cannot adopt a foreign lease or mistake an extra call mutation for the desired state', async () => {
+  for (const changed of ['lease', 'call_ids']) {
+    const f = fixture(), leases = f.make(), binding = f.binding(1);
+    if (changed === 'call_ids') await leases.reserveRoom(binding);
+    let attempts = 0;
+    f.intercept((_url, options) => {
+      if (options.method !== 'POST') return;
+      attempts++;
+      const value = JSON.parse(options.body);
+      f.store('slot-01', changed === 'lease' ? { ...value, room_id: roomId(2), lease: 'f'.repeat(48) }
+        : { ...value, call_ids: [...value.call_ids, callId(2)] });
+      throw new TypeError('lost conditional write response');
+    });
+    const pending = changed === 'lease' ? leases.reserveRoom(binding) : leases.recordEntry({ event: 'host.call.admitted',
+      host_room_id: binding.roomId, provider_call_id: callId(1) });
+    await assert.rejects(pending, /fleet_slot_busy/);
+    assert.equal(attempts, 1); assert.deepEqual(f.delays, []);
+    const retained = JSON.parse(f.item('slot-01').raw);
+    if (changed === 'lease') assert.equal(retained.room_id, roomId(2));
+    else assert.deepEqual(retained.call_ids, [callId(1), callId(2)]);
+  }
+});
+
+test('the allowance wait shares the original deadline and cannot bypass the final lease fence', async () => {
+  for (const condition of ['foreign_lease', 'deadline']) {
+    const f = fixture(), started = f.now(); let allowanceOptions;
+    const leases = f.make(undefined, async (_room, options) => {
+      allowanceOptions = options;
+      if (condition === 'deadline') f.advanceTo(options.deadline);
+      else f.store('slot-01', { ...JSON.parse(f.item('slot-01').raw), room_id: roomId(2), lease: 'f'.repeat(48) });
+    });
+    await assert.rejects(leases.reserveRoom(f.binding(1)), condition === 'deadline' ? /fleet_lease_storage_failed/ : /fleet_lease_fenced/);
+    assert.deepEqual(allowanceOptions, { deadline: started + 6000 });
+    assert.equal(f.requests.filter(row => row.method === 'POST').length, 1);
+    if (condition === 'foreign_lease') assert.equal(JSON.parse(f.item('slot-01').raw).room_id, roomId(2));
+  }
+});
+
+test('permanent storage errors and malformed state never retry while transient attempts remain bounded', async () => {
+  for (const response of [() => new Response('', { status: 403 }), () => Response.json(null)]) {
+    const f = fixture(); f.intercept(response);
+    await assert.rejects(f.make().reserveRoom(f.binding(1)), /fleet_lease_storage_failed/);
+    assert.equal(f.requests.length, 1); assert.deepEqual(f.delays, []);
+  }
+  const f = fixture(), started = f.now(); let attempts = 0;
+  f.intercept((_url, options) => { if (options.method === 'POST') { attempts++; return new Response('', { status: 429 }); } });
+  await assert.rejects(f.make().reserveRoom(f.binding(1)), error => error.message === 'fleet_lease_storage_failed' && error.status === 429);
+  assert.equal(attempts, 8); assert.ok(f.now() - started < 6000); assert.equal(f.objects.size, 0);
+  assert.equal(f.requests.filter(row => row.method === 'POST').length, 8);
 });

@@ -64,3 +64,61 @@ for (const mode of ['qualification', 'preview', 'permanent']) test(`Plivo host $
       assert.ok(!stderr.includes('untrusted') && !stderr.includes('fixture-account-token'), 'webhook diagnostics must not log payloads or credentials');
     }
   });
+
+for (const [scenario, code, expectedStatus, expectedError] of [
+  ['lease-failure', 'fleet_lease_storage_failed', 503, 'test_unavailable'],
+  ['lease-throttled', 'fleet_lease_storage_failed', 503, 'test_unavailable'],
+  ['allowance-failure', 'fleet_allowance_unavailable', 503, 'test_unavailable'],
+  ['allowance-exhausted', 'test_allowance_exhausted', 429, 'test_allowance_exhausted'],
+]) test(`permanent room HTTP admission safely reports ${scenario}`, { timeout: 8000 }, async () => {
+  const child = spawn(process.execPath, ['--import', './test/server-storage-fixture.mjs', 'server.mjs'], {
+    stdio: ['ignore', 'pipe', 'pipe'], env: {
+      PATH: process.env.PATH, PUBLIC_ORIGIN: 'https://test.example.com', PLIVO_AUTH_ID: 'MAfixtureaccount12345',
+      PLIVO_AUTH_TOKEN: 'fixture-account-token', PLIVO_APP_ID: '12345678901234567',
+      PLIVO_CUSTOMER_USERNAME: 'pyaiCustomer1', PLIVO_AGENT_USERNAME: 'pyaiAgent2', PLIVO_REPLACEMENT_USERNAME: 'pyaiReplacement3',
+      PYAI_API_KEY: 'fixture-api-key', ADMIN_TOKEN: 'fixture-operator-token-with-at-least-32-chars',
+      JOURNAL_BUCKET: 'fixture-private-bucket', JOURNAL_PREFIX: 'qualification/fixture', PORT: '0',
+      CONSOLE_PERMANENT: '1', SERVICE_ID: 'plivo-permanent-fixture', K_REVISION: 'pyai-plivo-permanent-001',
+      SERVICE_REVISION: 'plivo-console-v1', MOCK_STORAGE_SCENARIO: scenario,
+      PLIVO_ENDPOINT_POOL: JSON.stringify(Array.from({ length: 10 }, (_, index) => ({ slot_id: `slot-${String(index + 1).padStart(2, '0')}`,
+        endpointUsernames: Object.fromEntries(['customer', 'agent', 'replacement'].map(role => [role, `P${index}${role}`])) }))),
+    },
+  });
+  let stderr = ''; child.stderr.on('data', value => { stderr += value.toString().slice(0, 8192); });
+  const exit = once(child, 'exit');
+  try {
+    const lines = createInterface({ input: child.stdout });
+    const [line] = await Promise.race([once(lines, 'line'), exit.then(() => { throw new Error(`startup_failed: ${stderr}`); })]);
+    const base = `http://127.0.0.1:${JSON.parse(line).port}`;
+    const headers = { Authorization: 'Bearer fixture-operator-token-with-at-least-32-chars',
+      'X-PyAI-Preview-Id': 'plivo-permanent-fixture', 'X-PyAI-Preview-Revision': 'plivo-console-v1',
+      'X-PyAI-Room-Project': 'private-project-marker', 'X-PyAI-Room-Owner': 'private-owner-marker', 'Content-Type': 'application/json' };
+    const input = { language: 'hi', customerVoice: 'voice-hi', agentVoice: 'voice-en', sensitive: 'private-request-marker' };
+    assert.equal((await fetch(base + '/rooms', { method: 'POST', body: JSON.stringify(input) })).status, 401);
+    assert.equal((await fetch(base + '/rooms', { method: 'POST', headers: { ...headers, 'X-PyAI-Room-Owner': '' },
+      body: JSON.stringify(input) })).status, 404, 'the trusted owner scope remains mandatory');
+    assert.equal((await fetch(base + '/rooms', { method: 'POST', headers, body: JSON.stringify({ ...input, language: 'invalid' }) })).status,
+      400, 'invalid inputs retain the existing rejection');
+    const response = await fetch(base + '/rooms', { method: 'POST', headers, body: JSON.stringify(input) });
+    assert.equal(response.status, expectedStatus); assert.deepEqual(await response.json(), { error: expectedError });
+    assert.equal(response.headers.get('retry-after'), expectedStatus === 503 ? '1' : null);
+  } finally {
+    child.kill('SIGTERM'); const result = await Promise.race([exit, delay(2000).then(() => null)]);
+    if (!result) child.kill('SIGKILL');
+    assert.ok(result, 'the fixture must close the actual server without external cleanup');
+    const diagnostics = stderr.split('\n').filter(line => line.includes('room_admission_rejected')).map(line => JSON.parse(line));
+    assert.deepEqual(diagnostics, [
+      { event: 'room_admission_rejected', code: 'invalid_room_binding', http_status: 404 },
+      { event: 'room_admission_rejected', code: 'invalid_room', http_status: 400 },
+      { event: 'room_admission_rejected', code, http_status: expectedStatus,
+        ...(scenario === 'lease-throttled' ? { retry_status: 429 } : {}) },
+    ]);
+    const fixture = stderr.split('\n').filter(line => line.includes('storage_fixture_complete')).map(line => JSON.parse(line));
+    assert.deepEqual(fixture, [{ event: 'storage_fixture_complete', denied_external_requests: 0,
+      allowance_reached: !scenario.startsWith('lease-') }]);
+    for (const marker of ['private-project-marker', 'private-owner-marker', 'private-request-marker', 'private-upstream-response',
+      'fixture-private-adc', 'fixture-account-token', 'fixture-api-key', 'fixture-operator-token', 'https://private.example']) {
+      assert.ok(!stderr.includes(marker), `diagnostics must not expose ${marker}`);
+    }
+  }
+});

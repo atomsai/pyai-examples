@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createFleetAllowance } from '../fleet-allowance.mjs';
+import { createStorageBudget, isTransientStorageError } from '../storage-retry.mjs';
 
 const serviceId = 'plivo-permanent-fixture';
 const room = value => `test-${String(value).padStart(8, '0')}-1111-4111-8111-111111111111`;
@@ -8,7 +9,7 @@ const tick = value => Date.parse(value + 'T12:00:00.000Z');
 
 function fixture() {
   let clock = tick('2026-10-20'), generation = 0, intercept;
-  const objects = new Map(), history = new Map(), requests = [];
+  const objects = new Map(), history = new Map(), requests = [], delays = [];
   const name = month => `qualification/fleet/fleet-${serviceId}/allowance-${month}.json`;
   const store = (month, value) => {
     const item = { name: name(month), generation: String(++generation),
@@ -34,9 +35,9 @@ function fixture() {
     return url.searchParams.get('alt') === 'media' ? new Response(item.raw) : Response.json({ generation: item.generation, name: item.name });
   };
   const make = () => createFleetAllowance({ bucket: 'fixture-private', prefix: 'qualification/fleet', serviceId,
-    token: async () => 'fixture-private-adc', fetchImpl, now: () => clock });
+    token: async () => 'fixture-private-adc', fetchImpl, now: () => clock, sleep: async milliseconds => { delays.push(milliseconds); clock += milliseconds; } });
   const seed = rooms => store('2026-10', { schema: 'pyai-carrier-allowance-v1', service_id: serviceId, month: '2026-10', rooms });
-  return { make, seed, store, objects, requests, item: month => JSON.parse(objects.get(name(month)).raw),
+  return { make, seed, store, objects, requests, delays, now: () => clock, item: month => JSON.parse(objects.get(name(month)).raw),
     setClock(value) { clock = typeof value === 'string' ? Date.parse(value) : value; },
     intercept(value) { intercept = value; } };
 }
@@ -121,7 +122,7 @@ test('admission keeps its original UTC day and month during a midnight CAS retry
 test('foreign, malformed or oversized retained ledgers fail closed without making a reservation write', async () => {
   const valid = { schema: 'pyai-carrier-allowance-v1', service_id: serviceId, month: '2026-10',
     rooms: [{ id: room(1), date: '2026-10-20' }] };
-  const variants = [{ ...valid, service_id: 'another-service' }, { ...valid, month: '2026-11' },
+  const variants = [null, { ...valid, rooms: [null] }, { ...valid, service_id: 'another-service' }, { ...valid, month: '2026-11' },
     { ...valid, rooms: [{ id: 'test-' + '-'.repeat(36), date: '2026-10-20' }] },
     { ...valid, rooms: [{ id: room(1), date: '2026-10-99' }] },
     { ...valid, rooms: [{ id: room(1), date: '2026-10-00' }] },
@@ -132,6 +133,7 @@ test('foreign, malformed or oversized retained ledgers fail closed without makin
     const f = fixture(); f.store('2026-10', value);
     await assert.rejects(f.make().reserve(room(2)), /fleet_allowance_unavailable/);
     assert.equal(f.requests.filter(row => row.method === 'POST').length, 0);
+    assert.equal(f.delays.length, 0);
   }
   for (const phase of ['metadata', 'body', 'write']) {
     const f = fixture(); if (phase !== 'write') f.store('2026-10', valid);
@@ -159,8 +161,83 @@ test('bad input, malformed generations and ambiguous committed writes never crea
       first = false; ambiguous.store('2026-10', options.body); return new Response('', { status: 500 });
     }
   });
-  await assert.rejects(ambiguous.make().reserve(room(1)), /fleet_allowance_unavailable/);
   await ambiguous.make().reserve(room(1));
   assert.equal(ambiguous.item('2026-10').rooms.length, 1);
   assert.equal(ambiguous.requests.filter(row => row.method === 'POST').length, 1);
+});
+
+
+test('a throttled tenth allowance write is retried after strong reads without losing the nine admitted rooms', async () => {
+  const f = fixture(); for (let i = 1; i <= 9; i++) await f.make().reserve(room(i));
+  const until = f.now() + 1000; let throttled = 0;
+  f.intercept((_url, options) => {
+    if (options.method === 'POST' && f.now() < until) { throttled++; return new Response('', { status: 429 }); }
+  });
+  const before = f.requests.length; await f.make().reserve(room(10));
+  assert.ok(throttled > 0); assert.ok(f.delays.reduce((a, b) => a + b, 0) >= 1000);
+  assert.deepEqual(f.item('2026-10').rooms.map(row => row.id), Array.from({ length: 10 }, (_, i) => room(i + 1)));
+  const retryRequests = f.requests.slice(before);
+  for (let i = 1; i < retryRequests.length; i++) if (retryRequests[i].method === 'POST') {
+    assert.equal(retryRequests[i - 1].method, 'GET'); assert.equal(retryRequests[i - 2].method, 'GET');
+    assert.equal(retryRequests[i].condition, '9');
+  }
+});
+
+test('read failures and a lost committed-write response recover while every ambiguous write is reconciled first', async () => {
+  for (const phase of ['metadata', 'body', 'committed-write']) {
+    const f = fixture(); if (phase === 'body') f.seed([{ id: room(1), date: '2026-10-20' }]); let first = true;
+    f.intercept((url, options) => {
+      const selected = phase === 'metadata' ? options.method !== 'POST' && !url.searchParams.has('alt')
+        : phase === 'body' ? url.searchParams.get('alt') === 'media' : options.method === 'POST';
+      if (!first || !selected) return; first = false;
+      if (phase === 'committed-write') { f.store('2026-10', options.body); throw new TypeError('fixture connection reset'); }
+      return new Response('', { status: 503 });
+    });
+    await f.make().reserve(room(2));
+    assert.equal(f.item('2026-10').rooms.filter(row => row.id === room(2)).length, 1);
+    assert.equal(f.requests.filter(row => row.method === 'POST').length, 1);
+    assert.equal(f.delays.length, 1);
+  }
+});
+
+test('403 and malformed retained data stop immediately, while persistent transient errors stop within the shared deadline', async () => {
+  const denied = fixture(); denied.intercept(() => new Response('', { status: 403 }));
+  await assert.rejects(denied.make().reserve(room(1)), /fleet_allowance_unavailable/);
+  assert.equal(denied.requests.length, 1); assert.equal(denied.delays.length, 0);
+  const malformed = fixture(); malformed.intercept(() => Response.json(null));
+  await assert.rejects(malformed.make().reserve(room(1)), /fleet_allowance_unavailable/);
+  assert.equal(malformed.requests.length, 1); assert.equal(malformed.delays.length, 0);
+  const f = fixture(), start = f.now(); f.intercept(() => new Response('', { status: 500 }));
+  await assert.rejects(f.make().reserve(room(1)), /fleet_allowance_(?:busy|unavailable)/);
+  assert.ok(f.now() - start <= 6500); assert.ok(f.requests.length <= 12);
+  assert.equal(f.objects.size, 0);
+  const clipped = fixture(), deadline = clipped.now() + 150;
+  clipped.intercept(() => new Response('', { status: 429 }));
+  await assert.rejects(clipped.make().reserve(room(1), { deadline }), /fleet_allowance_(?:busy|unavailable)/);
+  assert.ok(clipped.now() <= deadline); assert.equal(clipped.objects.size, 0);
+});
+
+test('transient retries retain their original UTC month and do not spend the reservation twice across midnight', async () => {
+  const f = fixture(); f.setClock('2026-10-31T23:59:59.950Z'); let first = true;
+  f.intercept((_url, options) => {
+    if (options.method === 'POST' && first) { first = false; f.store('2026-10', options.body); return new Response('', { status: 503 }); }
+  });
+  await f.make().reserve(room(1));
+  assert.ok(f.now() >= Date.parse('2026-11-01T00:00:00.000Z'));
+  assert.equal(f.objects.size, 1); assert.deepEqual(f.item('2026-10').rooms, [{ id: room(1), date: '2026-10-31' }]);
+  assert.equal(f.requests.filter(row => row.method === 'POST').length, 1);
+});
+
+test('the shared storage budget bounds a stuck token and response body and prevents a late token from sending a write', async () => {
+  const budget = createStorageBudget({ timeoutMs: 10, deadline: Date.now() + 100, errorCode: 'fixture_storage_error' });
+  let resolveToken, sent = 0;
+  await assert.rejects(budget.request(async () => { sent++; return Response.json({}); },
+    () => new Promise(resolve => { resolveToken = resolve; }), 'https://storage.googleapis.com/fixture', { method: 'POST' }),
+  error => error.name === 'TimeoutError');
+  resolveToken('fixture-private-adc'); await new Promise(resolve => setImmediate(resolve)); assert.equal(sent, 0);
+  const response = new Response(new ReadableStream({ start() {}, cancel() {} }));
+  await assert.rejects(budget.json(response), error => error.name === 'TimeoutError');
+  assert.equal(isTransientStorageError(Object.assign(new Error(), { status: 503 })), true);
+  assert.equal(isTransientStorageError(Object.assign(new Error(), { status: 403 })), false);
+  assert.equal(isTransientStorageError(new SyntaxError()), false);
 });
