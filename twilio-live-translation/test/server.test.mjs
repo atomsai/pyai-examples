@@ -5,7 +5,7 @@ import { once } from 'node:events';
 import { createInterface } from 'node:readline';
 import { setTimeout as delay } from 'node:timers/promises';
 
-test('real server boots with packaged browser assets, denies untrusted controls, and shuts down cleanly',
+for (const consolePreview of [false, true]) test(`real server (${consolePreview ? 'Console rehearsal' : 'acceptance'}) packages assets, denies untrusted controls, and shuts down cleanly`,
   { timeout: 8000 }, async () => {
     const child = spawn(process.execPath, ['server.mjs'], { stdio: ['ignore', 'pipe', 'pipe'], env: {
       PATH: process.env.PATH, PUBLIC_ORIGIN: 'https://test.example.com',
@@ -14,6 +14,8 @@ test('real server boots with packaged browser assets, denies untrusted controls,
       TWILIO_API_KEY_SECRET: 'fixture-signing-secret', PYAI_API_KEY: 'fixture-api-key',
       ADMIN_TOKEN: 'fixture-operator-token-with-at-least-32-chars', JOURNAL_BUCKET: 'fixture-private-bucket',
       JOURNAL_PREFIX: 'qualification/fixture', TEST_DEADLINE: new Date(Date.now() + 60_000).toISOString(), PORT: '0',
+      CONSOLE_PREVIEW: consolePreview ? '1' : '0', PREVIEW_ID: 'twilio-preview-fixture', K_REVISION: 'twilio-preview-fixture-001',
+      PREVIEW_OWNER: 'a'.repeat(20),
     } });
     let stderr = ''; child.stderr.on('data', value => { stderr += value.toString().slice(0, 4096); });
     const exit = once(child, 'exit');
@@ -23,6 +25,8 @@ test('real server boots with packaged browser assets, denies untrusted controls,
       const base = `http://127.0.0.1:${JSON.parse(line).port}`;
       for (const path of ['/health', '/', '/browser.mjs', '/twilio.min.js']) assert.equal((await fetch(base + path)).status, 200, path);
       assert.equal((await fetch(base + '/room')).status, 401);
+      assert.equal((await fetch(base + '/join', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: '{"grant":"unknown"}' })).status, consolePreview ? 401 : 400);
       assert.equal((await fetch(base + '/join', { method: 'POST', headers: { Origin: 'https://attacker.example.com',
         'Content-Type': 'application/json' }, body: '{"grant":"unknown"}' })).status, 403);
       assert.equal((await fetch(base + '/twilio/voice', { method: 'POST', headers: {

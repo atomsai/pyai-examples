@@ -14,6 +14,22 @@ const makeForm = (host, role, digit) => ({ AccountSid: config.accountSid,
   CallSid: `CA${digit.repeat(32)}`, From: `client:${host.room.endpoints[role].identity}`,
   JoinGrant: host.room.endpoints[role].grant });
 
+test('preview reserves durable allowance before issuing grants and clamps rooms to the fixed preview end', async () => {
+  const reserved = [], host = new TranslationHost({ ...config, identityPrefix: 'a'.repeat(20) }, { now: () => 1000, maxRooms: 12, absoluteDeadline: 2000,
+    reserveRoom: async value => reserved.push(value), record: async () => {}, retire: async () => {} });
+  try {
+    const room = await host.create(input);
+    assert.equal(Date.parse(room.expires_at), 2000);
+    assert.deepEqual(reserved, [{ id: room.id, expiresAt: 2000 }]);
+    assert.ok(Object.values(host.room.endpoints).every(endpoint => endpoint.identity.startsWith('pyai_test_' + 'a'.repeat(20) + '_')),
+      'independent cleanup can identify only this preview’s browser calls');
+  } finally { await host.finish(); }
+  const denied = new TranslationHost(config, { maxRooms: 12, reserveRoom: async () => { throw new Error('allowance_exhausted'); },
+    record: async () => {}, retire: async () => {} });
+  await assert.rejects(denied.create(input), /allowance_exhausted/);
+  assert.equal(denied.grants.size, 0); assert.equal(denied.snapshot().state, 'closed');
+});
+
 test('browser grant and signed Twilio webhook bind one exact identity, call and WSS upgrade', async () => {
   const records = [], limits = [];
   const host = new TranslationHost(config, { record: async e => records.push(e), retire: async () => {},

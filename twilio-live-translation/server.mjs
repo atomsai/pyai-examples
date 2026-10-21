@@ -7,17 +7,21 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import twilio from 'twilio';
 import { TranslationHost } from './host.mjs';
+import { createPreviewRoomBudget } from './preview.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const env = { ...process.env, ...(process.env.CONFIG_PATH ? JSON.parse(await readFile(process.env.CONFIG_PATH, 'utf8')) : {}) };
 const config = { publicOrigin: env.PUBLIC_ORIGIN, accountSid: env.TWILIO_ACCOUNT_SID, authToken: env.TWILIO_AUTH_TOKEN,
   applicationSid: env.TWILIO_APPLICATION_SID, apiKeySid: env.TWILIO_API_KEY_SID, apiKeySecret: env.TWILIO_API_KEY_SECRET,
-  pyaiKey: env.PYAI_API_KEY };
+  pyaiKey: env.PYAI_API_KEY, identityPrefix: env.CONSOLE_PREVIEW === '1' ? env.PREVIEW_OWNER : undefined };
 const deadline = Date.parse(env.TEST_DEADLINE ?? '');
+const consolePreview = env.CONSOLE_PREVIEW === '1';
 if (!env.ADMIN_TOKEN || env.ADMIN_TOKEN.length < 32 || !/^[a-z0-9][a-z0-9._-]{2,62}$/.test(env.JOURNAL_BUCKET ?? '')
     || !/^[\w/-]{1,160}$/.test(env.JOURNAL_PREFIX ?? '') || !Number.isFinite(deadline)
-    || deadline <= Date.now() || deadline > Date.now() + 1_800_000) throw new Error('invalid_bounded_test_config');
+    || deadline <= Date.now() || deadline > Date.now() + (consolePreview ? 86_400_000 : 1_800_000)
+    || (consolePreview && (!/^[a-z0-9-]{8,80}$/.test(env.PREVIEW_ID ?? '')
+      || !/^[0-9a-f]{20}$/.test(env.PREVIEW_OWNER ?? '')))) throw new Error('invalid_bounded_test_config');
 
 const client = twilio(config.accountSid, config.authToken, { timeout: 4000, autoRetry: false });
 let adc = { value: '', expires: 0 };
@@ -30,7 +34,11 @@ async function cloudToken() {
   return adc.value;
 }
 
+const previewBudget = consolePreview ? createPreviewRoomBudget({ bucket: env.JOURNAL_BUCKET,
+  prefix: env.JOURNAL_PREFIX, previewId: env.PREVIEW_ID, deadline, token: cloudToken }) : null;
 const host = new TranslationHost(config, {
+  maxRooms: consolePreview ? 12 : 2, absoluteDeadline: deadline,
+  reserveRoom: previewBudget ? room => previewBudget.reserve(room) : async () => {},
   limitCall: async (callId, seconds) => { await client.calls(callId).update({ timeLimit: Math.min(seconds, 480) }); },
   retire: async callId => {
     const current = await client.calls(callId).fetch();
@@ -46,6 +54,7 @@ const host = new TranslationHost(config, {
       { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(entry), signal: AbortSignal.timeout(1700) });
     if (!response.ok) throw new Error('journal_write_failed');
+    if (entry.event === 'host.room.closed' && entry.cleanup === 'calls_terminal_verified') previewBudget?.retired(entry.host_room_id);
   },
 });
 
@@ -79,6 +88,9 @@ const server = createServer(async (req, res) => {
       return send(200, xml, 'text/xml');
     }
     if (req.headers.origin && req.headers.origin !== config.publicOrigin) return send(403, { error: 'origin_denied' });
+    if (consolePreview && (!equal(String(req.headers.authorization ?? ''), `Bearer ${env.ADMIN_TOKEN}`)
+        || req.headers['x-pyai-preview-id'] !== env.PREVIEW_ID
+        || req.headers['x-pyai-preview-revision'] !== env.K_REVISION)) return send(401, { error: 'unauthorized' });
     if (req.method === 'POST' && req.url === '/join') {
       return send(200, host.mint(JSON.parse(await body(req)).grant));
     }

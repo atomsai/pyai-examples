@@ -10,6 +10,16 @@ and incur usage.
 The host is an implementation candidate. Offline tests and the SDK's synthetic
 interpreter test do not establish live carrier acceptance or speech quality.
 
+For an authenticated Console rehearsal, `CONSOLE_PREVIEW=1` and a fixed
+`PREVIEW_ID` enable at most twelve sequential rooms until `TEST_DEADLINE`, which
+must be within 24 hours. Each room is at most eight minutes and is shortened at
+the preview deadline. Immutable private storage reservations retain the shared
+limit across restarts. This mode accepts room creation and browser-token exchange
+only from the server-side Console broker with its exact preview ID and serving
+revision. The Console continues to require a verified `saaslabs.co` login and
+active live-project access. This bounded rehearsal does not establish ten-call
+capacity or a permanent production tester.
+
 ## Run the candidate
 
 Build `sdk/twilio` from this PR before installing this example. Its new

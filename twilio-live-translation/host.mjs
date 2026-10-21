@@ -9,35 +9,41 @@ const id = () => randomBytes(24).toString('base64url');
 export class TranslationHost {
   constructor(config, { record, Room = InterpretationRoom, Transport = TwilioInterpretationTransport,
     retire = async () => { throw new Error('carrier_cleanup_unavailable'); },
-    limitCall = async () => { throw new Error('carrier_limit_unavailable'); }, now = Date.now } = {}) {
+    limitCall = async () => { throw new Error('carrier_limit_unavailable'); }, now = Date.now,
+    maxRooms = 2, absoluteDeadline = Infinity, reserveRoom = async () => {} } = {}) {
     if (!/^AC[0-9a-f]{32}$/i.test(config.accountSid) || !/^AP[0-9a-f]{32}$/i.test(config.applicationSid)
         || !/^SK[0-9a-f]{32}$/i.test(config.apiKeySid) || !config.apiKeySecret || !config.authToken
-        || !config.pyaiKey || typeof record !== 'function') throw new Error('invalid_host_config');
+        || !config.pyaiKey || typeof record !== 'function'
+        || (config.identityPrefix !== undefined && !/^[0-9a-f]{20}$/.test(config.identityPrefix))) throw new Error('invalid_host_config');
     this.origin = new URL(config.publicOrigin);
     if (this.origin.protocol !== 'https:' || this.origin.pathname !== '/' || this.origin.search
         || this.origin.hash || this.origin.username || this.origin.password) throw new Error('invalid_public_origin');
     this.config = config; this.record = record; this.Room = Room; this.Transport = Transport;
     this.retire = retire; this.limitCall = limitCall; this.now = now; this.room = null; this.created = 0;
+    if (!Number.isInteger(maxRooms) || maxRooms < 1 || maxRooms > 12 || typeof reserveRoom !== 'function'
+        || !(absoluteDeadline > now())) throw new Error('invalid_room_bound');
+    this.maxRooms = maxRooms; this.absoluteDeadline = absoluteDeadline; this.reserveRoom = reserveRoom;
     this.grants = new Map(); this.streams = new Map();
     this.admission = new TwilioStreamAdmission(this.origin.href.replace('https:', 'wss:'), config.authToken, 3);
   }
 
   async create(input) {
     if (this.room && (this.room.state !== 'closed' || this.room.cleanup !== 'calls_terminal_verified')) throw new Error('room_already_exists');
-    if (this.created >= 2) throw new Error('session_limit');
+    if (this.created >= this.maxRooms || this.now() >= this.absoluteDeadline) throw new Error('session_limit');
     if (!['hi', 'pa'].includes(input.language) || !/^[\w.-]{1,80}$/.test(input.customerVoice ?? '')
         || !/^[\w.-]{1,80}$/.test(input.agentVoice ?? '')) throw new Error('invalid_room');
     const room = { id: `test-${randomUUID()}`, state: 'waiting', createdAt: this.now(),
-      expiresAt: this.now() + 480_000, endpoints: {}, events: [], retired: new Set(), sequence: 0,
+      expiresAt: Math.min(this.now() + 480_000, this.absoluteDeadline), endpoints: {}, events: [], retired: new Set(), sequence: 0,
       closing: false, cleanup: null, interpretation: null, retiring: new Map() };
     this.room = room; this.created++;
-    room.timer = setTimeout(() => { void this.finish('lifetime_limit'); }, 480_000);
+    room.timer = setTimeout(() => { void this.finish('lifetime_limit'); }, room.expiresAt - this.now());
     const grants = {};
     try {
+      await this.reserveRoom({ id: room.id, expiresAt: room.expiresAt });
       await this.journal({ event: 'host.room.created', language: input.language });
       for (const role of ROLES) {
         const grant = id();
-        const endpoint = { role, grant, identity: `pyai_test_${randomBytes(12).toString('hex')}`,
+        const endpoint = { role, grant, identity: `pyai_test_${this.config.identityPrefix ? this.config.identityPrefix + '_' : ''}${randomBytes(12).toString('hex')}`,
           participant: { participant_id: `${room.id}-${role}`, language: role === 'customer' ? input.language : 'en',
             voice: role === 'customer' ? input.customerVoice : input.agentVoice },
           minted: false, callId: '', transport: null, limitReady: null };
