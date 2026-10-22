@@ -61,7 +61,7 @@ test('one daily reservation remains one complete eight-minute allowance even whe
   assert.equal(f.requests.filter(row => row.method === 'POST').length, 2);
 });
 
-for (const extra of [10, 20, 30]) test(`a dated ${extra}-room qualification retains charged rooms and the monthly ceiling, then expires automatically`, async () => {
+for (const extra of [10, 20, 30, 40]) test(`a dated ${extra}-room qualification retains charged rooms and the monthly ceiling, then expires automatically`, async () => {
   const f = fixture(), qualification = { date: '2026-10-20', extra_rooms: extra, reason: 'final_carrier_qualification' };
   f.store('2026-10', { schema: 'pyai-carrier-allowance-v1', service_id: serviceId, month: '2026-10',
     rooms: Array.from({ length: 15 }, (_, i) => ({ id: room(i + 1), date: qualification.date })), qualification });
@@ -82,6 +82,7 @@ for (const extra of [10, 20, 30]) test(`a dated ${extra}-room qualification reta
 test('malformed qualification grants fail closed without writing', async () => {
   for (const qualification of [{ date: '2026-10-20', extra_rooms: 11, reason: 'final_carrier_qualification' },
     { date: '2026-10-20', extra_rooms: 21, reason: 'final_carrier_qualification' },
+    { date: '2026-10-20', extra_rooms: 41, reason: 'final_carrier_qualification' },
     { date: '2026-10-32', extra_rooms: 10, reason: 'final_carrier_qualification' },
     { date: '2026-10-20', extra_rooms: 10, reason: 'unbounded' }]) {
     const f = fixture();
