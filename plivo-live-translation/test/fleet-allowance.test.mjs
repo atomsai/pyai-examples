@@ -94,6 +94,48 @@ test('malformed qualification grants fail closed without writing', async () => {
   }
 });
 
+test('the final October grant preserves 71 charged attempts, admits the repaired ten-room test and leaves four reservations', async () => {
+  const f = fixture(), qualification = { date:'2026-10-22', extra_rooms:60,
+    extra_monthly_rooms:10, reason:'final_carrier_qualification' };
+  const prior = Array.from({length:71}, (_,i) => ({id:room(i+1),date:i<10?'2026-10-21':'2026-10-22'}));
+  f.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:prior,qualification});
+  f.setClock(tick('2026-10-22'));
+  for (let i=72;i<=81;i++) await f.make().reserve(room(i));
+  assert.deepEqual(f.item('2026-10').rooms.slice(0,71),prior);
+  assert.deepEqual(f.item('2026-10').qualification,qualification);
+  f.setClock(tick('2026-10-23'));
+  for (let i=82;i<=85;i++) await f.make().reserve(room(i));
+  await assert.rejects(f.make().reserve(room(86)),/test_allowance_exhausted/);
+  await f.make().reserve(room(1));
+  assert.equal(f.item('2026-10').rooms.length,85);
+  f.setClock(tick('2026-11-01'));
+  for (let i=100;i<115;i++) await f.make().reserve(room(i));
+  await assert.rejects(f.make().reserve(room(115)),/test_allowance_exhausted/);
+  assert.equal(f.item('2026-11').qualification,undefined);
+});
+
+test('the final October grant keeps a finite daily cap and cannot activate its monthly exception early', async () => {
+  const f=fixture(),qualification={date:'2026-10-22',extra_rooms:60,extra_monthly_rooms:10,reason:'final_carrier_qualification'};
+  f.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:[],qualification});
+  f.setClock(tick('2026-10-22'));
+  for(let i=1;i<=75;i++) await f.make().reserve(room(i));
+  await assert.rejects(f.make().reserve(room(76)),/test_allowance_exhausted/);
+  f.setClock(tick('2026-10-21'));
+  await assert.rejects(f.make().reserve(room(76)),/test_allowance_exhausted/);
+});
+
+test('monthly qualification additions outside the exact final October grant fail closed', async () => {
+  const valid={date:'2026-10-22',extra_rooms:60,extra_monthly_rooms:10,reason:'final_carrier_qualification'};
+  for(const qualification of [{...valid,extra_monthly_rooms:11},{...valid,extra_monthly_rooms:0},
+    {...valid,extra_rooms:50},{...valid,date:'2026-10-23'},
+    {date:valid.date,extra_rooms:60,reason:valid.reason}]){
+    const f=fixture();f.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:[],qualification});
+    f.setClock(tick('2026-10-22'));
+    await assert.rejects(f.make().reserve(room(1)),/fleet_allowance_unavailable/);
+    assert.equal(f.requests.filter(row=>row.method==='POST').length,0);
+  }
+});
+
 test('the UTC day resets independently of the monthly ceiling while old-month records cannot consume the new month', async () => {
   const f = fixture();
   f.setClock('2026-10-31T23:59:59.900Z');
