@@ -61,6 +61,34 @@ test('one daily reservation remains one complete eight-minute allowance even whe
   assert.equal(f.requests.filter(row => row.method === 'POST').length, 2);
 });
 
+test('a dated final qualification retains charged rooms and the monthly ceiling, then expires automatically', async () => {
+  const f = fixture(), qualification = { date: '2026-10-20', extra_rooms: 10, reason: 'final_carrier_qualification' };
+  f.store('2026-10', { schema: 'pyai-carrier-allowance-v1', service_id: serviceId, month: '2026-10',
+    rooms: Array.from({ length: 15 }, (_, i) => ({ id: room(i + 1), date: qualification.date })), qualification });
+  for (let i = 16; i <= 25; i++) await f.make().reserve(room(i));
+  await assert.rejects(f.make().reserve(room(26)), /test_allowance_exhausted/);
+  assert.equal(f.item('2026-10').rooms.length, 25);
+  assert.deepEqual(f.item('2026-10').qualification, qualification);
+  f.setClock('2026-10-21T00:00:00.000Z');
+  for (let i = 26; i <= 40; i++) await f.make().reserve(room(i));
+  await assert.rejects(f.make().reserve(room(41)), /test_allowance_exhausted/);
+  f.setClock('2026-10-22T00:00:00.000Z');
+  f.store('2026-10', { ...f.item('2026-10'), rooms: Array.from({ length: 75 }, (_, i) => ({ id: room(i + 1), date: '2026-10-19' })),
+    qualification: { ...qualification, date: '2026-10-22' } });
+  await assert.rejects(f.make().reserve(room(76)), /test_allowance_exhausted/);
+});
+
+test('malformed qualification grants fail closed without writing', async () => {
+  for (const qualification of [{ date: '2026-10-20', extra_rooms: 11, reason: 'final_carrier_qualification' },
+    { date: '2026-10-32', extra_rooms: 10, reason: 'final_carrier_qualification' },
+    { date: '2026-10-20', extra_rooms: 10, reason: 'unbounded' }]) {
+    const f = fixture();
+    f.store('2026-10', { schema: 'pyai-carrier-allowance-v1', service_id: serviceId, month: '2026-10', rooms: [], qualification });
+    await assert.rejects(f.make().reserve(room(1)), /fleet_allowance_unavailable/);
+    assert.equal(f.requests.filter(row => row.method === 'POST').length, 0);
+  }
+});
+
 test('the UTC day resets independently of the monthly ceiling while old-month records cannot consume the new month', async () => {
   const f = fixture();
   f.setClock('2026-10-31T23:59:59.900Z');

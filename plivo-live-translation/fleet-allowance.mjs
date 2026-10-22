@@ -20,7 +20,7 @@ export function createFleetAllowance({ bucket, prefix, serviceId, token, fetchIm
         budget.assertTime();
         try {
           const metadata = await request(objectUrl);
-          let generation = '0', rooms = [];
+          let generation = '0', rooms = [], qualification;
           if (metadata.status !== 404) {
             const fields = await readJson(metadata);
             if (!fields || typeof fields !== 'object') throw new Error('fleet_allowance_unavailable');
@@ -34,12 +34,25 @@ export function createFleetAllowance({ bucket, prefix, serviceId, token, fetchIm
                   || !Number.isFinite(Date.parse(room.date)) || new Date(Date.parse(room.date)).toISOString().slice(0, 10) !== room.date)
                 || new Set(value.rooms.map(room => room.id)).size !== value.rooms.length) throw new Error('fleet_allowance_unavailable');
             rooms = value.rooms;
+            qualification = value.qualification;
+            if (qualification !== undefined && (!qualification || typeof qualification !== 'object'
+                || typeof qualification.date !== 'string' || qualification.date.slice(0, 7) !== month
+                || !/^\d{4}-\d{2}-\d{2}$/.test(qualification.date)
+                || !Number.isFinite(Date.parse(qualification.date))
+                || new Date(Date.parse(qualification.date)).toISOString().slice(0, 10) !== qualification.date
+                || qualification.extra_rooms !== 10 || qualification.reason !== 'final_carrier_qualification')) {
+              throw new Error('fleet_allowance_unavailable');
+            }
           }
           if (rooms.some(room => room.id === roomId)) return;
-          if (rooms.length >= 75 || rooms.filter(room => room.date === date).length >= 15) throw new Error('test_allowance_exhausted');
+          // A trusted storage operator may admit one dated final qualification.
+          // Every room still consumes the unchanged 75-room monthly budget;
+          // existing attempts are never removed or reclassified.
+          const dailyLimit = 15 + (qualification?.date === date ? qualification.extra_rooms : 0);
+          if (rooms.length >= 75 || rooms.filter(room => room.date === date).length >= dailyLimit) throw new Error('test_allowance_exhausted');
           const response = await request(`https://storage.googleapis.com/upload/storage/v1/b/${bucket}/o?uploadType=media&ifGenerationMatch=${generation}&name=${encodeURIComponent(name)}`,
             { method: 'POST', body: JSON.stringify({ schema: 'pyai-carrier-allowance-v1', service_id: serviceId, month,
-              rooms: [...rooms, { id: roomId, date }] }) });
+              rooms: [...rooms, { id: roomId, date }], ...(qualification ? { qualification } : {}) }) });
           if (response.status === 412) continue; // Re-read the winning generation before another attempt.
           const stored = await readJson(response);
           if (!stored || typeof stored !== 'object' || !/^[1-9][0-9]{0,30}$/.test(stored.generation ?? '')) throw new Error('fleet_allowance_unavailable');
