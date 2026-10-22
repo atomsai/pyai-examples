@@ -1,3 +1,4 @@
+import { InterpretationRecording } from "@pyai/twilio";
 import { randomBytes, randomUUID } from 'node:crypto';
 import twilio from 'twilio';
 import { InterpretationRoom, TwilioInterpretationTransport, TwilioStreamAdmission, connectStreamTwiML } from '@pyai/twilio';
@@ -35,6 +36,7 @@ export class TranslationHost {
     const room = { id: `test-${randomUUID()}`, state: 'waiting', createdAt: this.now(),
       expiresAt: Math.min(this.now() + 480_000, this.absoluteDeadline), endpoints: {}, events: [], retired: new Set(), sequence: 0,
       closing: false, cleanup: null, interpretation: null, retiring: new Map() };
+    if (input.recording) room.recording = new InterpretationRecording(input.recording, room.id, this.now);
     this.room = room; this.created++;
     room.timer = setTimeout(() => { void this.finish('lifetime_limit', room); }, room.expiresAt - this.now());
     const grants = {};
@@ -51,7 +53,7 @@ export class TranslationHost {
         room.endpoints[role] = endpoint; this.grants.set(grant, endpoint);
         grants[role] = `${this.origin.origin}/#${grant}`;
       }
-      return { id: room.id, expires_at: new Date(room.expiresAt).toISOString(), links: grants };
+      return { id: room.id, ...(room.recording ? {recording_id:input.recording.id} : {}), expires_at: new Date(room.expiresAt).toISOString(), links: grants };
     } catch (error) { await this.finish('journal_failed', room); throw error; }
   }
 
@@ -149,6 +151,7 @@ export class TranslationHost {
             if (!room.closing && event.event === 'session.started') room.state = 'connected';
           },
           retireCall: async callId => { await this.retireOnce(callId, room); },
+          observeAudio: (kind, leg, pcm) => room.recording?.capture(kind, leg, pcm),
           onClose: reason => { void this.finish(reason, room); } });
       }
     }).catch(() => { void this.finish('call_setup_failed', room); });
@@ -162,6 +165,7 @@ export class TranslationHost {
     const entry = { ...metadata, host_room_id: room.id, host_sequence: ++room.sequence, recorded_at: new Date(this.now()).toISOString() };
     if (room.events.length >= 2000 || Buffer.byteLength(JSON.stringify(entry)) > 65536) throw new Error('journal_limit');
     await this.record(entry);
+    room.recording?.event(entry);
     room.events.push(entry);
   }
 
@@ -204,6 +208,11 @@ export class TranslationHost {
       room.cleanup = results.every(result => result.status === 'fulfilled') ? 'calls_terminal_verified' : 'needs_reconciliation';
       try { await this.journal({ event: 'host.room.closed', reason, cleanup: room.cleanup, transports: this.transportDiagnostics(room) }, room); }
       catch { room.cleanup = 'journal_failed'; }
+      if (room.recording) {
+        room.recordingStatus = 'saving';
+        try { await room.recording.finish(); room.recordingStatus = 'ready'; }
+        catch { room.recordingStatus = 'incomplete'; }
+      }
       room.state = 'closed';
     });
     return room.finishing;

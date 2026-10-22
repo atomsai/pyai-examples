@@ -37,7 +37,7 @@ for (const mode of ['qualification', 'preview', 'permanent']) test(`Plivo host $
           'X-PyAI-Preview-Id': 'plivo-permanent-fixture', 'X-PyAI-Preview-Revision': 'plivo-console-v1' };
         assert.equal((await fetch(base + '/capacity', { headers: { ...headers, 'X-PyAI-Preview-Revision': 'pyai-plivo-permanent-001' } })).status, 401);
         const capacity = await fetch(base + '/capacity', { headers }); assert.equal(capacity.status, 200);
-        assert.deepEqual(await capacity.json(), { available: true, admissions_paused: false, maximum_concurrent_rooms: 10, active_rooms: 0, cooldown_rooms: 0 });
+        assert.deepEqual(await capacity.json(), { available: true, admissions_paused: false, maximum_concurrent_rooms: 10, active_rooms: 0, cooldown_rooms: 0, recording_supported: true });
         assert.equal((await fetch(base + '/room', { headers })).status, 404, 'permanent rooms require an exact room ID');
         assert.equal((await fetch(base + '/room?room_id=test-11111111-1111-4111-8111-111111111111', { headers })).status, 404,
           'an admin credential without the original owner tuple cannot read rooms');

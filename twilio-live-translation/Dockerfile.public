@@ -1,4 +1,4 @@
-# For this example folder after publishing to pyai-examples; SDK 0.4.4 must exist on npm.
+# For this example folder after publishing to pyai-examples; SDK 0.4.6 must exist on npm.
 FROM node:24-bookworm-slim
 WORKDIR /app
 COPY package*.json ./

@@ -78,7 +78,7 @@ const server = createServer(async (req, res) => {
   try {
     if (Date.now() >= deadline) return send(410, { error: 'test_expired' });
     // Cloud Run reserves some paths ending in z; keep application readiness on /health.
-    if (req.method === 'GET' && req.url === '/health') return send(200, { status: 'ready', expires_at: new Date(deadline).toISOString() });
+    if (req.method === 'GET' && req.url === '/health') return send(200, { status: 'ready', recording_supported: true, expires_at: new Date(deadline).toISOString() });
     if (req.method === 'GET' && assets.has(req.url)) { const [type, value] = assets.get(req.url); return send(200, value, type); }
     if (req.method === 'POST' && req.url === '/twilio/voice') {
       if (!req.headers['content-type']?.startsWith('application/x-www-form-urlencoded')) return send(415, { error: 'invalid_content_type' });

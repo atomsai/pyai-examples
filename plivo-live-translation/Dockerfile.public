@@ -1,5 +1,5 @@
 # Public pyai-examples clone: run with this example directory as build context
-# after @pyai/twilio@0.4.5 is published. The public mirror rewrites package.json
+# after @pyai/twilio@0.4.6 is published. The public mirror rewrites package.json
 # to the published SDK; it intentionally omits monorepo lockfiles and sdk/.
 FROM node:24-bookworm-slim
 WORKDIR /app

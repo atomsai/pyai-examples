@@ -1,3 +1,4 @@
+import { InterpretationRecording } from "@pyai/twilio";
 import { randomBytes, randomUUID } from 'node:crypto';
 import plivo from 'plivo';
 import { InterpretationRoom, PlivoInterpretationTransport, PlivoStreamAdmission } from '@pyai/twilio';
@@ -52,6 +53,7 @@ export class TranslationHost {
     const room = { id: `test-${randomUUID()}`, state: 'waiting', createdAt: this.now(),
       expiresAt: Math.min(this.now() + 480_000, this.absoluteDeadline), endpoints: {}, events: [], retired: new Set(), sequence: 0,
       closing: false, cleanup: null, interpretation: null, retiring: new Map(), completed: new Set(), terminalWaiters: new Map() };
+    if (input.recording) room.recording = new InterpretationRecording(input.recording, room.id, this.now);
     this.room = room; this.created++;
     room.timer = setTimeout(() => { void this.finish('lifetime_limit'); }, room.expiresAt - this.now());
     const links = {};
@@ -68,7 +70,7 @@ export class TranslationHost {
         room.endpoints[role] = endpoint; this.grants.set(grant, endpoint);
         links[role] = `${this.origin.origin}/#${grant}`;
       }
-      return { id: room.id, expires_at: new Date(room.expiresAt).toISOString(), links };
+      return { id: room.id, ...(room.recording ? {recording_id:input.recording.id} : {}), expires_at: new Date(room.expiresAt).toISOString(), links };
     } catch (error) { await this.finish('journal_failed'); throw error; }
   }
 
@@ -208,6 +210,7 @@ export class TranslationHost {
             { participant: room.endpoints[role].participant, transport: room.endpoints[role].transport }])),
           record: async event => { await this.journal(event); if (event.event === 'session.started') room.state = 'connected'; },
           retireCall: async callId => { await this.retireOnce(callId); },
+          observeAudio: (kind, leg, pcm) => room.recording?.capture(kind, leg, pcm),
           onClose: reason => { void this.finish(reason); } });
       }
     }).catch(() => { void this.finish('call_setup_failed'); });
@@ -220,7 +223,8 @@ export class TranslationHost {
     const { audio, ...metadata } = event;
     const entry = { ...metadata, host_room_id: room.id, host_sequence: ++room.sequence, recorded_at: new Date(this.now()).toISOString() };
     if (room.events.length >= 2000 || Buffer.byteLength(JSON.stringify(entry)) > 65536) throw new Error('journal_limit');
-    await this.record(entry); room.events.push(entry);
+    await this.record(entry);
+    room.recording?.event(entry); room.events.push(entry);
   }
 
   async retireOnce(callId) {
@@ -283,6 +287,11 @@ export class TranslationHost {
       room.state = 'closed';
       try { await this.journal({ event: 'host.room.closed', reason, cleanup: room.cleanup, transports: this.transportDiagnostics() }); }
       catch { room.cleanup = 'journal_failed'; }
+      if (room.recording) {
+        room.recordingStatus = 'saving';
+        try { await room.recording.finish(); room.recordingStatus = 'ready'; }
+        catch { room.recordingStatus = 'incomplete'; }
+      }
     });
     return room.finishing;
   }
