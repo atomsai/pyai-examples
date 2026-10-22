@@ -124,11 +124,31 @@ test('the final October grant keeps a finite daily cap and cannot activate its m
   await assert.rejects(f.make().reserve(room(76)),/test_allowance_exhausted/);
 });
 
+test('the completion allowance retains all 83 charges, admits ten qualification and two recording calls, and remains bounded', async () => {
+  const f = fixture(), qualification = { date:'2026-10-22', extra_rooms:60,
+    extra_monthly_rooms:10, completion_rooms:12, reason:'final_carrier_qualification' };
+  const prior = Array.from({length:83}, (_,i) => ({id:room(i+1),date:i<10?'2026-10-21':'2026-10-22'}));
+  f.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:prior,qualification});
+  f.setClock(tick('2026-10-22'));
+  for(let i=84;i<=95;i++) await f.make().reserve(room(i));
+  assert.deepEqual(f.item('2026-10').rooms.slice(0,83),prior);
+  assert.deepEqual(f.item('2026-10').qualification,qualification);
+  for(let i=96;i<=97;i++) await f.make().reserve(room(i));
+  await assert.rejects(f.make().reserve(room(98)),/test_allowance_exhausted/);
+  await f.make().reserve(room(1));
+  f.setClock(tick('2026-11-01'));
+  for(let i=100;i<115;i++) await f.make().reserve(room(i));
+  await assert.rejects(f.make().reserve(room(115)),/test_allowance_exhausted/);
+  assert.equal(f.item('2026-11').qualification,undefined);
+});
+
 test('monthly qualification additions outside the exact final October grant fail closed', async () => {
   const valid={date:'2026-10-22',extra_rooms:60,extra_monthly_rooms:10,reason:'final_carrier_qualification'};
   for(const qualification of [{...valid,extra_monthly_rooms:11},{...valid,extra_monthly_rooms:0},
     {...valid,extra_rooms:50},{...valid,date:'2026-10-23'},
-    {date:valid.date,extra_rooms:60,reason:valid.reason}]){
+    {date:valid.date,extra_rooms:60,reason:valid.reason},
+    {...valid,completion_rooms:13},{...valid,completion_rooms:0},
+    {date:'2026-10-20',extra_rooms:10,reason:valid.reason,completion_rooms:12}]){
     const f=fixture();f.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:[],qualification});
     f.setClock(tick('2026-10-22'));
     await assert.rejects(f.make().reserve(room(1)),/fleet_allowance_unavailable/);
