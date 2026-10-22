@@ -40,12 +40,12 @@ export function createFleetAllowance({ bucket, prefix, serviceId, token, fetchIm
                 || !/^\d{4}-\d{2}-\d{2}$/.test(qualification.date)
                 || !Number.isFinite(Date.parse(qualification.date))
                 || new Date(Date.parse(qualification.date)).toISOString().slice(0, 10) !== qualification.date
-                || ![10, 20, 30, 40].includes(qualification.extra_rooms) || qualification.reason !== 'final_carrier_qualification')) {
+                || ![10, 20, 30, 40, 50].includes(qualification.extra_rooms) || qualification.reason !== 'final_carrier_qualification')) {
               throw new Error('fleet_allowance_unavailable');
             }
           }
           if (rooms.some(room => room.id === roomId)) return;
-          // A trusted storage operator may admit at most four dated qualification blocks.
+          // A trusted storage operator may admit at most five dated qualification blocks.
           // Every room still consumes the unchanged 75-room monthly budget;
           // existing attempts are never removed or reclassified.
           const dailyLimit = 15 + (qualification?.date === date ? qualification.extra_rooms : 0);
