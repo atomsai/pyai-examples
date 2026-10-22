@@ -119,6 +119,14 @@ test('two started legs create one interpreter; replacement preserves room, retir
     assert.equal(host.snapshot().cleanup, 'calls_terminal_verified');
     assert.ok(records.every(e => e.host_room_id === host.room.id && !('audio' in e)));
     await host.create({ ...input, language: 'pa' });
+    const currentId = host.room.id;
+    rooms[0].opts.onClose('late_old_interpreter_failure');
+    rooms[0].opts.legs.customer.transport.onFailure();
+    await rooms[0].opts.record({ event: 'transcript.final', text: 'stale old transcript' });
+    await delay(0);
+    assert.equal(host.snapshot().id, currentId);
+    assert.equal(host.snapshot().state, 'waiting', 'late callbacks cannot close the next conversation');
+    assert.ok(!host.snapshot().events.some(event => event.text === 'stale old transcript'));
     await host.finish();
     await assert.rejects(host.create(input), /session_limit/);
   } finally { await host.finish(); }

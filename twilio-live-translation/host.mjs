@@ -36,11 +36,12 @@ export class TranslationHost {
       expiresAt: Math.min(this.now() + 480_000, this.absoluteDeadline), endpoints: {}, events: [], retired: new Set(), sequence: 0,
       closing: false, cleanup: null, interpretation: null, retiring: new Map() };
     this.room = room; this.created++;
-    room.timer = setTimeout(() => { void this.finish('lifetime_limit'); }, room.expiresAt - this.now());
+    room.timer = setTimeout(() => { void this.finish('lifetime_limit', room); }, room.expiresAt - this.now());
     const grants = {};
     try {
       await this.reserveRoom({ id: room.id, expiresAt: room.expiresAt });
-      await this.journal({ event: 'host.room.created', language: input.language });
+      await this.journal({ event: 'host.room.created', language: input.language }, room);
+      if (this.room !== room || room.closing) throw new Error('room_closed');
       for (const role of ROLES) {
         const grant = id();
         const endpoint = { role, grant, identity: `pyai_test_${this.config.identityPrefix ? this.config.identityPrefix + '_' : ''}${randomBytes(12).toString('hex')}`,
@@ -51,7 +52,7 @@ export class TranslationHost {
         grants[role] = `${this.origin.origin}/#${grant}`;
       }
       return { id: room.id, expires_at: new Date(room.expiresAt).toISOString(), links: grants };
-    } catch (error) { await this.finish('journal_failed'); throw error; }
+    } catch (error) { await this.finish('journal_failed', room); throw error; }
   }
 
   mint(grant) {
@@ -81,14 +82,14 @@ export class TranslationHost {
     const issued = this.admission.issue({ accountSid: this.config.accountSid, callSid: endpoint.callId,
       participantId: endpoint.participant.participant_id, externalCallId: room.id }, 30_000);
     const path = new URL(issued.url).pathname;
-    const timer = setTimeout(() => { void this.finish('stream_admission_timeout'); }, 30_000);
-    this.streams.set(path, { endpoint, issued, timer });
+    const timer = setTimeout(() => { void this.finish('stream_admission_timeout', room); }, 30_000);
+    this.streams.set(path, { endpoint, issued, timer, room });
     return connectStreamTwiML(issued.url);
   }
 
   admit(path, signature) {
     const item = this.streams.get(path);
-    if (!item || !this.room || this.room.closing) return null;
+    if (!item || !this.room || item.room !== this.room || this.room.closing) return null;
     const binding = item.issued.consume(`wss://${this.origin.host}${path}`, signature);
     if (!binding) return null;
     clearTimeout(item.timer); this.streams.delete(path);
@@ -102,13 +103,13 @@ export class TranslationHost {
     }
     const transport = new this.Transport(socket, endpoint.callId, endpoint.participant.participant_id, this.config.accountSid);
     endpoint.transport = transport;
-    transport.onFailure = () => { void this.finish('transport_failed'); };
+    transport.onFailure = () => { void this.finish('transport_failed', room); };
     // The answer webhook can run while Twilio still reports ringing. Updating
     // timeLimit requires an active call, established by its media start frame.
     endpoint.limitReady = transport.ready.then(async () => {
       if (room.closing) return transport.close();
       const seconds = Math.floor((room.expiresAt - this.now()) / 1000);
-      if (seconds < 1) { await this.finish('lifetime_limit'); return; }
+      if (seconds < 1) { await this.finish('lifetime_limit', room); return; }
       try { await this.limitCall(endpoint.callId, Math.min(seconds, 480)); }
       catch (error) {
         // Twilio's error message can contain request/credential information.
@@ -116,21 +117,21 @@ export class TranslationHost {
         const code = Number.isSafeInteger(error?.code) && error.code >= 0 && error.code <= 99_999_999 ? error.code : null;
         const status = Number.isSafeInteger(error?.status) && error.status >= 100 && error.status <= 599 ? error.status : null;
         try { await this.journal({ event: 'host.call.limit.failed', role: endpoint.role, provider_call_id: endpoint.callId,
-          twilio_error_code: code, twilio_http_status: status }); }
-        finally { await this.finish('carrier_limit_failed'); }
+          twilio_error_code: code, twilio_http_status: status }, room); }
+        finally { await this.finish('carrier_limit_failed', room); }
         throw new Error('carrier_limit_failed');
       }
     });
     void endpoint.limitReady.then(async () => {
       if (room.closing) return transport.close();
-      await this.journal({ event: 'host.call.connected', role: endpoint.role, provider_call_id: endpoint.callId });
+      await this.journal({ event: 'host.call.connected', role: endpoint.role, provider_call_id: endpoint.callId }, room);
       if (endpoint.role === 'replacement') {
         if (!room.interpretation || room.state !== 'connected') throw new Error('transfer_not_ready');
         room.state = 'transferring';
         await room.interpretation.replaceAgent(endpoint.participant, transport);
         room.state = 'connected';
         await this.journal({ event: 'host.transfer.completed', provider_call_id: endpoint.callId,
-          transports: this.transportDiagnostics() });
+          transports: this.transportDiagnostics(room) }, room);
       } else if (!room.interpretation && room.endpoints.customer.transport && room.endpoints.agent.transport) {
         // Both start callbacks can wake together. Neither may create the
         // interpreter until both active calls have their carrier limit applied.
@@ -142,15 +143,18 @@ export class TranslationHost {
           lifetimeMs: Math.max(1000, room.expiresAt - this.now()),
           legs: Object.fromEntries(['customer', 'agent'].map(role => [role,
             { participant: room.endpoints[role].participant, transport: room.endpoints[role].transport }])),
-          record: async event => { await this.journal(event); if (event.event === 'session.started') room.state = 'connected'; },
-          retireCall: async callId => { await this.retireOnce(callId); },
-          onClose: reason => { void this.finish(reason); } });
+          record: async event => {
+            if (this.room !== room || room.closing) return;
+            await this.journal(event, room);
+            if (!room.closing && event.event === 'session.started') room.state = 'connected';
+          },
+          retireCall: async callId => { await this.retireOnce(callId, room); },
+          onClose: reason => { void this.finish(reason, room); } });
       }
-    }).catch(() => { void this.finish('call_setup_failed'); });
+    }).catch(() => { void this.finish('call_setup_failed', room); });
   }
 
-  async journal(event) {
-    const room = this.room;
+  async journal(event, room = this.room) {
     if (!room) throw new Error('room_unavailable');
     // Source, target, gate, delivery and transfer records persist; no PCM or per-chunk write on the audio path.
     if (event.event === 'audio.chunk') return;
@@ -161,13 +165,14 @@ export class TranslationHost {
     room.events.push(entry);
   }
 
-  async retireOnce(callId) {
-    if (this.room.retired.has(callId)) return;
-    if (!this.room.retiring.has(callId)) {
-      const promise = this.retire(callId).then(() => { this.room.retired.add(callId); });
-      this.room.retiring.set(callId, promise);
+  async retireOnce(callId, room = this.room) {
+    if (!room || !Object.values(room.endpoints).some(endpoint => endpoint.callId === callId)) throw new Error('invalid_retired_call');
+    if (room.retired.has(callId)) return;
+    if (!room.retiring.has(callId)) {
+      const promise = Promise.resolve().then(() => this.retire(callId)).then(() => { room.retired.add(callId); });
+      room.retiring.set(callId, promise);
     }
-    await this.room.retiring.get(callId);
+    await room.retiring.get(callId);
   }
 
   snapshot() {
@@ -179,14 +184,13 @@ export class TranslationHost {
           transport: endpoint.transport?.diagnostics ?? null }])) };
   }
 
-  transportDiagnostics() {
-    return Object.fromEntries(Object.entries(this.room.endpoints).map(([role, endpoint]) =>
+  transportDiagnostics(room = this.room) {
+    return Object.fromEntries(Object.entries(room.endpoints).map(([role, endpoint]) =>
       [role, { provider_call_id: endpoint.callId || null, ...(endpoint.transport?.diagnostics ?? {}) }]));
   }
 
-  finish(reason = 'host_closed') {
-    const room = this.room;
-    if (!room) return Promise.resolve();
+  finish(reason = 'host_closed', room = this.room) {
+    if (!room || room !== this.room) return Promise.resolve();
     if (room.finishing) return room.finishing;
     room.closing = true; room.state = 'closing'; clearTimeout(room.timer); this.grants.clear();
     for (const item of this.streams.values()) clearTimeout(item.timer);
@@ -196,11 +200,11 @@ export class TranslationHost {
       room.interpretation?.close(reason);
       for (const endpoint of Object.values(room.endpoints)) endpoint.transport?.close();
       const results = await Promise.allSettled(Object.values(room.endpoints)
-        .filter(endpoint => endpoint.callId).map(endpoint => this.retireOnce(endpoint.callId)));
+        .filter(endpoint => endpoint.callId).map(endpoint => this.retireOnce(endpoint.callId, room)));
       room.cleanup = results.every(result => result.status === 'fulfilled') ? 'calls_terminal_verified' : 'needs_reconciliation';
-      room.state = 'closed';
-      try { await this.journal({ event: 'host.room.closed', reason, cleanup: room.cleanup, transports: this.transportDiagnostics() }); }
+      try { await this.journal({ event: 'host.room.closed', reason, cleanup: room.cleanup, transports: this.transportDiagnostics(room) }, room); }
       catch { room.cleanup = 'journal_failed'; }
+      room.state = 'closed';
     });
     return room.finishing;
   }

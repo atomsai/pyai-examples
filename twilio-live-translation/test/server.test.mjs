@@ -25,6 +25,15 @@ for (const consolePreview of [false, true]) test(`real server (${consolePreview 
       const base = `http://127.0.0.1:${JSON.parse(line).port}`;
       for (const path of ['/health', '/', '/browser.mjs', '/twilio.min.js']) assert.equal((await fetch(base + path)).status, 200, path);
       assert.equal((await fetch(base + '/room')).status, 401);
+      const operatorHeaders = { 'Content-Type': 'application/json',
+        Authorization: 'Bearer fixture-operator-token-with-at-least-32-chars',
+        ...(consolePreview ? { 'X-PyAI-Preview-Id': 'twilio-preview-fixture',
+          'X-PyAI-Preview-Revision': 'twilio-preview-fixture-001' } : {}) };
+      assert.equal((await fetch(base + '/end', { method: 'POST', headers: operatorHeaders,
+        body: JSON.stringify({ room_id: 'test-stale-conversation' }) })).status, 409,
+      'a stale operator cannot end whichever room is current');
+      if (consolePreview) assert.equal((await fetch(base + '/end', { method: 'POST', headers: operatorHeaders,
+        body: '{}' })).status, 409, 'Console termination requires its exact room identity');
       assert.equal((await fetch(base + '/join', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: '{"grant":"unknown"}' })).status, consolePreview ? 401 : 400);
       assert.equal((await fetch(base + '/join', { method: 'POST', headers: { Origin: 'https://attacker.example.com',

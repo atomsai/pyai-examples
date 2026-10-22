@@ -97,7 +97,12 @@ const server = createServer(async (req, res) => {
     if (!equal(String(req.headers.authorization ?? ''), `Bearer ${env.ADMIN_TOKEN}`)) return send(401, { error: 'unauthorized' });
     if (req.method === 'POST' && req.url === '/rooms') return send(201, await host.create(JSON.parse(await body(req))));
     if (req.method === 'GET' && req.url === '/room') return send(200, host.snapshot());
-    if (req.method === 'POST' && req.url === '/end') { await host.finish(); return send(200, host.snapshot()); }
+    if (req.method === 'POST' && req.url === '/end') {
+      const { room_id } = JSON.parse(await body(req));
+      if ((consolePreview || room_id !== undefined) && (typeof room_id !== 'string' || room_id !== host.room?.id))
+        return send(409, { error: 'room_changed' });
+      const room = host.room; await host.finish('host_closed', room); return send(200, host.snapshot());
+    }
     if (req.method === 'POST' && req.url === '/commit') {
       const { leg } = JSON.parse(await body(req));
       if (!['customer', 'agent'].includes(leg) || !host.room?.interpretation) throw new Error('input_not_ready');
