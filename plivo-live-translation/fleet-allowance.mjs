@@ -28,7 +28,7 @@ export function createFleetAllowance({ bucket, prefix, serviceId, token, fetchIm
             if (!/^[1-9][0-9]{0,30}$/.test(generation ?? '')) throw new Error('fleet_allowance_unavailable');
             const value = await readJson(await request(objectUrl + `?alt=media&generation=${generation}`));
             if (!value || typeof value !== 'object' || value.schema !== 'pyai-carrier-allowance-v1' || value.service_id !== serviceId || value.month !== month
-                || !Array.isArray(value.rooms) || value.rooms.length > 97 || value.rooms.some(room =>
+                || !Array.isArray(value.rooms) || value.rooms.length > 109 || value.rooms.some(room =>
                   !room || typeof room !== 'object' || !/^test-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(room.id ?? '')
                   || !/^\d{4}-\d{2}-\d{2}$/.test(room.date ?? '') || room.date.slice(0, 7) !== month
                   || !Number.isFinite(Date.parse(room.date)) || new Date(Date.parse(room.date)).toISOString().slice(0, 10) !== room.date)
@@ -48,7 +48,7 @@ export function createFleetAllowance({ bucket, prefix, serviceId, token, fetchIm
             if (qualification && (qualification.extra_rooms === 60 || qualification.extra_monthly_rooms !== undefined)
                 && !finalOctober) throw new Error('fleet_allowance_unavailable');
             if (qualification?.completion_rooms !== undefined
-                && (!finalOctober || qualification.completion_rooms !== 12)) throw new Error('fleet_allowance_unavailable');
+                && (!finalOctober || ![12, 24].includes(qualification.completion_rooms))) throw new Error('fleet_allowance_unavailable');
             monthlyLimit = finalOctober && date >= qualification.date ? 85 + (qualification.completion_rooms ?? 0) : 75;
             if (rooms.length > monthlyLimit) throw new Error('fleet_allowance_unavailable');
           }

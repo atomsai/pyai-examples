@@ -142,12 +142,29 @@ test('the completion allowance retains all 83 charges, admits ten qualification 
   assert.equal(f.item('2026-11').qualification,undefined);
 });
 
+test('the final driver correction retains all 93 charges and permits one more ten-room qualification plus recorded calls', async () => {
+  const f=fixture(),qualification={date:'2026-10-22',extra_rooms:60,
+    extra_monthly_rooms:10,completion_rooms:24,reason:'final_carrier_qualification'};
+  const prior=Array.from({length:93},(_,i)=>({id:room(i+1),date:i<10?'2026-10-21':'2026-10-22'}));
+  f.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:prior,qualification});
+  f.setClock(tick('2026-10-22'));
+  for(let i=94;i<=105;i++)await f.make().reserve(room(i));
+  assert.deepEqual(f.item('2026-10').rooms.slice(0,93),prior);
+  for(let i=106;i<=109;i++)await f.make().reserve(room(i));
+  await assert.rejects(f.make().reserve(room(110)),/test_allowance_exhausted/);
+  await f.make().reserve(room(1));
+  f.setClock(tick('2026-11-01'));
+  for(let i=120;i<135;i++)await f.make().reserve(room(i));
+  await assert.rejects(f.make().reserve(room(135)),/test_allowance_exhausted/);
+  assert.equal(f.item('2026-11').qualification,undefined);
+});
+
 test('monthly qualification additions outside the exact final October grant fail closed', async () => {
   const valid={date:'2026-10-22',extra_rooms:60,extra_monthly_rooms:10,reason:'final_carrier_qualification'};
   for(const qualification of [{...valid,extra_monthly_rooms:11},{...valid,extra_monthly_rooms:0},
     {...valid,extra_rooms:50},{...valid,date:'2026-10-23'},
     {date:valid.date,extra_rooms:60,reason:valid.reason},
-    {...valid,completion_rooms:13},{...valid,completion_rooms:0},
+    {...valid,completion_rooms:13},{...valid,completion_rooms:25},{...valid,completion_rooms:0},
     {date:'2026-10-20',extra_rooms:10,reason:valid.reason,completion_rooms:12}]){
     const f=fixture();f.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:[],qualification});
     f.setClock(tick('2026-10-22'));
