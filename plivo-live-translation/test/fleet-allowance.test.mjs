@@ -159,11 +159,30 @@ test('the final driver correction retains all 93 charges and permits one more te
   assert.equal(f.item('2026-11').qualification,undefined);
 });
 
+test('the sustained capture retry preserves 103 charged attempts, admits ten calls and two recordings, and expires its extra daily allowance',async()=>{
+  const f=fixture(),qualification={date:'2026-10-22',extra_rooms:60,extra_monthly_rooms:10,
+    completion_rooms:36,completion_date:'2026-10-23',reason:'final_carrier_qualification'};
+  const prior=Array.from({length:103},(_,i)=>({id:room(i+1),date:i<93?'2026-10-22':'2026-10-23'}));
+  f.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:prior,qualification});
+  f.setClock(tick('2026-10-23'));for(let i=104;i<=115;i++)await f.make().reserve(room(i));
+  assert.deepEqual(f.item('2026-10').rooms.slice(0,103),prior);await f.make().reserve(room(1));
+  for(let i=116;i<=120;i++)await f.make().reserve(room(i));
+  await assert.rejects(f.make().reserve(room(121)),/test_allowance_exhausted/); // 27 on this UTC day.
+  f.setClock(tick('2026-10-24'));await f.make().reserve(room(121));
+  await assert.rejects(f.make().reserve(room(122)),/test_allowance_exhausted/); // 121 monthly, no refund.
+  f.setClock(tick('2026-11-01'));for(let i=130;i<145;i++)await f.make().reserve(room(i));
+  await assert.rejects(f.make().reserve(room(145)),/test_allowance_exhausted/);
+  assert.equal(f.item('2026-11').qualification,undefined);
+});
+
 test('monthly qualification additions outside the exact final October grant fail closed', async () => {
   const valid={date:'2026-10-22',extra_rooms:60,extra_monthly_rooms:10,reason:'final_carrier_qualification'};
   for(const qualification of [{...valid,extra_monthly_rooms:11},{...valid,extra_monthly_rooms:0},
     {...valid,extra_rooms:50},{...valid,date:'2026-10-23'},
     {date:valid.date,extra_rooms:60,reason:valid.reason},
+    {...valid,completion_rooms:36},{...valid,completion_rooms:36,completion_date:'2026-10-24'},
+    {...valid,completion_rooms:24,completion_date:'2026-10-23'},
+    {...valid,completion_rooms:36,completion_date:'2026-10-23'},
     {...valid,completion_rooms:13},{...valid,completion_rooms:25},{...valid,completion_rooms:0},
     {date:'2026-10-20',extra_rooms:10,reason:valid.reason,completion_rooms:12}]){
     const f=fixture();f.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:[],qualification});
@@ -352,4 +371,11 @@ test('the shared storage budget bounds a stuck token and response body and preve
   assert.equal(isTransientStorageError(Object.assign(new Error(), { status: 503 })), true);
   assert.equal(isTransientStorageError(Object.assign(new Error(), { status: 403 })), false);
   assert.equal(isTransientStorageError(new SyntaxError()), false);
+});
+
+
+test('retained-ledger reads reject bodies beyond twelve KiB before any write',async()=>{
+  const f=fixture();f.intercept(()=>new Response(' '.repeat(12*1024+1),{status:200}));
+  await assert.rejects(f.make().reserve(room(1)),error=>error.code==='storage_response_limit');
+  assert.equal(f.requests.filter(row=>row.method==='POST').length,0);
 });
