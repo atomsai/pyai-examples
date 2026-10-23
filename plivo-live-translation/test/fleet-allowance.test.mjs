@@ -160,10 +160,10 @@ test('the final driver correction retains all 93 charges and permits one more te
 });
 
 test('dated capture qualification additions preserve charged attempts, admit ten calls and two recordings, and expire their daily allowance',async()=>{
-  for(const completion of [36,48,60]){
+  for(const completion of [36,48,60,72]){
     const f=fixture(),qualification={date:'2026-10-22',extra_rooms:60,extra_monthly_rooms:10,
       completion_rooms:completion,completion_date:'2026-10-23',reason:'final_carrier_qualification'};
-    const retained=completion===36?103:completion===48?113:123,monthly=85+completion,lastToday=monthly-1;
+    const retained=completion===36?103:completion===48?113:completion===60?123:134,monthly=85+completion,lastToday=monthly-1;
     const prior=Array.from({length:retained},(_,i)=>({id:room(i+1),date:i<93?'2026-10-22':'2026-10-23'}));
     f.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:prior,qualification});
     f.setClock(tick('2026-10-23'));for(let i=retained+1;i<=retained+12;i++)await f.make().reserve(room(i));
@@ -185,7 +185,7 @@ test('monthly qualification additions outside the exact final October grant fail
     {date:valid.date,extra_rooms:60,reason:valid.reason},
     {...valid,completion_rooms:48},{...valid,completion_rooms:48,completion_date:'2026-10-24'},
     {...valid,completion_rooms:48,completion_date:'2026-10-23'},
-    {...valid,completion_rooms:72,completion_date:'2026-10-23'},{...valid,completion_rooms:36},{...valid,completion_rooms:36,completion_date:'2026-10-24'},
+    {...valid,completion_rooms:84,completion_date:'2026-10-23'},{...valid,completion_rooms:36},{...valid,completion_rooms:36,completion_date:'2026-10-24'},
     {...valid,completion_rooms:24,completion_date:'2026-10-23'},
     {...valid,completion_rooms:36,completion_date:'2026-10-23'},
     {...valid,completion_rooms:13},{...valid,completion_rooms:25},{...valid,completion_rooms:0},
