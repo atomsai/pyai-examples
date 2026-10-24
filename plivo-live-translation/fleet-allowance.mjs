@@ -60,6 +60,9 @@ export function createFleetAllowance({ bucket, prefix, serviceId, token, fetchIm
               && qualification.verification_date === '2026-10-24';
             if (qualification && (qualification.verification_rooms !== undefined || qualification.verification_date !== undefined)
                 && (!verification || date < qualification.verification_date)) throw new Error('fleet_allowance_unavailable');
+            // Reuse the existing monthly ceiling; only five Oct24 daily slots move forward.
+            if (qualification?.verification_daily_rooms !== undefined
+                && (!verification || qualification.verification_daily_rooms !== 17)) throw new Error('fleet_allowance_unavailable');
             monthlyLimit = finalOctober && date >= qualification.date ? 85 + (qualification.completion_rooms ?? 0)
               + (verification ? 12 : 0) : 75;
             if (rooms.length > monthlyLimit) throw new Error('fleet_allowance_unavailable');
@@ -71,7 +74,7 @@ export function createFleetAllowance({ bucket, prefix, serviceId, token, fetchIm
           const dailyLimit = 15 + (qualification?.date === date
             ? qualification.extra_rooms + Math.min(qualification.completion_rooms ?? 0, 24) : 0)
             + ([36, 48, 60, 72].includes(qualification?.completion_rooms) && qualification.completion_date === date ? qualification.completion_rooms - 24 : 0)
-            + (qualification?.verification_rooms === 12 && qualification.verification_date === date ? 12 : 0);
+            + (qualification?.verification_rooms === 12 && qualification.verification_date === date ? qualification.verification_daily_rooms ?? 12 : 0);
           if (rooms.length >= monthlyLimit || rooms.filter(room => room.date === date).length >= dailyLimit) throw new Error('test_allowance_exhausted');
           const response = await request(`https://storage.googleapis.com/upload/storage/v1/b/${bucket}/o?uploadType=media&ifGenerationMatch=${generation}&name=${encodeURIComponent(name)}`,
             { method: 'POST', body: JSON.stringify({ schema: 'pyai-carrier-allowance-v1', service_id: serviceId, month,

@@ -408,3 +408,20 @@ test('one dated twelve-room verification keeps all failed reservations charged a
     assert.equal(bad.requests.filter(x=>x.method==='POST').length,0);
   }
 });
+
+
+test('dated daily redistribution retains 156 charges and the unchanged 169 month ceiling',async()=>{
+  const qualification={date:'2026-10-22',extra_rooms:60,extra_monthly_rooms:10,completion_rooms:72,
+    completion_date:'2026-10-23',verification_rooms:12,verification_date:'2026-10-24',verification_daily_rooms:17,reason:'final_carrier_qualification'};
+  const prior=Array.from({length:156},(_,i)=>({id:room(i+1),date:i<136?'2026-10-23':'2026-10-24'}));
+  const f=fixture();f.setClock(tick('2026-10-24'));f.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:prior,qualification});
+  for(let i=157;i<=168;i++)await f.make().reserve(room(i));
+  assert.deepEqual(f.item('2026-10').rooms.slice(0,156),prior);
+  await assert.rejects(f.make().reserve(room(169)),/test_allowance_exhausted/);
+  f.setClock(tick('2026-10-25'));await f.make().reserve(room(169));
+  await assert.rejects(f.make().reserve(room(170)),/test_allowance_exhausted/);
+  for(const delta of [{verification_daily_rooms:18},{verification_daily_rooms:0},{verification_date:'2026-10-25'},{verification_rooms:undefined}]){
+    const bad=fixture();bad.setClock(tick('2026-10-24'));bad.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:prior,qualification:{...qualification,...delta}});
+    await assert.rejects(bad.make().reserve(room(157)),/fleet_allowance_unavailable/);assert.equal(bad.requests.filter(x=>x.method==='POST').length,0);
+  }
+});
