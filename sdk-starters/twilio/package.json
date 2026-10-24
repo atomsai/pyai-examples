@@ -10,7 +10,7 @@
     "start": "node --env-file=.env server.mjs"
   },
   "dependencies": {
-    "@pyai/twilio": "0.4.7",
+    "@pyai/twilio": "0.4.9",
     "ws": "^8.18.0",
     "twilio": "^5.10.0"
   }

@@ -12,7 +12,7 @@ export function createFleetAllowance({ bucket, prefix, serviceId, token, fetchIm
       const budget = createStorageBudget({ now, sleep, deadline: options.deadline, errorCode: 'fleet_allowance_unavailable' });
       const date = new Date(now()).toISOString().slice(0, 10), month = date.slice(0, 7);
       const request = (url, init) => budget.request(fetchImpl, token, url, init);
-      // The finite retained ledger can contain 203 charged rooms; keep reads bounded.
+      // The finite retained ledger can contain 213 charged rooms; keep reads bounded.
       const readJson = response => budget.json(response, 16 * 1024);
       const name = `${prefix}/fleet-${serviceId}/allowance-${month}.json`;
       const objectUrl = `https://storage.googleapis.com/storage/v1/b/${bucket}/o/${encodeURIComponent(name)}`;
@@ -29,7 +29,7 @@ export function createFleetAllowance({ bucket, prefix, serviceId, token, fetchIm
             if (!/^[1-9][0-9]{0,30}$/.test(generation ?? '')) throw new Error('fleet_allowance_unavailable');
             const value = await readJson(await request(objectUrl + `?alt=media&generation=${generation}`));
             if (!value || typeof value !== 'object' || value.schema !== 'pyai-carrier-allowance-v1' || value.service_id !== serviceId || value.month !== month
-                || !Array.isArray(value.rooms) || value.rooms.length > 203 || value.rooms.some(room =>
+                || !Array.isArray(value.rooms) || value.rooms.length > 213 || value.rooms.some(room =>
                   !room || typeof room !== 'object' || !/^test-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(room.id ?? '')
                   || !/^\d{4}-\d{2}-\d{2}$/.test(room.date ?? '') || room.date.slice(0, 7) !== month
                   || !Number.isFinite(Date.parse(room.date)) || new Date(Date.parse(room.date)).toISOString().slice(0, 10) !== room.date)
@@ -56,13 +56,13 @@ export function createFleetAllowance({ bucket, prefix, serviceId, token, fetchIm
                 || (qualification.completion_date !== undefined && !sustainedCompletion)
                 || (sustainedCompletion && date < qualification.completion_date))) throw new Error('fleet_allowance_unavailable');
             const verification = finalOctober && qualification.completion_rooms === 72
-              && qualification.completion_date === '2026-10-23' && [12, 22, 32, 46].includes(qualification.verification_rooms)
+              && qualification.completion_date === '2026-10-23' && [12, 22, 32, 46, 56].includes(qualification.verification_rooms)
               && qualification.verification_date === '2026-10-24';
             if (qualification && (qualification.verification_rooms !== undefined || qualification.verification_date !== undefined)
                 && (!verification || date < qualification.verification_date)) throw new Error('fleet_allowance_unavailable');
             // Reuse the existing monthly ceiling; finite Oct24 slots move forward without refunding prior tests.
             if (qualification?.verification_daily_rooms !== undefined
-                && (!verification || qualification.verification_daily_rooms !== (qualification.verification_rooms === 46 ? 52 : qualification.verification_rooms === 32 ? 37 : qualification.verification_rooms === 22 ? 27 : 17))) throw new Error('fleet_allowance_unavailable');
+                && (!verification || qualification.verification_daily_rooms !== (qualification.verification_rooms === 56 ? 62 : qualification.verification_rooms === 46 ? 52 : qualification.verification_rooms === 32 ? 37 : qualification.verification_rooms === 22 ? 27 : 17))) throw new Error('fleet_allowance_unavailable');
             monthlyLimit = finalOctober && date >= qualification.date ? 85 + (qualification.completion_rooms ?? 0)
               + (verification ? qualification.verification_rooms : 0) : 75;
             if (rooms.length > monthlyLimit) throw new Error('fleet_allowance_unavailable');
@@ -74,7 +74,7 @@ export function createFleetAllowance({ bucket, prefix, serviceId, token, fetchIm
           const dailyLimit = 15 + (qualification?.date === date
             ? qualification.extra_rooms + Math.min(qualification.completion_rooms ?? 0, 24) : 0)
             + ([36, 48, 60, 72].includes(qualification?.completion_rooms) && qualification.completion_date === date ? qualification.completion_rooms - 24 : 0)
-            + ([12, 22, 32, 46].includes(qualification?.verification_rooms) && qualification.verification_date === date ? qualification.verification_daily_rooms ?? 12 : 0);
+            + ([12, 22, 32, 46, 56].includes(qualification?.verification_rooms) && qualification.verification_date === date ? qualification.verification_daily_rooms ?? 12 : 0);
           if (rooms.length >= monthlyLimit || rooms.filter(room => room.date === date).length >= dailyLimit) throw new Error('test_allowance_exhausted');
           const response = await request(`https://storage.googleapis.com/upload/storage/v1/b/${bucket}/o?uploadType=media&ifGenerationMatch=${generation}&name=${encodeURIComponent(name)}`,
             { method: 'POST', body: JSON.stringify({ schema: 'pyai-carrier-allowance-v1', service_id: serviceId, month,

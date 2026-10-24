@@ -428,7 +428,7 @@ test('dated daily redistribution retains 156 charges and the unchanged 169 month
 
 
 test('finite qualification grants preserve all failed charges and restore ordinary next-month limits',async()=>{
- for(const [verificationRooms,dailyBonus,priorCount,monthlyLimit] of [[22,27,166,179],[32,37,176,189],[46,52,176,203]]){
+ for(const [verificationRooms,dailyBonus,priorCount,monthlyLimit] of [[22,27,166,179],[32,37,176,189],[46,52,176,203],[56,62,186,213]]){
   const qualification={date:'2026-10-22',extra_rooms:60,extra_monthly_rooms:10,completion_rooms:72,completion_date:'2026-10-23',verification_rooms:verificationRooms,verification_date:'2026-10-24',verification_daily_rooms:dailyBonus,reason:'final_carrier_qualification'};
   const prior=Array.from({length:priorCount},(_,i)=>({id:room(i+1),date:i<136?'2026-10-23':'2026-10-24'}));
   const f=fixture();f.setClock(tick('2026-10-24'));f.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:prior,qualification});

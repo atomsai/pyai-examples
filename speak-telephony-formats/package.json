@@ -12,6 +12,6 @@
   },
   "dependencies": {
     "@pyai/sdk": "^0.9.0",
-    "@pyai/twilio": "^0.4.8"
+    "@pyai/twilio": "^0.4.9"
   }
 }
