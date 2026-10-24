@@ -425,3 +425,15 @@ test('dated daily redistribution retains 156 charges and the unchanged 169 month
     await assert.rejects(bad.make().reserve(room(157)),/fleet_allowance_unavailable/);assert.equal(bad.requests.filter(x=>x.method==='POST').length,0);
   }
 });
+
+
+test('one bounded progress qualification keeps all166 charges and caps October179/daily42',async()=>{
+ const qualification={date:'2026-10-22',extra_rooms:60,extra_monthly_rooms:10,completion_rooms:72,completion_date:'2026-10-23',verification_rooms:22,verification_date:'2026-10-24',verification_daily_rooms:27,reason:'final_carrier_qualification'};
+ const prior=Array.from({length:166},(_,i)=>({id:room(i+1),date:i<136?'2026-10-23':'2026-10-24'}));
+ const f=fixture();f.setClock(tick('2026-10-24'));f.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:prior,qualification});
+ for(let i=167;i<=178;i++)await f.make().reserve(room(i));assert.deepEqual(f.item('2026-10').rooms.slice(0,166),prior);await assert.rejects(f.make().reserve(room(179)),/test_allowance_exhausted/);
+ f.setClock(tick('2026-10-25'));await f.make().reserve(room(179));await assert.rejects(f.make().reserve(room(180)),/test_allowance_exhausted/);
+ for(const delta of [{verification_rooms:23},{verification_daily_rooms:28},{verification_daily_rooms:17},{verification_date:'2026-10-25'}]){
+  const bad=fixture();bad.setClock(tick('2026-10-24'));bad.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:prior,qualification:{...qualification,...delta}});await assert.rejects(bad.make().reserve(room(167)),/fleet_allowance_unavailable/);
+ }
+});
