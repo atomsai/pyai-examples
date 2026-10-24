@@ -379,8 +379,32 @@ test('the shared storage budget bounds a stuck token and response body and preve
 });
 
 
-test('retained-ledger reads reject bodies beyond twelve KiB before any write',async()=>{
-  const f=fixture();f.intercept(()=>new Response(' '.repeat(12*1024+1),{status:200}));
+test('retained-ledger reads reject bodies beyond fourteen KiB before any write',async()=>{
+  const f=fixture();f.intercept(()=>new Response(' '.repeat(14*1024+1),{status:200}));
   await assert.rejects(f.make().reserve(room(1)),error=>error.code==='storage_response_limit');
   assert.equal(f.requests.filter(row=>row.method==='POST').length,0);
+});
+
+
+test('one dated twelve-room verification keeps all failed reservations charged and resets only ordinary next-month limits',async()=>{
+  const qualification={date:'2026-10-22',extra_rooms:60,extra_monthly_rooms:10,completion_rooms:72,
+    completion_date:'2026-10-23',verification_rooms:12,verification_date:'2026-10-24',reason:'final_carrier_qualification'};
+  const prior=Array.from({length:146},(_,i)=>({id:room(i+1),date:i<136?'2026-10-23':'2026-10-24'}));
+  const f=fixture();f.setClock(tick('2026-10-24'));f.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:prior,qualification});
+  for(let i=147;i<=158;i++)await f.make().reserve(room(i));
+  assert.deepEqual(f.item('2026-10').rooms.slice(0,146),prior);
+  assert.deepEqual(f.item('2026-10').qualification,qualification);
+  await f.make().reserve(room(1));assert.equal(f.item('2026-10').rooms.length,158);
+  for(let i=159;i<=163;i++)await f.make().reserve(room(i));
+  await assert.rejects(f.make().reserve(room(164)),/test_allowance_exhausted/);
+  f.setClock(tick('2026-10-25'));for(let i=164;i<=169;i++)await f.make().reserve(room(i));
+  await assert.rejects(f.make().reserve(room(170)),/test_allowance_exhausted/);
+  f.setClock(tick('2026-11-01'));for(let i=200;i<215;i++)await f.make().reserve(room(i));
+  await assert.rejects(f.make().reserve(room(215)),/test_allowance_exhausted/);assert.equal(f.item('2026-11').qualification,undefined);
+  for(const delta of [{verification_rooms:13},{verification_date:'2026-10-25'},{completion_rooms:60},
+    {verification_rooms:undefined},{verification_date:undefined}]){
+    const bad=fixture();bad.setClock(tick('2026-10-24'));bad.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:prior,qualification:{...qualification,...delta}});
+    await assert.rejects(bad.make().reserve(room(147)),/fleet_allowance_unavailable/);
+    assert.equal(bad.requests.filter(x=>x.method==='POST').length,0);
+  }
 });
