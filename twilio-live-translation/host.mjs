@@ -1,4 +1,4 @@
-import { InterpretationRecording } from "@pyai/twilio";
+import { InterpretationRecording, interpretationLanguagePair } from "@pyai/twilio";
 import { randomBytes, randomUUID } from 'node:crypto';
 import twilio from 'twilio';
 import { InterpretationRoom, TwilioInterpretationTransport, TwilioStreamAdmission, connectStreamTwiML } from '@pyai/twilio';
@@ -31,7 +31,8 @@ export class TranslationHost {
   async create(input) {
     if (this.room && (this.room.state !== 'closed' || this.room.cleanup !== 'calls_terminal_verified')) throw new Error('room_already_exists');
     if (this.created >= this.maxRooms || this.now() >= this.absoluteDeadline) throw new Error('session_limit');
-    if (!['hi', 'pa'].includes(input.language) || !/^[\w.-]{1,80}$/.test(input.customerVoice ?? '')
+    const pair = interpretationLanguagePair(input.language, input.agentLanguage ?? 'en');
+    if (!pair.customer.voices.includes(input.customerVoice) || !pair.agent.voices.includes(input.agentVoice) || !/^[\w.-]{1,80}$/.test(input.customerVoice ?? '')
         || !/^[\w.-]{1,80}$/.test(input.agentVoice ?? '')) throw new Error('invalid_room');
     const room = { id: `test-${randomUUID()}`, state: 'waiting', createdAt: this.now(),
       expiresAt: Math.min(this.now() + 480_000, this.absoluteDeadline), endpoints: {}, events: [], retired: new Set(), sequence: 0,
@@ -42,18 +43,18 @@ export class TranslationHost {
     const grants = {};
     try {
       await this.reserveRoom({ id: room.id, expiresAt: room.expiresAt });
-      await this.journal({ event: 'host.room.created', language: input.language }, room);
+      await this.journal({ event: 'host.room.created', language: pair.customer.code, agent_language: pair.agent.code }, room);
       if (this.room !== room || room.closing) throw new Error('room_closed');
       for (const role of ROLES) {
         const grant = id();
         const endpoint = { role, grant, identity: `pyai_test_${this.config.identityPrefix ? this.config.identityPrefix + '_' : ''}${randomBytes(12).toString('hex')}`,
-          participant: { participant_id: `${room.id}-${role}`, language: role === 'customer' ? input.language : 'en',
+          participant: { participant_id: `${room.id}-${role}`, language: role === 'customer' ? pair.customer.code : pair.agent.code,
             voice: role === 'customer' ? input.customerVoice : input.agentVoice },
           minted: false, callId: '', transport: null, limitReady: null };
         room.endpoints[role] = endpoint; this.grants.set(grant, endpoint);
         grants[role] = `${this.origin.origin}/#${grant}`;
       }
-      return { id: room.id, ...(room.recording ? {recording_id:input.recording.id} : {}), expires_at: new Date(room.expiresAt).toISOString(), links: grants };
+      return { id: room.id,languages:[pair.customer.code,pair.agent.code], ...(room.recording ? {recording_id:input.recording.id} : {}), expires_at: new Date(room.expiresAt).toISOString(), links: grants };
     } catch (error) { await this.finish('journal_failed', room); throw error; }
   }
 

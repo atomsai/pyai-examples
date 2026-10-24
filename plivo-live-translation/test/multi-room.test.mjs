@@ -75,7 +75,7 @@ test('ten overlapping durable admissions own distinct endpoint triples and an el
 test('concurrent interpreters isolate captions, signed admission, transfers, commits and room ownership', async () => {
   const f = fixture();
   try {
-    const [first, second] = await Promise.all([f.host.create(input, scope(1)), f.host.create({ ...input, language: 'pa' }, scope(2))]);
+    const [first, second] = await Promise.all([f.host.create(input, scope(1)), f.host.create({ ...input, language: 'pa',customerVoice:'pa1' }, scope(2))]);
     const a = await connect(f.host, first, scope(1), 'customer', 1);
     await connect(f.host, first, scope(1), 'agent', 2);
     await connect(f.host, second, scope(2), 'customer', 3);

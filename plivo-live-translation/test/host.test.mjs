@@ -137,7 +137,7 @@ test('two Plivo sockets create one interpreter and the replacement uses that sam
     assert.equal(retired.length, 3); assert.equal(new Set(retired).size, 3);
     assert.equal(host.snapshot().cleanup, 'calls_terminal_verified');
     assert.ok(records.every(event => event.host_room_id === host.room.id && !('audio' in event)));
-    await host.create({ ...input, language: 'pa' }); await host.finish();
+    await host.create({ ...input, language: 'pa',customerVoice:'pa1' }); await host.finish();
     await assert.rejects(host.create(input), /session_limit/);
   } finally { await host.finish(); }
 });
@@ -234,7 +234,7 @@ test('only the consumed signed admission binds one socket to its exact live role
     assert.equal(transports.length, 1); assert.equal(replay.closes.length, 1);
     assert.equal(admit(), null); assert.equal(consumes, 1, 'SDK permit is never consumed twice');
     await host.finish(); assert.equal(verify(binding), false, 'late Start cannot revive closed room');
-    await host.create({ ...input, language: 'pa' }); assert.equal(verify(binding), false);
+    await host.create({ ...input, language: 'pa',customerVoice:'pa1' }); assert.equal(verify(binding), false);
     assert.ok(!JSON.stringify(host.snapshot()).includes(url));
   } finally { await host.finish(); }
 });
@@ -388,4 +388,16 @@ test('concurrent retirement is deduplicated and a rejected attempt permits clean
     assert.equal(attempts, 2); assert.equal(host.snapshot().cleanup, 'calls_terminal_verified');
     assert.deepEqual(host.snapshot().endpoints.customer.retirement, { proof: 'terminal_cdr', failure_code: null });
   } finally { await host.finish(); }
+});
+
+test('a non-English pair binds both roles and the replacement without accepting a mismatched voice',async()=>{
+ const host=new TranslationHost(config,{record:async()=>{},retire:async()=>{},mintToken:async()=> 'fixture-token',limitCall:async()=>{}});
+ try {
+   await assert.rejects(host.create({...input,language:'fr',agentLanguage:'ja',customerVoice:'fr1',agentVoice:'en1'}),/invalid_room/);
+   await assert.rejects(host.create({...input,language:'fr',agentLanguage:'fr',customerVoice:'fr1',agentVoice:'fr1'}),/invalid_room/);
+   await host.create({...input,language:'fr',agentLanguage:'ja',customerVoice:'fr1',agentVoice:'ja1'});
+   assert.equal(host.room.endpoints.customer.participant.language,'fr');assert.equal(host.room.endpoints.customer.participant.voice,'fr1');
+   assert.equal(host.room.endpoints.agent.participant.language,'ja');assert.equal(host.room.endpoints.replacement.participant.language,'ja');
+   assert.equal(host.room.endpoints.replacement.participant.voice,'ja1');
+ }finally{await host.finish();}
 });

@@ -118,7 +118,7 @@ test('two started legs create one interpreter; replacement preserves room, retir
     assert.equal(new Set(retired).size, 3); assert.equal(retired.length, 3);
     assert.equal(host.snapshot().cleanup, 'calls_terminal_verified');
     assert.ok(records.every(e => e.host_room_id === host.room.id && !('audio' in e)));
-    await host.create({ ...input, language: 'pa' });
+    await host.create({ ...input, language: 'pa',customerVoice:'pa1' });
     const currentId = host.room.id;
     rooms[0].opts.onClose('late_old_interpreter_failure');
     rooms[0].opts.legs.customer.transport.onFailure();
@@ -164,4 +164,16 @@ test('durable journal failure closes admission and uncertain cleanup prevents an
     assert.ok(!JSON.stringify(records).includes('credential-in-error-message'));
     assert.ok(records.some(event => event.event === 'host.room.closed' && event.reason === 'carrier_limit_failed'));
   } finally { await limitedHost.finish(); }
+});
+
+test('a non-English pair binds both roles and the replacement without accepting a mismatched voice',async()=>{
+ const host=new TranslationHost(config,{record:async()=>{},retire:async()=>{},mintToken:async()=> 'fixture-token',limitCall:async()=>{}});
+ try {
+   await assert.rejects(host.create({...input,language:'fr',agentLanguage:'ja',customerVoice:'fr1',agentVoice:'en1'}),/invalid_room/);
+   await assert.rejects(host.create({...input,language:'fr',agentLanguage:'fr',customerVoice:'fr1',agentVoice:'fr1'}),/invalid_room/);
+   await host.create({...input,language:'fr',agentLanguage:'ja',customerVoice:'fr1',agentVoice:'ja1'});
+   assert.equal(host.room.endpoints.customer.participant.language,'fr');assert.equal(host.room.endpoints.customer.participant.voice,'fr1');
+   assert.equal(host.room.endpoints.agent.participant.language,'ja');assert.equal(host.room.endpoints.replacement.participant.language,'ja');
+   assert.equal(host.room.endpoints.replacement.participant.voice,'ja1');
+ }finally{await host.finish();}
 });

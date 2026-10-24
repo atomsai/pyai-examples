@@ -108,8 +108,8 @@ const server = createServer(async (req, res) => {
     if (Date.now() >= deadline) return send(410, { error: 'test_expired' });
     // Cloud Run reserves some paths ending in z; keep application readiness on /health.
     if (req.method === 'GET' && req.url === '/health') return send(200, consolePermanent
-      ? { status: 'ready', recording_supported: true, mode: 'permanent', maximum_active_rooms: 10 }
-      : { status: 'ready', recording_supported: true, expires_at: new Date(deadline).toISOString() });
+      ? { status: 'ready', recording_supported: true, language_pairs:"all_supported",recording_formats:["mixed-v1","party-v1"], mode: 'permanent', maximum_active_rooms: 10 }
+      : { status: 'ready', recording_supported: true, language_pairs:"all_supported",recording_formats:["mixed-v1","party-v1"], expires_at: new Date(deadline).toISOString() });
     if (req.method === 'GET' && assets.has(req.url)) { const [type, value] = assets.get(req.url); return send(200, value, type); }
     if (req.method === 'POST' && ['/plivo/voice', '/plivo/status'].includes(req.url)) {
       if (!req.headers['content-type']?.startsWith('application/x-www-form-urlencoded')) return send(415, { error: 'invalid_content_type' });
@@ -127,7 +127,7 @@ const server = createServer(async (req, res) => {
       return send(401, { error: 'unauthorized' });
     }
     const scope = { project: req.headers['x-pyai-room-project'], owner: req.headers['x-pyai-room-owner'] };
-    if (req.method === 'GET' && req.url === '/capacity' && consolePermanent) return send(200, {...host.capacity(),recording_supported:true});
+    if (req.method === 'GET' && req.url === '/capacity' && consolePermanent) return send(200, {...host.capacity(),recording_supported:true,language_pairs:"all_supported",recording_formats:["mixed-v1","party-v1"]});
     if (req.method === 'POST' && req.url === '/drain' && consolePermanent) {
       const value = JSON.parse(await body(req));
       if (Object.keys(value).length !== 1 || typeof value.paused !== 'boolean') throw new Error('invalid_drain_state');
