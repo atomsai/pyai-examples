@@ -379,8 +379,8 @@ test('the shared storage budget bounds a stuck token and response body and preve
 });
 
 
-test('retained-ledger reads reject bodies beyond fourteen KiB before any write',async()=>{
-  const f=fixture();f.intercept(()=>new Response(' '.repeat(14*1024+1),{status:200}));
+test('retained-ledger reads reject bodies beyond sixteen KiB before any write',async()=>{
+  const f=fixture();f.intercept(()=>new Response(' '.repeat(16*1024+1),{status:200}));
   await assert.rejects(f.make().reserve(room(1)),error=>error.code==='storage_response_limit');
   assert.equal(f.requests.filter(row=>row.method==='POST').length,0);
 });
@@ -427,13 +427,17 @@ test('dated daily redistribution retains 156 charges and the unchanged 169 month
 });
 
 
-test('one bounded progress qualification keeps all166 charges and caps October179/daily42',async()=>{
- const qualification={date:'2026-10-22',extra_rooms:60,extra_monthly_rooms:10,completion_rooms:72,completion_date:'2026-10-23',verification_rooms:22,verification_date:'2026-10-24',verification_daily_rooms:27,reason:'final_carrier_qualification'};
- const prior=Array.from({length:166},(_,i)=>({id:room(i+1),date:i<136?'2026-10-23':'2026-10-24'}));
- const f=fixture();f.setClock(tick('2026-10-24'));f.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:prior,qualification});
- for(let i=167;i<=178;i++)await f.make().reserve(room(i));assert.deepEqual(f.item('2026-10').rooms.slice(0,166),prior);await assert.rejects(f.make().reserve(room(179)),/test_allowance_exhausted/);
- f.setClock(tick('2026-10-25'));await f.make().reserve(room(179));await assert.rejects(f.make().reserve(room(180)),/test_allowance_exhausted/);
- for(const delta of [{verification_rooms:23},{verification_daily_rooms:28},{verification_daily_rooms:17},{verification_date:'2026-10-25'}]){
-  const bad=fixture();bad.setClock(tick('2026-10-24'));bad.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:prior,qualification:{...qualification,...delta}});await assert.rejects(bad.make().reserve(room(167)),/fleet_allowance_unavailable/);
+test('finite qualification grants preserve all failed charges and restore ordinary next-month limits',async()=>{
+ for(const [verificationRooms,dailyBonus,priorCount,monthlyLimit] of [[22,27,166,179],[32,37,176,189],[46,52,176,203]]){
+  const qualification={date:'2026-10-22',extra_rooms:60,extra_monthly_rooms:10,completion_rooms:72,completion_date:'2026-10-23',verification_rooms:verificationRooms,verification_date:'2026-10-24',verification_daily_rooms:dailyBonus,reason:'final_carrier_qualification'};
+  const prior=Array.from({length:priorCount},(_,i)=>({id:room(i+1),date:i<136?'2026-10-23':'2026-10-24'}));
+  const f=fixture();f.setClock(tick('2026-10-24'));f.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:prior,qualification});
+  const lastDailyRoom=Math.min(monthlyLimit,136+15+dailyBonus);
+  for(let i=priorCount+1;i<=lastDailyRoom;i++)await f.make().reserve(room(i));assert.deepEqual(f.item('2026-10').rooms.slice(0,priorCount),prior);await assert.rejects(f.make().reserve(room(lastDailyRoom+1)),/test_allowance_exhausted/);
+  f.setClock(tick('2026-10-25'));for(let i=lastDailyRoom+1;i<=monthlyLimit;i++)await f.make().reserve(room(i));await assert.rejects(f.make().reserve(room(monthlyLimit+1)),/test_allowance_exhausted/);
+  f.setClock(tick('2026-11-01'));for(let i=300;i<315;i++)await f.make().reserve(room(i));await assert.rejects(f.make().reserve(room(315)),/test_allowance_exhausted/);assert.equal(f.item('2026-11').qualification,undefined);
+  for(const delta of [{verification_rooms:verificationRooms+1},{verification_daily_rooms:dailyBonus+1},{verification_daily_rooms:17},{verification_date:'2026-10-25'}]){
+   const bad=fixture();bad.setClock(tick('2026-10-24'));bad.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:prior,qualification:{...qualification,...delta}});await assert.rejects(bad.make().reserve(room(priorCount+1)),/fleet_allowance_unavailable/);assert.equal(bad.requests.filter(x=>x.method==='POST').length,0);
+  }
  }
 });
