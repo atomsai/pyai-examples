@@ -13,8 +13,7 @@ Run actual Plivo acceptance only after the Twilio acceptance stage.
 
 ## Dedicated carrier setup
 
-Build `sdk/twilio` from this candidate before installing this example. The new
-Plivo exports are not available in older SDK packages:
+In the monorepo, build the local SDK before installing this example:
 
 ```bash
 cd sdk/twilio
@@ -24,12 +23,13 @@ cd ../../examples/plivo-live-translation
 npm ci --ignore-scripts
 ```
 
-In a public `pyai-examples` clone, the package already names the published
-SDK dependency. From `plivo-live-translation`, use `npm install --ignore-scripts`
+The published `@pyai/twilio@0.4.9` includes the Plivo interpretation exports.
+In a public `pyai-examples` clone, the package names that published dependency.
+From `plivo-live-translation`, use `npm install --ignore-scripts`
 and `npm start`; the public mirror intentionally omits the platform lockfile.
 `Dockerfile` uses the full platform monorepo as its cloud build context.
 `Dockerfile.public` uses this example directory as its cloud build context
-after SDK `0.4.5` has been published. Keep cloud builds and carrier execution
+with the published SDK. Keep cloud builds and carrier execution
 within the bounds below.
 
 Use one disposable Plivo Application, with its Answer URL set to

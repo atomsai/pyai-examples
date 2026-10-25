@@ -22,9 +22,7 @@ capacity or a permanent production tester.
 
 ## Run the candidate
 
-Build `sdk/twilio` from this PR before installing this example. Its new
-interpretation exports require the upcoming SDK release; an older published
-package cannot run this host. In the monorepo:
+In the monorepo, build the local SDK before installing this example:
 
 ```bash
 cd sdk/twilio
@@ -34,8 +32,8 @@ cd ../../examples/twilio-live-translation
 npm install
 ```
 
-After SDK 0.4.4 and the public `pyai-examples` mirror are published, a public
-clone installs directly with `npm install` from this example folder. Its
+The published `@pyai/twilio@0.4.9` includes the interpretation exports. In the
+public `pyai-examples` mirror, install with `npm install` from this folder. Its
 dependencies resolve from npm; it does not contain the platform SDK source or
 the monorepo lockfile. Use `Dockerfile.public` with this folder as build context.
 The original `Dockerfile` uses the platform monorepo as context and builds the
