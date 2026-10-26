@@ -2,6 +2,18 @@
 
 Add Hear and Speak to an existing LiveKit Agents session.
 
+## Try it in your browser
+
+[Try Hear + Speak live](https://pyai-voice-demo-wfls74alya-uc.a.run.app/?source=livekit)
+before installing anything. Record or type a question about PyAI and hear the
+reply. Answers are scripted; speech and transcription use real PyAI APIs.
+Three free questions, no signup required; daily demo limits apply.
+
+This standalone reference app demonstrates the speech APIs, not a hosted
+LiveKit room.
+[Get a free API key](https://console.pyai.com/playground?signup=1&path=api&utm_source=pyai.com&utm_medium=starter&intent=livekit-demo)
+when you are ready to run the starter below.
+
 ## Requirements
 
 Python 3.10–3.13. Only a PyAI key for the included speech.wav smoke test. A complete room agent also needs LiveKit credentials and your chosen LLM; the linked guide covers that setup.
