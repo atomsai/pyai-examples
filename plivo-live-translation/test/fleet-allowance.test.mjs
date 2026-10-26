@@ -441,3 +441,26 @@ test('finite qualification grants preserve all failed charges and restore ordina
   }
  }
 });
+
+
+test('dated recording qualification retains 211 charges, admits a preflight and ten calls, leaves two team rooms, and expires next month', async () => {
+  const qualification={date:'2026-10-22',extra_rooms:60,extra_monthly_rooms:10,completion_rooms:72,
+    completion_date:'2026-10-23',verification_rooms:56,verification_date:'2026-10-24',verification_daily_rooms:62,
+    recording_rooms:11,recording_date:'2026-10-26',reason:'final_carrier_qualification'};
+  const prior=Array.from({length:211},(_,i)=>({id:room(i+1),date:'2026-10-24'}));
+  const f=fixture();f.setClock(tick('2026-10-26'));f.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:prior,qualification});
+  for(let i=212;i<=224;i++)await f.make().reserve(room(i));
+  assert.deepEqual(f.item('2026-10').rooms.slice(0,211),prior);
+  assert.equal(f.item('2026-10').rooms.length-211,13);
+  await assert.rejects(f.make().reserve(room(225)),/test_allowance_exhausted/);
+  await f.make().reserve(room(224));
+  f.setClock(tick('2026-11-01'));for(let i=300;i<315;i++)await f.make().reserve(room(i));
+  await assert.rejects(f.make().reserve(room(315)),/test_allowance_exhausted/);
+  assert.equal(f.item('2026-11').qualification,undefined);
+  for(const delta of [{recording_rooms:12},{recording_rooms:undefined},{recording_date:undefined},
+    {recording_date:'2026-10-27'},{verification_rooms:46}]){
+    const bad=fixture();bad.setClock(tick('2026-10-26'));bad.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:prior,qualification:{...qualification,...delta}});
+    await assert.rejects(bad.make().reserve(room(212)),/fleet_allowance_unavailable/);
+    assert.equal(bad.requests.filter(x=>x.method==='POST').length,0);
+  }
+});

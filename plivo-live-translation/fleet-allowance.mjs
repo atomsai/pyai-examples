@@ -12,7 +12,7 @@ export function createFleetAllowance({ bucket, prefix, serviceId, token, fetchIm
       const budget = createStorageBudget({ now, sleep, deadline: options.deadline, errorCode: 'fleet_allowance_unavailable' });
       const date = new Date(now()).toISOString().slice(0, 10), month = date.slice(0, 7);
       const request = (url, init) => budget.request(fetchImpl, token, url, init);
-      // The finite retained ledger can contain 213 charged rooms; keep reads bounded.
+      // The finite retained ledger can contain 224 charged rooms; keep reads bounded.
       const readJson = response => budget.json(response, 16 * 1024);
       const name = `${prefix}/fleet-${serviceId}/allowance-${month}.json`;
       const objectUrl = `https://storage.googleapis.com/storage/v1/b/${bucket}/o/${encodeURIComponent(name)}`;
@@ -29,7 +29,7 @@ export function createFleetAllowance({ bucket, prefix, serviceId, token, fetchIm
             if (!/^[1-9][0-9]{0,30}$/.test(generation ?? '')) throw new Error('fleet_allowance_unavailable');
             const value = await readJson(await request(objectUrl + `?alt=media&generation=${generation}`));
             if (!value || typeof value !== 'object' || value.schema !== 'pyai-carrier-allowance-v1' || value.service_id !== serviceId || value.month !== month
-                || !Array.isArray(value.rooms) || value.rooms.length > 213 || value.rooms.some(room =>
+                || !Array.isArray(value.rooms) || value.rooms.length > 224 || value.rooms.some(room =>
                   !room || typeof room !== 'object' || !/^test-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(room.id ?? '')
                   || !/^\d{4}-\d{2}-\d{2}$/.test(room.date ?? '') || room.date.slice(0, 7) !== month
                   || !Number.isFinite(Date.parse(room.date)) || new Date(Date.parse(room.date)).toISOString().slice(0, 10) !== room.date)
@@ -63,8 +63,12 @@ export function createFleetAllowance({ bucket, prefix, serviceId, token, fetchIm
             // Reuse the existing monthly ceiling; finite Oct24 slots move forward without refunding prior tests.
             if (qualification?.verification_daily_rooms !== undefined
                 && (!verification || qualification.verification_daily_rooms !== (qualification.verification_rooms === 56 ? 62 : qualification.verification_rooms === 46 ? 52 : qualification.verification_rooms === 32 ? 37 : qualification.verification_rooms === 22 ? 27 : 17))) throw new Error('fleet_allowance_unavailable');
+            const recordingQualification = verification && qualification.verification_rooms === 56
+              && qualification.recording_rooms === 11 && qualification.recording_date === '2026-10-26';
+            if (qualification && (qualification.recording_rooms !== undefined || qualification.recording_date !== undefined)
+                && (!recordingQualification || date < qualification.recording_date)) throw new Error('fleet_allowance_unavailable');
             monthlyLimit = finalOctober && date >= qualification.date ? 85 + (qualification.completion_rooms ?? 0)
-              + (verification ? qualification.verification_rooms : 0) : 75;
+              + (verification ? qualification.verification_rooms : 0) + (recordingQualification ? 11 : 0) : 75;
             if (rooms.length > monthlyLimit) throw new Error('fleet_allowance_unavailable');
           }
           if (rooms.some(room => room.id === roomId)) return;
