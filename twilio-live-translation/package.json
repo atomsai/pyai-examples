@@ -12,7 +12,7 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
-    "@pyai/twilio": "^0.4.9",
+    "@pyai/twilio": "^0.4.10",
     "@twilio/voice-sdk": "2.18.5",
     "twilio": "6.2.0",
     "ws": "^8.18.0"

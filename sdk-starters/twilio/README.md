@@ -8,7 +8,7 @@ Node.js 22+. A PyAI key, a Twilio phone number and auth token, and an HTTPS tunn
 
 ## Run
 
-This standalone starter uses `@pyai/twilio` 0.4.9 for playback receipts.
+This standalone starter uses `@pyai/twilio` 0.4.10 for playback receipts.
 
 ```sh
 npm install
