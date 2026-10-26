@@ -48,8 +48,14 @@ and single-use join grants. It does not accept a phone number to dial.
 Mount the values listed in `.env.example` through the runtime's secret store.
 The PyAI key must have `interpret:session` and live project access. Keep the
 Twilio auth token, API key secret, PyAI key and operator token on the server.
-Use a single instance, zero minimum instances, 512 MiB RAM and a maximum request
-timeout of 30 minutes. Keep the configured public origin fixed; the server never
+Use one state-owning process, 512 MiB RAM and a maximum request timeout of
+30 minutes. For Cloud Run, select service-level manual scaling with one
+instance (`--scaling=1`) and request-based billing (`--cpu-throttling`). A
+revision's `--max-instances=1` alone does not establish that both media sockets,
+webhooks and operator requests reach the same process. Manual scaling retains
+one warm worker and incurs idle hosting charges; remove the disposable host
+at its original deadline. For multiple workers, implement room-owner routing
+before enabling autoscaling. Keep the configured public origin fixed; the server never
 trusts forwarded host headers for signature validation.
 
 Set `TEST_DEADLINE` to one fixed UTC time within 30 minutes. The process accepts

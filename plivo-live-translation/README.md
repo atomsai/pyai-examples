@@ -80,8 +80,13 @@ that logs credentials. See
 
 ## Bounded runtime and cleanup
 
-Use one instance, zero minimum instances, 512 MiB RAM and request timeout at
-most 30 minutes. Set `PUBLIC_ORIGIN` to the final HTTPS host and `TEST_DEADLINE`
+Use one state-owning process, 512 MiB RAM and request timeout at most 30 minutes.
+For Cloud Run, select service-level manual scaling with one instance
+(`--scaling=1`) and request-based billing (`--cpu-throttling`). An automatic
+revision maximum of one is not a room-affinity guarantee. Manual scaling keeps
+a warm worker and incurs idle charges; remove this disposable host at its
+original deadline. A deployment with multiple workers needs room-owner routing
+for media, callbacks and controls. Set `PUBLIC_ORIGIN` to the final HTTPS host and `TEST_DEADLINE`
 once to an absolute UTC time within 30 minutes. The process permits two
 sequential rooms, each at most eight minutes. The carrier receives a scheduled
 Hangup and bounded `streamTimeout` in every accepted answer XML.
