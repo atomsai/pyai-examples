@@ -7,7 +7,7 @@ This server-side example uses a synthetic read-only office-hours tool. Read
 
 <!-- omni-install:start -->
 ```sh
-npm install @pyai/sdk@0.11.0
+npm install @pyai/sdk@0.12.0
 npx pyai init voice-demo --template omni
 cd voice-demo
 npm install
