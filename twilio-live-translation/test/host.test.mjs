@@ -14,6 +14,43 @@ const makeForm = (host, role, digit) => ({ AccountSid: config.accountSid,
   CallSid: `CA${digit.repeat(32)}`, From: `client:${host.room.endpoints[role].identity}`,
   JoinGrant: host.room.endpoints[role].grant });
 
+for (const predecessorFails of [false, true]) test(`concurrent durable writes publish a complete sequence prefix (predecessor fails: ${predecessorFails})`, async () => {
+  let releaseFirst, rejectFirst, releaseSecond;
+  const first = new Promise((resolve, reject) => { releaseFirst = resolve; rejectFirst = reject; });
+  const second = new Promise(resolve => { releaseSecond = resolve; });
+  const started = [], completed = [], recording = [];
+  const host = new TranslationHost(config, { record: async entry => {
+    if (!entry.event.startsWith('fixture.')) return;
+    started.push(entry.event);
+    await (entry.event === 'fixture.first' ? first : second);
+    completed.push(entry.event);
+  } });
+  try {
+    await host.create(input);
+    host.room.recording = { event: entry => recording.push(entry.host_sequence), finish: async () => {} };
+    const before = host.snapshot().events.length;
+    const writes = [host.journal({ event: 'fixture.first' }), host.journal({ event: 'fixture.second' })];
+    const settled = Promise.allSettled(writes);
+    await delay(0);
+    assert.deepEqual(started, ['fixture.first', 'fixture.second'], 'an earlier write must not serialize storage requests');
+    releaseSecond(); await delay(0);
+    assert.deepEqual(completed, ['fixture.second']);
+    assert.equal(host.snapshot().events.length, before, 'a later durable event cannot advance a reader past an unpublished predecessor');
+    assert.deepEqual(recording, []);
+    if (predecessorFails) rejectFirst(new Error('journal_write_failed')); else releaseFirst();
+    const results = await settled;
+    if (predecessorFails) {
+      assert.ok(results.every(result => result.status === 'rejected' && result.reason.message === 'journal_write_failed'));
+      assert.equal(host.snapshot().events.length, before, 'failed durability cannot manufacture a complete prefix');
+      assert.deepEqual(recording, []);
+    } else {
+      assert.ok(results.every(result => result.status === 'fulfilled'));
+      assert.deepEqual(host.snapshot().events.map(entry => entry.host_sequence), [1, 2, 3]);
+      assert.deepEqual(recording, [2, 3]);
+    }
+  } finally { releaseFirst(); releaseSecond(); await host.finish(); }
+});
+
 test('preview reserves durable allowance before issuing grants and clamps rooms to the fixed preview end', async () => {
   const reserved = [], host = new TranslationHost({ ...config, identityPrefix: 'a'.repeat(20) }, { now: () => 1000, maxRooms: 12, absoluteDeadline: 2000,
     reserveRoom: async value => reserved.push(value), record: async () => {}, retire: async () => {} });

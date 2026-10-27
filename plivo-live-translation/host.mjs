@@ -223,9 +223,15 @@ export class TranslationHost {
     if (event.event === 'audio.chunk') return;
     const { audio, ...metadata } = event;
     const entry = { ...metadata, host_room_id: room.id, host_sequence: ++room.sequence, recorded_at: new Date(this.now()).toISOString() };
-    if (room.events.length >= 2000 || Buffer.byteLength(JSON.stringify(entry)) > 65536) throw new Error('journal_limit');
-    await this.record(entry);
-    room.recording?.event(entry); room.events.push(entry);
+    if (room.sequence > 2000 || Buffer.byteLength(JSON.stringify(entry)) > 65536) throw new Error('journal_limit');
+    // Storage writes may finish out of order. Keep them concurrent, but expose
+    // only the acknowledged sequence prefix to snapshots and recording metadata.
+    const persisted = Promise.resolve().then(() => this.record(entry));
+    const published = Promise.all([room.journalTail ?? Promise.resolve(), persisted]).then(() => {
+      room.recording?.event(entry); room.events.push(entry);
+    });
+    room.journalTail = published;
+    await published;
   }
 
   async retireOnce(callId) {
