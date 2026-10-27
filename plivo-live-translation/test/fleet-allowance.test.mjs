@@ -482,3 +482,19 @@ test('final recording retry retains all 224 charges, admits ten calls and fiftee
     await assert.rejects(bad.make().reserve(room(225)),/fleet_allowance_unavailable/);assert.equal(bad.requests.filter(x=>x.method==='POST').length,0);
   }
 });
+
+
+test('the same approved 249-room allowance can move its dated retry allocation without refunding charges or adding monthly rooms', async () => {
+  const qualification={date:'2026-10-22',extra_rooms:60,extra_monthly_rooms:10,completion_rooms:72,
+    completion_date:'2026-10-23',verification_rooms:56,verification_date:'2026-10-24',verification_daily_rooms:62,
+    recording_rooms:36,recording_date:'2026-10-26',recording_retry_date:'2026-10-27',reason:'final_carrier_qualification'};
+  const prior=Array.from({length:234},(_,i)=>({id:room(i+1),date:i<211?'2026-10-24':i<224?'2026-10-26':'2026-10-27'}));
+  const f=fixture();f.setClock(tick('2026-10-27'));f.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:prior,qualification});
+  for(let i=235;i<=249;i++)await f.make().reserve(room(i));
+  assert.deepEqual(f.item('2026-10').rooms.slice(0,234),prior);
+  await assert.rejects(f.make().reserve(room(250)),/test_allowance_exhausted/);
+  for(const delta of [{recording_rooms:11},{recording_retry_date:'2026-10-28'},{recording_retry_date:'2026-11-01'}]){
+    const bad=fixture();bad.setClock(tick('2026-10-27'));bad.store('2026-10',{schema:'pyai-carrier-allowance-v1',service_id:serviceId,month:'2026-10',rooms:prior,qualification:{...qualification,...delta}});
+    await assert.rejects(bad.make().reserve(room(235)),/fleet_allowance_unavailable/);assert.equal(bad.requests.filter(x=>x.method==='POST').length,0);
+  }
+});

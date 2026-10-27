@@ -67,7 +67,11 @@ export function createFleetAllowance({ bucket, prefix, serviceId, token, fetchIm
               && [11, 36].includes(qualification.recording_rooms) && qualification.recording_date === '2026-10-26';
             if (qualification && (qualification.recording_rooms !== undefined || qualification.recording_date !== undefined)
                 && (!recordingQualification || date < qualification.recording_date)) throw new Error('fleet_allowance_unavailable');
-            recordingDailyBonus = recordingQualification && qualification.recording_rooms === 36 && qualification.recording_date === date ? 25 : 0;
+            if (qualification?.recording_retry_date !== undefined
+                && (!recordingQualification || qualification.recording_rooms !== 36
+                    || qualification.recording_retry_date !== '2026-10-27')) throw new Error('fleet_allowance_unavailable');
+            const recordingDay = qualification?.recording_retry_date ?? qualification?.recording_date;
+            recordingDailyBonus = recordingQualification && qualification.recording_rooms === 36 && recordingDay === date ? 25 : 0;
             monthlyLimit = finalOctober && date >= qualification.date ? 85 + (qualification.completion_rooms ?? 0)
               + (verification ? qualification.verification_rooms : 0) + (recordingQualification ? qualification.recording_rooms : 0) : 75;
             if (rooms.length > monthlyLimit) throw new Error('fleet_allowance_unavailable');
