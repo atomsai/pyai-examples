@@ -109,3 +109,22 @@ the real carrier test proves the behavior.
 
 This is a private two-conversation acceptance host. It does not claim production
 capacity, JustCall integration, PSTN qualification or human translation quality.
+
+### Concurrent carrier acceptance
+
+The bounded server accepts `CONCURRENT_ROOMS=10` for an isolated ten-conversation
+run. Use a fresh operation-specific `JOURNAL_PREFIX`; each admission writes an
+immutable slot reservation before issuing a join grant. Failed admissions remain
+charged and a process restart cannot reuse the prefix. This mode is separate
+from the single-room Console preview and retains the original 30-minute server
+deadline and eight-minute maximum room limit. `ROOM_SECONDS` may shorten that
+limit for a funded test; it cannot extend it. Run exactly one serving instance; no
+autoscaling or distributed room routing is provided by this example.
+
+The operator sends its existing admin bearer plus `X-PyAI-Room-Project` and
+`X-PyAI-Room-Owner` on `/rooms`, `/join`, `/commit`, `/end` and `/room`. Include
+`room_id` in POST controls and `/room?room_id=...` reads. Browser join requests
+are brokered by the operator; never place the admin bearer in frontend code.
+Use `/capacity` for bounded pool status. Signed carrier webhooks and one-use media
+admissions route to the exact owning room. Each room accepts an independent
+recording upload ticket created by the normal call-history API.

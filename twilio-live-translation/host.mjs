@@ -11,7 +11,7 @@ export class TranslationHost {
   constructor(config, { record, Room = InterpretationRoom, Transport = TwilioInterpretationTransport,
     retire = async () => { throw new Error('carrier_cleanup_unavailable'); },
     limitCall = async () => { throw new Error('carrier_limit_unavailable'); }, now = Date.now,
-    maxRooms = 2, absoluteDeadline = Infinity, reserveRoom = async () => {} } = {}) {
+    maxRooms = 2, absoluteDeadline = Infinity, roomLifetimeMs = 480_000, reserveRoom = async () => {} } = {}) {
     if (!/^AC[0-9a-f]{32}$/i.test(config.accountSid) || !/^AP[0-9a-f]{32}$/i.test(config.applicationSid)
         || !/^SK[0-9a-f]{32}$/i.test(config.apiKeySid) || !config.apiKeySecret || !config.authToken
         || !config.pyaiKey || typeof record !== 'function'
@@ -22,8 +22,8 @@ export class TranslationHost {
     this.config = config; this.record = record; this.Room = Room; this.Transport = Transport;
     this.retire = retire; this.limitCall = limitCall; this.now = now; this.room = null; this.created = 0;
     if (!Number.isInteger(maxRooms) || maxRooms < 1 || maxRooms > 12 || typeof reserveRoom !== 'function'
-        || !(absoluteDeadline > now())) throw new Error('invalid_room_bound');
-    this.maxRooms = maxRooms; this.absoluteDeadline = absoluteDeadline; this.reserveRoom = reserveRoom;
+        || !(absoluteDeadline > now()) || !Number.isInteger(roomLifetimeMs) || roomLifetimeMs < 1000 || roomLifetimeMs > 480_000) throw new Error('invalid_room_bound');
+    this.maxRooms = maxRooms; this.roomLifetimeMs = roomLifetimeMs; this.absoluteDeadline = absoluteDeadline; this.reserveRoom = reserveRoom;
     this.grants = new Map(); this.streams = new Map();
     this.admission = new TwilioStreamAdmission(this.origin.href.replace('https:', 'wss:'), config.authToken, 3);
   }
@@ -35,7 +35,7 @@ export class TranslationHost {
     if (!pair.customer.voices.includes(input.customerVoice) || !pair.agent.voices.includes(input.agentVoice) || !/^[\w.-]{1,80}$/.test(input.customerVoice ?? '')
         || !/^[\w.-]{1,80}$/.test(input.agentVoice ?? '')) throw new Error('invalid_room');
     const room = { id: `test-${randomUUID()}`, state: 'waiting', createdAt: this.now(),
-      expiresAt: Math.min(this.now() + 480_000, this.absoluteDeadline), endpoints: {}, events: [], retired: new Set(), sequence: 0,
+      expiresAt: Math.min(this.now() + this.roomLifetimeMs, this.absoluteDeadline), endpoints: {}, events: [], retired: new Set(), sequence: 0,
       closing: false, cleanup: null, interpretation: null, retiring: new Map() };
     if (input.recording) room.recording = new InterpretationRecording(input.recording, room.id, this.now);
     this.room = room; this.created++;
