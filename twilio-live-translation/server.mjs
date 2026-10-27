@@ -9,6 +9,7 @@ import twilio from 'twilio';
 import { TranslationHost } from './host.mjs';
 import { MultiRoomTranslationHost } from './multi-room.mjs';
 import { createPreviewRoomBudget } from './preview.mjs';
+import { createEventJournal } from './journal.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -37,6 +38,8 @@ async function cloudToken() {
   return adc.value;
 }
 
+const writeJournal = createEventJournal({ bucket: env.JOURNAL_BUCKET, prefix: env.JOURNAL_PREFIX, token: cloudToken });
+
 const previewBudget = consolePreview ? createPreviewRoomBudget({ bucket: env.JOURNAL_BUCKET,
   prefix: env.JOURNAL_PREFIX, previewId: env.PREVIEW_ID, deadline, token: cloudToken }) : null;
 const host = new (concurrentTest ? MultiRoomTranslationHost : TranslationHost)(config, {
@@ -59,12 +62,7 @@ const host = new (concurrentTest ? MultiRoomTranslationHost : TranslationHost)(c
     if (!terminal.includes(final.status)) throw new Error('call_not_terminal');
   },
   record: async entry => {
-    const token = await cloudToken();
-    const name = `${env.JOURNAL_PREFIX}/${entry.host_room_id}/${String(entry.host_sequence).padStart(6, '0')}.json`;
-    const response = await fetch(`https://storage.googleapis.com/upload/storage/v1/b/${env.JOURNAL_BUCKET}/o?uploadType=media&ifGenerationMatch=0&name=${encodeURIComponent(name)}`,
-      { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(entry), signal: AbortSignal.timeout(1700) });
-    if (!response.ok) throw new Error('journal_write_failed');
+    await writeJournal(entry);
     if (entry.event === 'host.room.closed' && entry.cleanup === 'calls_terminal_verified') previewBudget?.retired(entry.host_room_id);
   },
 });
