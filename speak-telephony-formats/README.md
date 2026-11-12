@@ -1,101 +1,66 @@
-# Speak telephony formats: 120 lines of DSP → one param
+# Streaming TTS for phone audio
 
-**Speak (`POST /v1/audio/speech`) now encodes the audio server-side.** Ask for
-`response_format: "g711_ulaw"` and you get back exactly the bytes a Twilio Media
-Stream or SIP leg wants, 8 kHz mono μ-law, with no client-side resampler and no
-μ-law encoder. The same `response_format` + `sample_rate` give you `wav`, `pcm`,
-`mp3`, `opus`, and `g711_alaw` too.
+Use **Speak** for streaming text-to-speech in a phone application. This existing
+example sends one fixed 49-character greeting and consumes raw **8 kHz mono
+G.711 μ-law** chunks as they arrive. It writes `out.ulaw` without buffering the
+whole response. It does not connect to a carrier, place a call, or play audio.
 
-```
-                       BEFORE                                    AFTER
-  Speak ─▶ wav@24k ─▶ [your resampler 24k→8k] ─▶      Speak ─▶ g711_ulaw@8k ─▶ Twilio
-                      [your μ-law encoder]    ─▶ Twilio        (one request param)
-                      ~120 lines of DSP you own & test
-```
+## Run the Node example
 
-## The accepted formats
+Node.js 22+, no dependencies:
 
-| `response_format` | sample rates (Hz) | Content-Type | notes |
-|---|---|---|---|
-| `mp3` | 8000 / 16000 / 24000 / 48000 | `audio/mpeg` | buffered (not chunk-streamed) |
-| `wav` | 8000 / 16000 / 24000 / 48000 | `audio/wav` | default |
-| `opus` | 8000 / 16000 / 24000 / 48000 | `audio/ogg` | buffered |
-| `aac` | 8000 / 16000 / 24000 / 48000 | `audio/aac` | buffered |
-| `flac` | 8000 / 16000 / 24000 / 48000 | `audio/flac` | lossless |
-| `pcm` | 8000 / 16000 / 24000 / 48000 | `audio/pcm` | raw int16 LE mono, no header |
-| `g711_ulaw` | 8000 (forced) | `audio/basic` | Twilio / PSTN μ-law |
-| `g711_alaw` | 8000 (forced) | `audio/basic` | A-law (EU telephony) |
-
-Any value outside this set is rejected with `400 unsupported_format`. `sample_rate`
-is optional, omit it for the engine's native 24 kHz (`g711_*` is always 8 kHz);
-omit `response_format` for the default `wav`. Responses carry `x-pyai-format` and
-`x-pyai-sample-rate` headers so you can confirm what you got.
-
-## Run it
-
-```bash
-cp .env.example .env       # then edit PYAI_API_KEY (a pyai_test_ key is fine)
-
-# Node (also demonstrates the @pyai/twilio μ-law helpers as the "before")
-npm install
+```sh
+cp .env.example .env
+# Set a test key and its confirmed PYAI_PROJECT_ID; review its usage limits.
 npm start
-
-# Python (zero third-party deps)
-python3 speak_g711.py
 ```
 
-Both write `out.ulaw` (raw 8 kHz μ-law) and print its size and the response
-headers.
+The example reads `GET /v1/me`, prints project identity and billing/limit fields,
+and stops before synthesis if the project differs, is live, lacks the scope or
+has an invalid or zero daily cap. An absent or null daily cap means no provider
+daily ceiling; the example still enforces its independent one-request bound.
+Review the project's remaining usage separately:
+`/v1/me` reports configured caps, not a remaining-usage counter. Starting it
+requests **one** greeting under that project's limits. There are no retries,
+and a 30-second deadline aborts the request and stream. Cancellation cannot
+undo usage already processed. See [current billing](https://pyai.com/pricing).
+An existing `out.ulaw` is preserved; move it before running again.
 
-## The one-liner, three ways
+The request sets `stream: true`, `response_format: "g711_ulaw"`, and
+`sample_rate: 8000`. Node's stream pipeline preserves backpressure and cancels
+upstream on sink failure. For a connected phone transport, frame and pace these
+bytes to its requirements; HTTP chunk boundaries are not telephony frames.
+Base64-encode each paced μ-law payload for Twilio Media Streams. Do not base64
+an entire long response into one frame. Carrier setup and charges are separate.
 
-### Node, `@pyai/sdk` + `@pyai/twilio`
+Use PCM for sinks that require signed 16-bit little-endian samples. MP3 and
+Opus responses are buffered; choosing them does not demonstrate low-latency
+chunk synthesis. See the [Speak format and streaming guide](https://docs.pyai.com/guides/speak-overview).
 
-```js
-import PyAI from "@pyai/sdk";
-const pyai = new PyAI({ apiKey: process.env.PYAI_API_KEY });
+## Python streaming counterpart
 
-// AFTER: server returns μ-law@8k directly, base64 straight into a Twilio frame.
-const ulaw = new Uint8Array(
-  await pyai.audio.speech({
-    input: "Your appointment is confirmed.",
-    voice: "stock_emma_en_gb",
-    response_format: "g711_ulaw",
-  }),
-);
-const twilioMediaPayload = Buffer.from(ulaw).toString("base64");
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install pyai-sdk==0.5.0
+set -a
+. ./.env
+set +a
+python speak_g711.py
 ```
 
-### Python, `pyai-sdk`
+This uses `speech_stream` and writes each received chunk. It checks the same test
+project first, sends one greeting and does not retry. Its HTTP timeout is an
+inactivity timeout, not a total wall-clock deadline; use the Node example when
+a strict total deadline is required. Do not run both unless both requests fit
+your approved usage budget.
 
-```python
-import base64, os
-from pyai import PyAI
+## Test without generating audio
 
-pyai = PyAI(api_key=os.environ["PYAI_API_KEY"])
-ulaw = pyai.audio.speech(
-    input="Your appointment is confirmed.",
-    voice="stock_emma_en_gb",
-    response_format="g711_ulaw",   # -> audio/basic, forced 8 kHz
-)
-twilio_media_payload = base64.b64encode(ulaw).decode()
+```sh
+npm test
 ```
 
-### Raw curl, no SDK
-
-```bash
-curl -sS https://api.pyai.com/v1/audio/speech \
-  -H "Authorization: Bearer $PYAI_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"input":"Your appointment is confirmed.","voice":"stock_emma_en_gb","response_format":"g711_ulaw"}' \
-  -D - -o out.ulaw
-# Response headers include:
-#   content-type: audio/basic
-#   x-pyai-format: g711_ulaw
-#   x-pyai-sample-rate: 8000
-# `out.ulaw` is raw 8 kHz mono μ-law, base64 it into a Twilio <Stream> media frame.
-```
-
-> Want a different rate? `pcm` at `sample_rate: 16000` for a 16 kHz agent
-> pipeline, `mp3` for progressive download, `opus` for WebRTC. Same call, one
-> param.
+Tests inject a mock HTTP transport and synthetic bytes: early chunk delivery,
+one POST, identity mismatch, failed responses, cancellation and sink failure.
+They establish stream behavior, not synthesis quality or audible playback.

@@ -1,57 +1,67 @@
-// Speak telephony formats, "120 lines of DSP" vs "one param".
-//
-// AFTER (the win): ask Speak for response_format: "g711_ulaw" and the server
-// returns 8 kHz mono μ-law, the exact bytes a Twilio Media Stream wants. No
-// client-side resampler, no μ-law encoder.
-//
-// BEFORE (what you used to write): request wav@24k, then resample 24k→8k and
-// μ-law-encode it yourself. This file shows that path too, using the audio
-// helpers from @pyai/twilio (muLawEncode + makeResampler), so you can see
-// exactly how much code the one param replaces. This runs two billable speech
-// requests; independently generated audio can have different durations.
-//
-// Run: cp .env.example .env  &&  npm install  &&  npm start
-import { writeFile } from "node:fs/promises";
-import PyAI from "@pyai/sdk";
-import { bytesToPcm16, makeResampler, muLawEncode } from "@pyai/twilio";
+// One bounded streaming request. No carrier connection or automatic retries.
+import { open, rm } from "node:fs/promises";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import { pathToFileURL } from "node:url";
 
-const apiKey = process.env.PYAI_API_KEY;
-if (!apiKey) {
-  console.error("Set PYAI_API_KEY (copy .env.example to .env). A pyai_test_ key is fine.");
-  process.exit(1);
+export const TEXT = "Your appointment is confirmed for Tuesday at ten.";
+
+export async function streamGreeting({ apiKey, projectId, voice = "stock_emma_en_gb",
+  baseURL = "https://api.pyai.com", fetchImpl = fetch, sink,
+  signal = AbortSignal.timeout(30_000), report = console.log }) {
+  if (!apiKey || !projectId) throw new Error("Set PYAI_API_KEY and PYAI_PROJECT_ID for the intended test project.");
+  const headers = { Authorization: `Bearer ${apiKey}` };
+  const base = baseURL.replace(/\/$/, "");
+  const identity = await fetchImpl(`${base}/v1/me`, { headers, signal });
+  if (!identity.ok) throw new Error(`Identity check failed: HTTP ${identity.status}; no synthesis requested.`);
+  const me = await identity.json();
+  report(JSON.stringify({ org_id: me.org_id, project_id: me.project_id, env: me.env,
+    limits: me.limits, credit: me.credit, key_budget_cents: me.key_budget_cents }));
+  if (me.project_id !== projectId || me.env !== "test") {
+    throw new Error("Expected test project does not match /v1/me; no synthesis requested.");
+  }
+  if (!me.scopes?.includes("speak:synthesize")) throw new Error("Test key lacks speak:synthesize.");
+  const cap = me.limits?.daily_unit_cap;
+  if (!me.limits || typeof me.limits !== "object" || Array.isArray(me.limits)
+      || (cap != null && (!Number.isFinite(cap) || cap <= 0))) {
+    throw new Error("Invalid or zero test daily cap; no synthesis requested.");
+  }
+  // The identity contract defines absent/null as no provider-enforced daily cap.
+  if (cap == null) report("No daily cap enforced; this run is still bounded to one 49-character request.");
+  const response = await fetchImpl(`${base}/v1/audio/speech`, {
+    method: "POST", headers: { ...headers, "Content-Type": "application/json" }, signal,
+    body: JSON.stringify({ model: "pyai-speak", input: TEXT, voice,
+      response_format: "g711_ulaw", sample_rate: 8000, stream: true }),
+  });
+  if (!response.ok) {
+    await response.body?.cancel();
+    throw new Error(`Speech request failed: HTTP ${response.status}; do not retry automatically.`);
+  }
+  if (!response.body || response.headers.get("content-type")?.split(";")[0] !== "audio/basic") {
+    await response.body?.cancel();
+    throw new Error("Expected raw G.711 audio/basic response.");
+  }
+  // pipeline preserves sink backpressure and cancels upstream on abort/failure.
+  await pipeline(Readable.fromWeb(response.body), sink, { signal });
 }
 
-const pyai = new PyAI({ apiKey, baseURL: process.env.PYAI_BASE_URL ?? "https://api.pyai.com" });
-const TEXT = "Your appointment is confirmed for Tuesday at ten.";
-const VOICE = process.env.PYAI_VOICE ?? "stock_emma_en_gb";
-
-// --- AFTER: one param. The server hands back μ-law@8k. -----------------------
-async function after() {
-  const buf = await pyai.audio.speech({ input: TEXT, voice: VOICE, response_format: "g711_ulaw" });
-  const ulaw = new Uint8Array(buf);
-  await writeFile("out.ulaw", ulaw);
-  // For Twilio's <Connect><Stream>, this is the whole encode step:
-  const twilioMediaPayload = Buffer.from(ulaw).toString("base64");
-  console.log(`AFTER  one param   → ${ulaw.length} bytes μ-law (wrote out.ulaw)`);
-  console.log(`       twilio media payload (base64, first 32): ${twilioMediaPayload.slice(0, 32)}…`);
-  return ulaw.length;
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const output = "out.ulaw";
+  let sink;
+  let owned = false;
+  try {
+    const file = await open(output, "wx");
+    owned = true;
+    sink = file.createWriteStream();
+    sink.on("error", () => {});
+    await streamGreeting({ apiKey: process.env.PYAI_API_KEY, projectId: process.env.PYAI_PROJECT_ID,
+      voice: process.env.PYAI_VOICE, baseURL: process.env.PYAI_BASE_URL, sink });
+    console.log(`Wrote ${output}: raw 8 kHz mono μ-law. No call was placed.`);
+  } catch (error) {
+    sink?.destroy();
+    // Preserve an existing file; remove only a file opened by this invocation.
+    if (owned) await rm(output, { force: true });
+    console.error(error.message);
+    process.exitCode = 1;
+  }
 }
-
-// --- BEFORE: request wav@24k, resample to 8k, μ-law-encode by hand. -----------
-async function before() {
-  // The old way: only WAV@24k came back, so you owned the DSP.
-  const wav = new Uint8Array(await pyai.audio.speech({ input: TEXT, voice: VOICE, response_format: "wav" }));
-  const pcm24k = bytesToPcm16(wav.subarray(44)); // skip the 44-byte RIFF header
-  const resampler = makeResampler(24000, 8000); // anti-aliased 3:1 polyphase
-  const pcm8k = resampler ? resampler.process(pcm24k) : pcm24k;
-  const ulaw = muLawEncode(pcm8k);
-  console.log(`BEFORE resample+μlaw → ${ulaw.length} bytes μ-law (you maintain this codec path)`);
-  return ulaw.length;
-}
-
-const afterLen = await after();
-const beforeLen = await before();
-console.log(
-  `\nIndependent renders: ${afterLen} vs ${beforeLen} μ-law bytes. ` +
-    `Durations may differ; the server-side path removes client-side conversion.`,
-);

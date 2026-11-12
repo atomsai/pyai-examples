@@ -3,15 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Speak server-side audio formats: g711_ulaw/alaw, pcm, mp3, opus in one param, the before/after vs hand-rolled resampler + μ-law.",
+  "description": "Stream one bounded Speak request as 8 kHz G.711 audio without a carrier call.",
   "scripts": {
-    "start": "node --env-file=.env index.js"
+    "start": "node --env-file=.env index.js",
+    "test": "node --test index.test.js"
   },
   "engines": {
     "node": ">=22"
-  },
-  "dependencies": {
-    "@pyai/sdk": "^0.17.0",
-    "@pyai/twilio": "^0.4.11"
   }
 }

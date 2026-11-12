@@ -1,8 +1,7 @@
 # PyAI examples
 
-Runnable, copy-pasteable examples for building on [PyAI](https://pyai.com). Each
-folder is self-contained with its own `package.json`, `.env.example`, and
-`README.md`, and starts with `npm start`.
+Runnable, copy-pasteable examples for building on [PyAI](https://pyai.com). Follow each folder’s README for its runtime, dependencies and run command;
+Node and Python starters are both available.
 
 > **Meet Omni, the all-in-one AI voice agent model.** Omni is a hybrid
 > speech-to-speech model with a fused LLM brain: over a single WebSocket it
@@ -31,19 +30,33 @@ npm create pyai-app@latest openai-drop-in my-app --key pyai_test_…
 | [`pyai-site-voice-concierge`](./pyai-site-voice-concierge) | A **"Talk to PyAI"** website voice agent: a browser widget brokered to **Omni** server-side (no key in the page), grounded per-turn on your own `kb_endpoint`. **One-click deploy** (Render) with grounding auto-configured, no ngrok. | Node, Fastify, browser |
 | [`omni-browser-widget`](./omni-browser-widget) | The **minimal embeddable**: add a talking **Omni** voice agent to any site with **one `<script>` tag**. Self-contained widget + a ~80-line, **zero-dependency** token-broker so your key never ships to the browser. No phone/Twilio. | Node (no deps), browser |
 | [`cascade-hear-llm-speak`](./cascade-hear-llm-speak) | The build-your-own pipeline: **Hear** (STT) → your LLM → **Speak** (TTS). Runs end to end with just a key. | Node, REST |
-| [`speak-telephony-formats`](./speak-telephony-formats) | **Speak** server-side audio formats (`g711_ulaw`/`g711_alaw`/`pcm`/`mp3`/`opus`), get Twilio-ready μ-law in one param instead of a hand-rolled resampler + μ-law encoder. | Node, Python, curl |
-| [`browser-hear-live-captions`](./browser-hear-live-captions) | Stream mic audio from the browser to **Hear** and render live partial/final captions. | Static HTML/JS |
+| [`speak-telephony-formats`](./speak-telephony-formats) | Stream one bounded **Speak** request as G.711 μ-law chunks, with project checks, backpressure and cancellation. No carrier call. | Node, Python |
+| [`browser-hear-live-captions`](./browser-hear-live-captions) | Stream mic audio from the browser to **Hear** and render live partial/final captions. | Node backend, browser |
 | [`voice-cloning`](./voice-cloning) | Clone a voice end to end: enroll a reference clip → poll until ready → speak in the cloned voice → use it in **Omni**. Includes the "why was my clip rejected" table. | Node, REST |
 | [`recap-call-intelligence`](./recap-call-intelligence) | Turn a conversation into a typed **`recap.call`**: enable Recap, POST utterances or a Hear job with `call_id`, read `recap.record.v1`. | Node, REST |
 | [`trace-dashboard`](./trace-dashboard) | Customize and embed a Trace summary dashboard, add an authenticated server adapter, and receive signed completed-call events. Fictional sample mode works without credentials. | Node (no deps), browser |
 | [`amd-twilio-detection`](./amd-twilio-detection) | Rip out Twilio AMD with **one line of TwiML**: fork the call's media to **PyAI AMD** and get who/what answered (human, voicemail, IVR, **screening**, dead number, fax) with the reason, on a webhook. `answered_by_twilio` keeps your routing unchanged. | Node (no deps) |
 | [`omni-mock`](./omni-mock) | An **offline Omni server** (wire protocol v2) to build + test your realtime client with **no key**, handshake, PCM16 both ways, barge-in, DTMF, and a built-in check for the event-vs-`type` footgun. | Node, `ws` |
-| [`mcp-quickstart`](./mcp-quickstart) | Use PyAI from **Cursor / Claude Code / Codex** via the **MCP** server ([`@pyai/mcp`](https://www.npmjs.com/package/@pyai/mcp)): your agent mints a free key and calls PyAI directly. Includes a zero-dep stdio client that mints a sandbox key → synthesizes speech end to end. | Node (no deps) |
+| [`mcp-quickstart`](./mcp-quickstart) | Use PyAI from **Cursor / Claude Code / Codex** via the **MCP** server ([`@pyai/mcp`](https://www.npmjs.com/package/@pyai/mcp)): hosted HTTP uses OAuth; local stdio uses your CLI profile. Inspect identity and billing before opting into a bounded synthesis request. | Node (no deps) |
+
+## Choose the requested job
+
+| Job | Existing implementation path |
+|---|---|
+| Telephony transcription | [Hear streaming guide](https://docs.pyai.com/guides/streaming-stt): decode G.711 to PCM16 at 8 kHz; use final events. [Recorded transcription](https://docs.pyai.com/guides/hear-overview) and [async speaker labels](https://docs.pyai.com/guides/async-transcription-jobs) are separate paths. |
+| Streaming TTS for a phone app | [speak-telephony-formats](./speak-telephony-formats): streamed audio bytes, no Calling or carrier setup. |
+| LiveKit | [Existing starter](./sdk-starters/livekit) and [agent integration guide](https://docs.pyai.com/guides/livekit-agents). The starter is a TTS adapter test; bring rooms, worker and LLM for a complete agent. |
+| Pipecat | [Existing starter](./sdk-starters/pipecat) and [pipeline guide](https://docs.pyai.com/guides/pipecat). The starter is text-to-WAV; bring transport and LLM for conversation. |
+| Voice agent | [omni-browser-widget](./omni-browser-widget) for browser conversations; framework guides above when you own the conversation pipeline. Saved Agent profiles are optional for Omni. |
+| Dubbing | [Existing runnable Dub API workflow](https://docs.pyai.com/guides/dub-overview). Check [live capabilities](https://api.pyai.com/healthz/dub), submit, poll, then download. Source and output languages are independent. |
 
 ## Getting a key
 
 All examples authenticate with a PyAI key. A **sandbox** key (`pyai_test_…`) is
-perfect for trying things out. Keys are opaque, pass them through verbatim;
+bounded by project usage limits. Before running any audio example, inspect
+`GET /v1/me` and verify `org_id`, `project_id`, `env`, scopes, limits and billing
+context. Live projects incur usage charges; [current billing](https://pyai.com/pricing).
+Keys are opaque, pass them through verbatim;
 never parse, split, or decode them.
 
 - REST base: `https://api.pyai.com/v1`
@@ -75,4 +88,4 @@ never parse, split, or decode them.
 - **Analytics on recorded calls** → `recap-call-intelligence`.
 - **Answering machine detection / rip out Twilio AMD** → `amd-twilio-detection` (one line of TwiML).
 - **Build an Omni client before you have a key** → `omni-mock` (offline protocol server).
-- **Build with PyAI from Cursor / Claude Code / Codex** → `mcp-quickstart` (the MCP server; your agent mints a key and calls PyAI for you).
+- **Build with PyAI from Cursor / Claude Code / Codex** → `mcp-quickstart` (choose hosted HTTP or local stdio; verify identity before usage).

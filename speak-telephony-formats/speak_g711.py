@@ -1,36 +1,50 @@
 #!/usr/bin/env python3
-"""Speak telephony formats, the one-param μ-law win, in Python.
-
-AFTER: ask Speak for response_format="g711_ulaw" and the server returns 8 kHz
-mono μ-law, the exact bytes a Twilio Media Stream wants. No client-side
-resampler, no μ-law encoder.
-
-Run:  cp .env.example .env  (edit PYAI_API_KEY)  &&  python3 speak_g711.py
-A pyai_test_ key is fine. Requires `pip install pyai-sdk` (zero third-party deps).
-"""
-import base64
+"""One streaming test-project greeting; see README for setup and timeout limits."""
+import json
+import math
 import os
-import sys
-
+from contextlib import closing
+from pathlib import Path
 from pyai import PyAI
 
-api_key = os.environ.get("PYAI_API_KEY")
-if not api_key:
-    sys.exit("Set PYAI_API_KEY (copy .env.example to .env). A pyai_test_ key is fine.")
 
-pyai = PyAI(api_key=api_key, base_url=os.environ.get("PYAI_BASE_URL", "https://api.pyai.com"))
-text = "Your appointment is confirmed for Tuesday at ten."
-voice = os.environ.get("PYAI_VOICE", "stock_emma_en_gb")
+def main():
+    project_id = os.environ["PYAI_PROJECT_ID"]
+    with PyAI(api_key=os.environ["PYAI_API_KEY"],
+              base_url=os.environ.get("PYAI_BASE_URL", "https://api.pyai.com"),
+              max_retries=0, timeout=30) as pyai:
+        me = pyai.me()
+        print(json.dumps({k: me.get(k) for k in (
+            "org_id", "project_id", "env", "limits", "credit", "key_budget_cents")}))
+        if me.get("project_id") != project_id or me.get("env") != "test":
+            raise ValueError("Expected test project mismatch; no synthesis requested")
+        if "speak:synthesize" not in me.get("scopes", []):
+            raise ValueError("Missing speak:synthesize")
+        limits = me.get("limits")
+        if not isinstance(limits, dict):
+            raise ValueError("Missing test-project limits")
+        cap = limits.get("daily_unit_cap")
+        if cap is not None and (isinstance(cap, bool) or not isinstance(cap, (int, float))
+                                or not math.isfinite(cap) or cap <= 0):
+            raise ValueError("Invalid or zero test daily cap")
+        if cap is None:
+            print("No daily cap enforced; this run is still bounded to one 49-character request.")
+        path = Path("out.ulaw")
+        # Open exclusively before generation; never overwrite an existing result.
+        with path.open("xb") as output:
+            try:
+                with closing(pyai.audio.speech_stream(
+                    input="Your appointment is confirmed for Tuesday at ten.",
+                    voice=os.environ.get("PYAI_VOICE", "stock_emma_en_gb"),
+                    response_format="g711_ulaw", sample_rate=8000,
+                )) as chunks:
+                    for chunk in chunks:
+                        output.write(chunk)
+            except BaseException:
+                path.unlink(missing_ok=True)
+                raise
+    print("Wrote out.ulaw: raw 8 kHz mono μ-law. No call was placed.")
 
-# One param: the server hands back μ-law @ 8 kHz, ready for telephony.
-ulaw = pyai.audio.speech(input=text, voice=voice, response_format="g711_ulaw")
 
-with open("out.ulaw", "wb") as fh:
-    fh.write(ulaw)
-
-# For Twilio's <Connect><Stream>, this is the entire encode step:
-twilio_media_payload = base64.b64encode(ulaw).decode()
-
-print(f"AFTER  one param → {len(ulaw)} bytes μ-law (wrote out.ulaw)")
-print(f"       twilio media payload (base64, first 32): {twilio_media_payload[:32]}…")
-print("\nNo resampler, no μ-law encoder, no codec tests to maintain, the server did it.")
+if __name__ == "__main__":
+    main()

@@ -12,6 +12,16 @@ stack: one API key, one set of products, live in an afternoon.
 
 Never invent endpoints, scopes, or parameters, fetch the spec.
 
+Choose the requested job using the [existing examples index](./README.md#choose-the-requested-job).
+For phone transcription use Hear; for streaming phone TTS use Speak, not Calling.
+LiveKit and Pipecat starters already exist under `sdk-starters/`; their READMEs
+separate adapter smoke tests from complete voice agents. Dubbing uses the existing
+[Dub API workflow](https://docs.pyai.com/guides/dub-overview); check live
+`/healthz/dub` source and target languages independently before submitting.
+Before usage, verify `GET /v1/me` project, environment, scopes, limits and billing
+against the user's intended project and bounded request budget. Never fall back
+to a live key or silently create a new tenant when a confirmed project exists.
+
 ---
 
 ## 1. Get a key (sandbox, no humans, no card)
@@ -29,8 +39,8 @@ export PYAI_API_KEY=pyai_test_...   # use api_key from the response
 
 What a sandbox key gives you:
 
-- **Works on the first call.** It skips the credit gate, so it never returns
-  `402`, it's bounded instead by a daily usage cap and low concurrency.
+- **Test environment.** Daily caps and concurrency limits apply. Inspect
+  `/v1/me` for the actual limits and stop on quota or billing errors.
 - **Scopes:** enough to drive STT, TTS, realtime, AMD, and Recap:
   `hear:transcribe`, `hear:stream`, `transcribe:jobs`, `speak:synthesize`,
   `omni:session`, `amd:detect`, `amd:configure`, `amd:read`, `cast:render`,
