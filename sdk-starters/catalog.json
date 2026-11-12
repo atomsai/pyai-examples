@@ -96,7 +96,7 @@
     "headline": "Natural speech inside your Pipecat pipeline.",
     "description": "Add PyAI Hear and Speak to Pipecat. Download a complete text-to-audio pipeline, copy the adapter commands, and build with Cursor, Codex, or Claude Code today.",
     "summary": "Plug PyAI speech services into the transport and LLM pipeline you already use.",
-    "install": "python -m pip install pipecat-pyai==0.1.2",
+    "install": "python -m pip install pipecat-pyai==0.1.4",
     "entry": "main.py",
     "run": "python main.py",
     "guide": "https://docs.pyai.com/guides/pipecat",
