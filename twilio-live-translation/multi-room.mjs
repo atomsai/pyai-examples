@@ -2,16 +2,20 @@ import { TranslationHost } from './host.mjs';
 
 const validScope = scope => scope && ['project', 'owner'].every(key => typeof scope[key] === 'string' && /^[\w.-]{1,100}$/.test(scope[key]));
 const validRoom = value => /^test-[0-9a-f-]{36}$/.test(value ?? '');
+const slotIds = Array.from({ length: 10 }, (_, i) => `slot-${String(i + 1).padStart(2, '0')}`);
 
-/** Bounded, isolated carrier acceptance pool. The durable reservation is never refunded.
- * One process owns the pool; a fresh operation prefix is required on every launch. */
+/** An isolated pool. The permanent mode uses fenced slots across restarts. */
 export class MultiRoomTranslationHost {
-  constructor(config, { reserveRoom, record, absoluteDeadline, roomLifetimeMs = 480_000, now = Date.now, ...dependencies } = {}) {
-    if (!Number.isInteger(roomLifetimeMs) || roomLifetimeMs < 1000 || roomLifetimeMs > 480_000 || typeof reserveRoom !== 'function' || typeof record !== 'function' || !Number.isFinite(absoluteDeadline)
-        || absoluteDeadline <= now() || absoluteDeadline > now() + 1_800_000) throw new Error('invalid_pool_config');
+  constructor(config, { reserveRoom, releaseRoom, reconcileRoom, record, absoluteDeadline,
+    roomLifetimeMs = 480_000, now = Date.now, ...dependencies } = {}) {
+    const permanent = absoluteDeadline === Infinity;
+    if (!Number.isInteger(roomLifetimeMs) || roomLifetimeMs < 1000 || roomLifetimeMs > 480_000 || typeof reserveRoom !== 'function' || typeof record !== 'function'
+        || (!permanent && (!Number.isFinite(absoluteDeadline) || absoluteDeadline <= now() || absoluteDeadline > now() + 1_800_000))
+        || (permanent && (typeof releaseRoom !== 'function' || typeof reconcileRoom !== 'function'))) throw new Error('invalid_pool_config');
     this.config = config; this.reserve = reserveRoom; this.record = record; this.deadline = absoluteDeadline;
+    this.permanent = permanent; this.release = releaseRoom; this.reconcile = reconcileRoom; this.slots = new Map();
     this.roomLifetimeMs = roomLifetimeMs; this.now = now; this.dependencies = dependencies; this.rooms = new Map(); this.calls = new Map();
-    this.admissions = new WeakMap(); this.created = 0; this.stopping = false;
+    this.admissions = new WeakMap(); this.created = 0; this.stopping = false; this.paused = false;
   }
   entry(roomId, scope) {
     if (!validScope(scope) || !validRoom(roomId)) throw new Error('invalid_room_binding');
@@ -19,29 +23,68 @@ export class MultiRoomTranslationHost {
     if (!entry || entry.scope.project !== scope.project || entry.scope.owner !== scope.owner) throw new Error('room_not_found');
     return entry;
   }
-  async create(input, scope) {
+  async reclaim() {
+    for (const [slotId, entry] of this.slots) {
+      if (!entry.binding || entry.child.room?.state !== 'closed'
+          || this.now() < Math.max(entry.binding.leaseUntil, (entry.closedAt ?? 0) + 30_000)) continue;
+      entry.releasing ??= Promise.resolve().then(() => entry.lease && entry.child.room.cleanup === 'calls_terminal_verified'
+        ? this.release({ ...entry.binding, lease: entry.lease }) : this.reconcile(entry.binding)).then(() => {
+        if (this.slots.get(slotId) !== entry) throw new Error('permanent_slot_binding_changed');
+        for (const [callId, owner] of this.calls) if (owner === entry) this.calls.delete(callId);
+        this.rooms.delete(entry.roomId); this.slots.delete(slotId);
+      }).catch(() => { entry.releasing = null; });
+      await entry.releasing;
+    }
+  }
+  async create(input, scope, attempted = new Set()) {
     if (!validScope(scope)) throw new Error('invalid_room_binding');
-    if (this.stopping || this.now() >= this.deadline) throw new Error('host_draining');
-    // Claim before awaiting persistence. Failed/ambiguous reservations remain charged.
-    if (this.created >= 10) throw new Error('session_limit');
-    const slotId = `slot-${String(++this.created).padStart(2, '0')}`;
+    if (this.config.customerBilling && input.billing_session?.project_id !== scope.project) throw new Error('invalid_billing_session');
+    if (this.permanent) await this.reclaim();
+    if (this.stopping || this.paused || this.now() >= this.deadline) throw new Error('host_draining');
+    const slotId = this.permanent ? slotIds.find(slot => !this.slots.has(slot) && !attempted.has(slot)) : slotIds[this.created];
+    if (!slotId) throw new Error(this.permanent ? 'rooms_at_capacity' : 'session_limit');
     const entry = { scope: Object.freeze({ ...scope }), child: null };
+    if (!this.permanent) this.created++;
     const child = new TranslationHost(this.config, {
       ...this.dependencies, now: this.now, maxRooms: 1, absoluteDeadline: this.deadline, roomLifetimeMs: this.roomLifetimeMs,
+      journalAdmission: this.permanent,
       reserveRoom: async ({ id, expiresAt }) => {
         entry.roomId = id; this.rooms.set(id, entry);
-        await this.reserve({ slotId, roomId: id, expiresAt, project: scope.project, owner: scope.owner });
+        const binding = { slotId, roomId: id, expiresAt, project: scope.project, owner: scope.owner };
+        if (this.permanent) {
+          entry.binding = Object.freeze({ ...binding, leaseUntil: expiresAt + 630_000 });
+          entry.lease = await this.reserve(entry.binding);
+          if (!entry.lease) throw new Error('permanent_slot_lease_required');
+        } else await this.reserve(binding);
       },
-      record: event => this.record({ ...event, host_project_id: scope.project, host_owner_id: scope.owner, host_slot_id: slotId }),
+      record: async event => {
+        await this.record({ ...event, host_project_id: scope.project, host_owner_id: scope.owner, host_slot_id: slotId });
+        if (this.permanent && event.event === 'host.room.closed') entry.closedAt = this.now();
+      },
     });
     entry.child = child;
-    const created = await child.create(input);
-    if (this.stopping) { await child.finish('host_shutdown'); throw new Error('host_draining'); }
-    return created;
+    if (this.permanent) { this.slots.set(slotId, entry); attempted.add(slotId); }
+    try {
+      const created = await child.create(input);
+      if (this.stopping || this.paused) { await child.finish('host_shutdown'); throw new Error('host_draining'); }
+      return created;
+    } catch (error) {
+      if (this.permanent && error?.message === 'fleet_slot_busy' && !entry.lease) {
+        this.rooms.delete(entry.roomId); this.slots.delete(slotId);
+        return this.create(input, scope, attempted);
+      }
+      if (this.permanent && !entry.binding) this.slots.delete(slotId);
+      throw error;
+    }
   }
   capacity() {
-    return { maximum_concurrent_rooms: 10, available: !this.stopping && this.now() < this.deadline,
-      admitted_rooms: this.created, active_rooms: [...this.rooms.values()].filter(e => e.child.room.state !== 'closed').length };
+    return { maximum_concurrent_rooms: 10, available: !this.stopping && !this.paused && this.now() < this.deadline,
+      admitted_rooms: this.created, active_rooms: [...this.rooms.values()].filter(e => e.child?.room?.state !== 'closed').length };
+  }
+  pauseAdmissions(paused) {
+    if (typeof paused !== 'boolean' || this.stopping) throw new Error('invalid_drain_state');
+    this.paused = paused;
+    return this.capacity();
   }
   snapshot(roomId, scope) { return this.entry(roomId, scope).child.snapshot(); }
   mint(grant, roomId, scope) { return this.entry(roomId, scope).child.mint(grant); }

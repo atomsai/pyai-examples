@@ -7,8 +7,8 @@
 // BEFORE (what you used to write): request wav@24k, then resample 24k→8k and
 // μ-law-encode it yourself. This file shows that path too, using the audio
 // helpers from @pyai/twilio (muLawEncode + makeResampler), so you can see
-// exactly how much code the one param replaces, and verify both produce the
-// same μ-law length.
+// exactly how much code the one param replaces. This runs two billable speech
+// requests; independently generated audio can have different durations.
 //
 // Run: cp .env.example .env  &&  npm install  &&  npm start
 import { writeFile } from "node:fs/promises";
@@ -52,6 +52,6 @@ async function before() {
 const afterLen = await after();
 const beforeLen = await before();
 console.log(
-  `\nSame audio, both ~${Math.round((afterLen / Math.max(beforeLen, 1)) * 100)}% of the hand-rolled length, ` +
-    `the server-side path drops the client DSP entirely.`,
+  `\nIndependent renders: ${afterLen} vs ${beforeLen} μ-law bytes. ` +
+    `Durations may differ; the server-side path removes client-side conversion.`,
 );

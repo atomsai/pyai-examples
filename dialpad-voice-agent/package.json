@@ -1,0 +1,13 @@
+{
+  "name": "pyai-dialpad-voice-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "test": "node --test routing.test.mjs",
+    "check:account": "node --env-file-if-exists=.env setup.mjs --check",
+    "setup:plan": "node --env-file-if-exists=.env setup.mjs --plan"
+  }
+}

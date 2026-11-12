@@ -47,9 +47,11 @@ For production, create a `pyai_live_…` key in the console
 - REST base: `https://api.pyai.com/v1` · Realtime base: `wss://api.pyai.com/v1`
 - Send the key as a bearer token: `Authorization: Bearer pyai_…`
   (`x-api-key: pyai_…` is an accepted alias).
-- On a WebSocket upgrade (browsers can't set headers), pass the key as a
-  subprotocols: `pyai.v1, pyai-key.pyai_…` (both, always). Server-side WS clients may instead append
-  `?api_key=pyai_…`.
+- Server-side WebSocket clients use the SDK's `pyai.v1, pyai-key.<credential>`
+  subprotocol pair. For Omni browsers, mint an origin-locked short-lived session
+  token on an authenticated backend. Never put a long-lived key in browser code
+  or a URL. Hear browser clients must proxy through an authenticated backend;
+  Omni session tokens do not grant Hear access.
 - **Keys are opaque strings (≤512 chars).** Never parse, split, decode, or log
   them. They work on every surface the instant they're created, no activation
   delay.

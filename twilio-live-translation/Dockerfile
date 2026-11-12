@@ -13,6 +13,7 @@ COPY --from=sdk /app/sdk/twilio /app/sdk/twilio
 COPY examples/twilio-live-translation/package.json examples/twilio-live-translation/package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY examples/twilio-live-translation/*.mjs examples/twilio-live-translation/index.html ./
+COPY examples/plivo-live-translation/fleet-allowance.mjs examples/plivo-live-translation/fleet-leases.mjs examples/plivo-live-translation/storage-retry.mjs /app/examples/plivo-live-translation/
 ENV NODE_ENV=production PORT=8080
 USER node
 CMD ["node", "server.mjs"]

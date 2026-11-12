@@ -38,9 +38,9 @@ function fixture() {
     if (!item || item.name !== objectName) return new Response('', { status: 404 });
     return url.searchParams.get('alt') === 'media' ? new Response(item.raw) : Response.json({ name: item.name, generation: item.generation });
   };
-  const make = (recover = async value => { recovered.push(value); }, reserveAllowance = async () => {}) => createFleetLeases({
+  const make = (recover = async value => { recovered.push(value); }, reserveAllowance = async () => {}, isCallId) => createFleetLeases({
     bucket: 'fixture-private', prefix: 'qualification/fleet', serviceId, token: async () => 'fixture-private-adc',
-    recover, reserveAllowance, fetchImpl, now: () => clock, sleep: async milliseconds => { delays.push(milliseconds); clock += milliseconds; },
+    recover, reserveAllowance, isCallId, fetchImpl, now: () => clock, sleep: async milliseconds => { delays.push(milliseconds); clock += milliseconds; },
   });
   const binding = (value, slotId = 'slot-01') => ({ roomId: roomId(value), slotId,
     project: 'proj-fixture', owner: 'user-fixture', expiresAt: clock + 480_000, leaseUntil: clock + 1_110_000 });
@@ -80,6 +80,18 @@ test('concurrent admitted-call writes serialize without losing identities and re
   for (const value of [1, 4]) await assert.rejects(leases.recordEntry({ event: 'host.call.admitted',
     host_room_id: binding.roomId, provider_call_id: callId(value) }), /fleet_call_binding_failed/);
   assert.equal(JSON.parse(f.item('slot-01').raw).terminal_verified, false);
+});
+
+test('Twilio leases accept and recover only Twilio CallSids', async () => {
+  const f = fixture(), makeTwilio = () => f.make(undefined, undefined, id => /^CA[0-9a-f]{32}$/i.test(id));
+  const first = makeTwilio(), old = f.binding(1), sid = `CA${'1'.repeat(32)}`;
+  await first.reserveRoom(old);
+  await assert.rejects(first.recordEntry({ event: 'host.call.admitted', host_room_id: old.roomId,
+    provider_call_id: callId(1) }), /fleet_call_binding_failed/);
+  await first.recordEntry({ event: 'host.call.admitted', host_room_id: old.roomId, provider_call_id: sid });
+  f.advanceTo(old.leaseUntil);
+  await makeTwilio().reserveRoom(f.binding(2));
+  assert.deepEqual(f.recovered, [{ roomId: old.roomId, callIds: [sid] }]);
 });
 
 test('expired unverified slots reconcile only retained calls, then fence stale owners across processes', async () => {

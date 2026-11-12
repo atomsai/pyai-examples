@@ -12,6 +12,19 @@ const sign = form => twilio.getExpectedTwilioSignature(config.authToken, config.
 const build = overrides => new MultiRoomTranslationHost(config, { absoluteDeadline: Date.now() + 600_000,
   reserveRoom: async () => {}, record: async () => {}, retire: async () => {}, ...overrides });
 
+test('customer credentials cannot cross project bindings or consume a slot before validation', async () => {
+  const host = new MultiRoomTranslationHost({ ...config, customerBilling: true, sessionOrigin: 'https://console.pyai.com' },
+    { absoluteDeadline: Date.now() + 600_000, reserveRoom: async () => {}, record: async () => {}, retire: async () => {} });
+  try {
+    const billing_session = {token:'fixture-customer-token',expires_at:Date.now()+470_000,project_id:'another-project'};
+    await assert.rejects(host.create({...input,billing_session},scope),/invalid_billing_session/);
+    assert.equal(host.capacity().admitted_rooms,0);
+    const room = await host.create({...input,billing_session:{...billing_session,project_id:scope.project}},scope);
+    assert.equal(Date.parse(room.expires_at),billing_session.expires_at);
+    assert.ok(!JSON.stringify(room).includes(billing_session.token));
+  } finally { await host.finishAll(); }
+});
+
 test('ten concurrent reservations are isolated and failed persistence never refunds a slot', async () => {
   const reservations = [], writes = [];
   const host = build({ reserveRoom: async b => { reservations.push(b); }, record: async e => writes.push(e) });
@@ -71,4 +84,69 @@ test('a shorter funded test bound clamps every room before any call can join', a
   const host=build({now:()=>1000,absoluteDeadline:61000,roomLifetimeMs:5000});
   try {const room=await host.create(input,scope);assert.equal(Date.parse(room.expires_at),6000);}
   finally{await host.finishAll();}
+});
+
+test('permanent rooms persist signed call admission and reuse a slot only after its lease expires', async () => {
+  let clock = 1_000;
+  const reserved = [], released = [], events = [];
+  const host = build({ absoluteDeadline: Infinity, now: () => clock,
+    reserveRoom: async binding => { reserved.push(binding); return 'lease-' + binding.slotId; },
+    releaseRoom: async binding => { released.push(binding); }, reconcileRoom: async () => assert.fail('clean room should release'),
+    record: async event => { events.push(event); } });
+  try {
+    const rooms = await Promise.all(Array.from({ length: 10 }, () => host.create(input, scope)));
+    const room = rooms[0], grant = new URL(room.links.customer).hash.slice(1);
+    host.mint(grant, room.id, scope);
+    const child = host.entry(room.id, scope).child;
+    const form = { AccountSid: config.accountSid, CallSid: `CA${'1'.repeat(32)}`,
+      From: `client:${child.room.endpoints.customer.identity}`, JoinGrant: grant };
+    assert.match(await host.answer(form, sign(form)), /<Stream/);
+    assert.equal(events.at(-1).event, 'host.call.admitted');
+    assert.equal(events.at(-1).provider_call_id, form.CallSid);
+    await host.finish('operator_end', room.id, scope);
+    await assert.rejects(host.create(input, scope), /rooms_at_capacity/);
+    clock = reserved[0].leaseUntil;
+    const replacement = await host.create(input, scope);
+    assert.equal(reserved.at(-1).slotId, reserved[0].slotId);
+    assert.equal(released[0].roomId, room.id);
+    assert.notEqual(replacement.id, room.id);
+    assert.throws(() => host.snapshot(room.id, scope), /room_not_found/);
+    host.pauseAdmissions(true);
+    await assert.rejects(host.create(input, scope), /host_draining/);
+  } finally { await host.finishAll(); }
+});
+
+test('a rejected fleet slot cannot finalize the recording ticket reused by the admitted room', async (t) => {
+  const reservations = [];
+  const uploads = [];
+  const recording = {
+    id: 'tr_0000000000000_' + 'a'.repeat(24),
+    upload_capability: 'tr1.fixture.' + 'b'.repeat(64),
+    upload_until: Date.now() + 60_000,
+    capture_format: 'party-v1',
+  };
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    uploads.push({ url: new URL(url), metadata: typeof options.body === 'string' ? JSON.parse(options.body) : null });
+    return new Response(null, { status: 200 });
+  });
+  const host = build({
+    absoluteDeadline: Infinity,
+    reserveRoom: async binding => {
+      reservations.push(binding);
+      if (binding.slotId === 'slot-01') throw new Error('fleet_slot_busy');
+      return 'lease-' + binding.slotId;
+    },
+    releaseRoom: async () => {},
+    reconcileRoom: async () => {},
+  });
+  try {
+    const room = await host.create({ ...input, recording }, scope);
+    assert.equal(reservations.length, 2);
+    assert.equal(room.id, reservations[1].roomId);
+    assert.equal(room.recording_id, recording.id);
+    assert.equal(uploads.length, 0, 'abandoned slot must never upload against the shared recording ticket');
+    await host.finish('operator_end', room.id, scope);
+    assert.deepEqual(uploads.filter(upload => upload.metadata).map(upload => upload.metadata.room_id), [room.id, room.id]);
+    assert.deepEqual(uploads.filter(upload => !upload.metadata).map(upload => upload.url.searchParams.get('perspective')), ['customer', 'agent']);
+  } finally { await host.finishAll(); }
 });

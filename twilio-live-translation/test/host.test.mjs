@@ -96,7 +96,7 @@ test('browser grant and signed Twilio webhook bind one exact identity, call and 
   } finally { await host.finish(); }
 });
 
-test('two started legs create one interpreter; replacement preserves room, retires old call, ends all owned calls', async () => {
+for (const customerBilling of [false, true]) test(`two started legs, transfer and cleanup preserve the selected billing credential (${customerBilling})`, async () => {
   const rooms = [], retired = [], records = [], limits = [], started = new Map(), limited = new Map();
   class Transport {
     constructor(socket, callId, participantId) {
@@ -114,12 +114,14 @@ test('two started legs create one interpreter; replacement preserves room, retir
     }
     close(reason) { this.opts.onClose(reason); }
   }
-  const host = new TranslationHost(config, { Room, Transport, record: async e => records.push(e),
+  const session = { token: 'customer-scoped-ephemeral-key', expires_at: Date.now() + 480_000, project_id: 'project-one' };
+  const host = new TranslationHost({ ...config, customerBilling, sessionOrigin: 'https://console.pyai.com' }, { Room, Transport, record: async e => records.push(e),
     retire: async callId => { retired.push(callId); }, limitCall: (callId, seconds) => {
       limits.push({ callId, seconds }); return new Promise(resolve => limited.set(callId, resolve));
     } });
   try {
-    await host.create(input);
+    if (customerBilling) await assert.rejects(host.create(input), /invalid_billing_session/);
+    await host.create({ ...input, ...(customerBilling ? { billing_session: session } : {}) });
     for (const [role, digit] of [['customer', '1'], ['agent', '2']]) {
       host.mint(host.room.endpoints[role].grant);
       const form = makeForm(host, role, digit);
@@ -138,6 +140,9 @@ test('two started legs create one interpreter; replacement preserves room, retir
     assert.equal(rooms.length, 0, 'one completed limit cannot bypass the other pending limit');
     limited.get(`CA${'2'.repeat(32)}`)(); await delay(20);
     assert.equal(rooms.length, 1); assert.equal(host.snapshot().state, 'connected');
+    assert.equal(rooms[0].opts.apiKey, customerBilling ? session.token : config.pyaiKey);
+    assert.equal(rooms[0].opts.origin, customerBilling ? 'https://console.pyai.com' : undefined);
+    assert.ok(!JSON.stringify(host.snapshot()).includes(session.token));
     host.mint(host.room.endpoints.replacement.grant);
     const form = makeForm(host, 'replacement', '3');
     const xml = await host.answer(form, signature(form)), url = xml.match(/url="([^"]+)"/)[1];
@@ -155,7 +160,7 @@ test('two started legs create one interpreter; replacement preserves room, retir
     assert.equal(new Set(retired).size, 3); assert.equal(retired.length, 3);
     assert.equal(host.snapshot().cleanup, 'calls_terminal_verified');
     assert.ok(records.every(e => e.host_room_id === host.room.id && !('audio' in e)));
-    await host.create({ ...input, language: 'pa',customerVoice:'pa1' });
+    await host.create({ ...input, language: 'pa',customerVoice:'pa1', ...(customerBilling ? {billing_session:session} : {}) });
     const currentId = host.room.id;
     rooms[0].opts.onClose('late_old_interpreter_failure');
     rooms[0].opts.legs.customer.transport.onFailure();

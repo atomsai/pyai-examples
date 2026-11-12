@@ -11,10 +11,12 @@ export class TranslationHost {
   constructor(config, { record, Room = InterpretationRoom, Transport = TwilioInterpretationTransport,
     retire = async () => { throw new Error('carrier_cleanup_unavailable'); },
     limitCall = async () => { throw new Error('carrier_limit_unavailable'); }, now = Date.now,
-    maxRooms = 2, absoluteDeadline = Infinity, roomLifetimeMs = 480_000, reserveRoom = async () => {} } = {}) {
+    maxRooms = 2, absoluteDeadline = Infinity, roomLifetimeMs = 480_000, reserveRoom = async () => {},
+    journalAdmission = false } = {}) {
     if (!/^AC[0-9a-f]{32}$/i.test(config.accountSid) || !/^AP[0-9a-f]{32}$/i.test(config.applicationSid)
         || !/^SK[0-9a-f]{32}$/i.test(config.apiKeySid) || !config.apiKeySecret || !config.authToken
-        || !config.pyaiKey || typeof record !== 'function'
+        || (!config.customerBilling && !config.pyaiKey) || typeof record !== 'function'
+        || (config.customerBilling && config.sessionOrigin !== 'https://console.pyai.com')
         || (config.identityPrefix !== undefined && !/^[0-9a-f]{20}$/.test(config.identityPrefix))) throw new Error('invalid_host_config');
     this.origin = new URL(config.publicOrigin);
     if (this.origin.protocol !== 'https:' || this.origin.pathname !== '/' || this.origin.search
@@ -24,6 +26,7 @@ export class TranslationHost {
     if (!Number.isInteger(maxRooms) || maxRooms < 1 || maxRooms > 12 || typeof reserveRoom !== 'function'
         || !(absoluteDeadline > now()) || !Number.isInteger(roomLifetimeMs) || roomLifetimeMs < 1000 || roomLifetimeMs > 480_000) throw new Error('invalid_room_bound');
     this.maxRooms = maxRooms; this.roomLifetimeMs = roomLifetimeMs; this.absoluteDeadline = absoluteDeadline; this.reserveRoom = reserveRoom;
+    this.journalAdmission = journalAdmission;
     this.grants = new Map(); this.streams = new Map();
     this.admission = new TwilioStreamAdmission(this.origin.href.replace('https:', 'wss:'), config.authToken, 3);
   }
@@ -31,13 +34,19 @@ export class TranslationHost {
   async create(input) {
     if (this.room && (this.room.state !== 'closed' || this.room.cleanup !== 'calls_terminal_verified')) throw new Error('room_already_exists');
     if (this.created >= this.maxRooms || this.now() >= this.absoluteDeadline) throw new Error('session_limit');
+    const session = input.billing_session;
+    if (this.config.customerBilling && (!session || typeof session.token !== 'string' || !session.token.length
+        || session.token.length > 512 || /\s/.test(session.token) || !Number.isSafeInteger(session.expires_at)
+        || session.expires_at <= this.now() || session.expires_at > this.now() + 480_000)) throw new Error('invalid_billing_session');
+    if (!this.config.customerBilling && session !== undefined) throw new Error('billing_session_unavailable');
     const pair = interpretationLanguagePair(input.language, input.agentLanguage ?? 'en');
     if (!pair.customer.voices.includes(input.customerVoice) || !pair.agent.voices.includes(input.agentVoice) || !/^[\w.-]{1,80}$/.test(input.customerVoice ?? '')
         || !/^[\w.-]{1,80}$/.test(input.agentVoice ?? '')) throw new Error('invalid_room');
     const room = { id: `test-${randomUUID()}`, state: 'waiting', createdAt: this.now(),
-      expiresAt: Math.min(this.now() + this.roomLifetimeMs, this.absoluteDeadline), endpoints: {}, events: [], retired: new Set(), sequence: 0,
+      expiresAt: Math.min(this.now() + this.roomLifetimeMs, this.absoluteDeadline, session?.expires_at ?? Infinity),
+      billingSession: session, endpoints: {}, events: [], retired: new Set(), sequence: 0,
       closing: false, cleanup: null, interpretation: null, retiring: new Map() };
-    if (input.recording) room.recording = new InterpretationRecording(input.recording, room.id, this.now);
+    const recording = input.recording ? new InterpretationRecording(input.recording, room.id, this.now) : null;
     this.room = room; this.created++;
     room.timer = setTimeout(() => { void this.finish('lifetime_limit', room); }, room.expiresAt - this.now());
     const grants = {};
@@ -45,6 +54,8 @@ export class TranslationHost {
       await this.reserveRoom({ id: room.id, expiresAt: room.expiresAt });
       await this.journal({ event: 'host.room.created', language: pair.customer.code, agent_language: pair.agent.code }, room);
       if (this.room !== room || room.closing) throw new Error('room_closed');
+      // An abandoned slot may be retried with the same ticket. Attach it only to an admitted room.
+      if (recording) room.recording = recording;
       for (const role of ROLES) {
         const grant = id();
         const endpoint = { role, grant, identity: `pyai_test_${this.config.identityPrefix ? this.config.identityPrefix + '_' : ''}${randomBytes(12).toString('hex')}`,
@@ -82,6 +93,12 @@ export class TranslationHost {
         || (endpoint.role === 'replacement' && room.state !== 'connected')) throw new Error('invalid_call_binding');
     endpoint.callId = form.CallSid;
     this.grants.delete(endpoint.grant);
+    if (this.journalAdmission) {
+      try {
+        await this.journal({ event: 'host.call.admitted', role: endpoint.role, provider_call_id: endpoint.callId }, room);
+        if (room.closing || this.now() >= room.expiresAt) throw new Error('room_closed');
+      } catch (error) { await this.finish('call_admission_failed', room); throw error; }
+    }
     const issued = this.admission.issue({ accountSid: this.config.accountSid, callSid: endpoint.callId,
       participantId: endpoint.participant.participant_id, externalCallId: room.id }, 30_000);
     const path = new URL(issued.url).pathname;
@@ -142,7 +159,8 @@ export class TranslationHost {
         // Both callbacks can wake on the same readiness promise; create exactly one interpreter.
         if (room.interpretation || room.closing) return;
         room.state = 'connecting';
-        room.interpretation = new this.Room({ apiKey: this.config.pyaiKey, externalCallId: room.id,
+        room.interpretation = new this.Room({ apiKey: room.billingSession?.token ?? this.config.pyaiKey,
+          ...(room.billingSession ? { origin: this.config.sessionOrigin } : {}), externalCallId: room.id,
           lifetimeMs: Math.max(1000, room.expiresAt - this.now()),
           legs: Object.fromEntries(['customer', 'agent'].map(role => [role,
             { participant: room.endpoints[role].participant, transport: room.endpoints[role].transport }])),
@@ -220,6 +238,7 @@ export class TranslationHost {
         catch { room.recordingStatus = 'incomplete'; }
       }
       room.state = 'closed';
+      room.billingSession = null;
     });
     return room.finishing;
   }

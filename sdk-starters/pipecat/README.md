@@ -16,7 +16,7 @@ when you are ready to run the starter below.
 
 ## Requirements
 
-Python 3.10–3.13. Only a PyAI key for the included text-to-WAV pipeline. A conversational bot additionally needs a Pipecat transport and an LLM; follow the linked integration guide.
+Python 3.11–3.13. Only a PyAI key for the included text-to-WAV pipeline. A conversational bot additionally needs a Pipecat transport and an LLM; follow the linked integration guide.
 
 ## Run
 

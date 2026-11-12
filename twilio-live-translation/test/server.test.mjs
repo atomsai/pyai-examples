@@ -5,9 +5,9 @@ import { once } from 'node:events';
 import { createInterface } from 'node:readline';
 import { setTimeout as delay } from 'node:timers/promises';
 
-for (const mode of ['acceptance', 'Console rehearsal', 'ten-room']) test(`real server (${mode}) packages assets, denies untrusted controls, and shuts down cleanly`,
+for (const mode of ['acceptance', 'Console rehearsal', 'ten-room', 'permanent', 'customer']) test(`real server (${mode}) packages assets, denies untrusted controls, and shuts down cleanly`,
   { timeout: 8000 }, async () => {
-    const consolePreview = mode === 'Console rehearsal', concurrent = mode === 'ten-room';
+    const consolePreview = mode === 'Console rehearsal', permanent = mode === 'permanent' || mode === 'customer', concurrent = mode === 'ten-room' || permanent;
     const child = spawn(process.execPath, ['server.mjs'], { stdio: ['ignore', 'pipe', 'pipe'], env: {
       PATH: process.env.PATH, PUBLIC_ORIGIN: 'https://test.example.com',
       TWILIO_ACCOUNT_SID: `AC${'a'.repeat(32)}`, TWILIO_AUTH_TOKEN: 'fixture-account-token',
@@ -16,7 +16,10 @@ for (const mode of ['acceptance', 'Console rehearsal', 'ten-room']) test(`real s
       ADMIN_TOKEN: 'fixture-operator-token-with-at-least-32-chars', JOURNAL_BUCKET: 'fixture-private-bucket',
       JOURNAL_PREFIX: 'qualification/fixture', TEST_DEADLINE: new Date(Date.now() + 60_000).toISOString(), PORT: '0',
       CONSOLE_PREVIEW: consolePreview ? '1' : '0', PREVIEW_ID: 'twilio-preview-fixture', K_REVISION: 'twilio-preview-fixture-001',
-      PREVIEW_OWNER: 'a'.repeat(20), ...(concurrent ? { CONCURRENT_ROOMS: '10' } : {}),
+      PREVIEW_OWNER: 'a'.repeat(20), ...(mode === 'ten-room' ? { CONCURRENT_ROOMS: '10' } : {}),
+      ...(mode === 'customer' ? {CUSTOMER_BILLING:'1',CONSOLE_ORIGIN:'https://console.pyai.com'} : {}),
+      ...(permanent ? { CONSOLE_PERMANENT: '1', SERVICE_ID: 'twilio-console-fixture', SERVICE_REVISION: 'twilio-console-r1',
+        ALLOWANCE_BUCKET: 'fixture-private', ALLOWANCE_PREFIX: 'production/plivo-console', ALLOWANCE_SERVICE_ID: 'plivo-console-fixture' } : {}),
     } });
     let stderr = ''; child.stderr.on('data', value => { stderr += value.toString().slice(0, 4096); });
     const exit = once(child, 'exit');
@@ -29,7 +32,9 @@ for (const mode of ['acceptance', 'Console rehearsal', 'ten-room']) test(`real s
       const operatorHeaders = { 'Content-Type': 'application/json',
         Authorization: 'Bearer fixture-operator-token-with-at-least-32-chars',
         ...(consolePreview ? { 'X-PyAI-Preview-Id': 'twilio-preview-fixture',
-          'X-PyAI-Preview-Revision': 'twilio-preview-fixture-001' } : {}) };
+          'X-PyAI-Preview-Revision': 'twilio-preview-fixture-001' } : {}),
+        ...(permanent ? { 'X-PyAI-Preview-Id': 'twilio-console-fixture',
+          'X-PyAI-Preview-Revision': 'twilio-console-r1' } : {}) };
       assert.equal((await fetch(base + '/end', { method: 'POST', headers: operatorHeaders,
         body: JSON.stringify({ room_id: 'test-stale-conversation' }) })).status, concurrent ? 404 : 409,
       'a stale operator cannot end whichever room is current');
@@ -37,6 +42,11 @@ for (const mode of ['acceptance', 'Console rehearsal', 'ten-room']) test(`real s
         const capacity = await (await fetch(base + '/capacity', { headers: operatorHeaders })).json();
         assert.equal(capacity.maximum_concurrent_rooms, 10); assert.equal(capacity.admitted_rooms, 0);
         assert.equal((await fetch(base + '/room?room_id=test-00000000-0000-0000-0000-000000000000', { headers: operatorHeaders })).status, 404);
+        if (permanent) {
+          assert.equal(capacity.recording_supported, true);
+          assert.equal((await fetch(base + '/capacity', { headers: { ...operatorHeaders, 'X-PyAI-Preview-Revision': 'other-revision' } })).status, 401);
+          assert.equal((await (await fetch(base + '/health')).json()).mode, 'permanent');
+        }
       }
       if (consolePreview) assert.equal((await fetch(base + '/end', { method: 'POST', headers: operatorHeaders,
         body: '{}' })).status, 409, 'Console termination requires its exact room identity');

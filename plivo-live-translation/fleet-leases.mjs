@@ -10,10 +10,12 @@ const same = (value, binding) => value.room_id === binding.roomId && value.slot_
   && value.lease_until === binding.leaseUntil;
 
 /** Renewable ten-slot admission, fenced by GCS object generations across restarts. */
-export function createFleetLeases({ bucket, prefix, serviceId, token, recover, reserveAllowance = async () => {}, fetchImpl = fetch, now = Date.now, sleep }) {
+export function createFleetLeases({ bucket, prefix, serviceId, token, recover, reserveAllowance = async () => {},
+  isCallId = value => UUID.test(value), fetchImpl = fetch, now = Date.now, sleep }) {
   if (!/^[a-z0-9][a-z0-9._-]{2,62}$/.test(bucket ?? '') || !/^[\w/-]{1,160}$/.test(prefix ?? '')
       || prefix.includes('..') || !/^[a-z0-9-]{8,80}$/.test(serviceId ?? '')
-      || typeof token !== 'function' || typeof recover !== 'function' || typeof reserveAllowance !== 'function') throw new Error('invalid_fleet_lease_config');
+      || typeof token !== 'function' || typeof recover !== 'function' || typeof reserveAllowance !== 'function'
+      || typeof isCallId !== 'function') throw new Error('invalid_fleet_lease_config');
   const owned = new Map();
   const object = slot => `${prefix}/fleet-${serviceId}/${slot}.json`;
   const url = name => `https://storage.googleapis.com/storage/v1/b/${bucket}/o/${encodeURIComponent(name)}`;
@@ -45,7 +47,7 @@ export function createFleetLeases({ bucket, prefix, serviceId, token, recover, r
         || !/^[0-9a-f]{48}$/.test(value.lease ?? '') || !Number.isSafeInteger(value.expires_at)
         || !Number.isSafeInteger(value.lease_until) || value.lease_until !== value.expires_at + 630_000
         || typeof value.terminal_verified !== 'boolean' || !Array.isArray(value.call_ids) || value.call_ids.length > 3
-        || value.call_ids.some(id => !UUID.test(id)) || new Set(value.call_ids).size !== value.call_ids.length) {
+        || value.call_ids.some(id => typeof id !== 'string' || !isCallId(id)) || new Set(value.call_ids).size !== value.call_ids.length) {
       throw new Error('fleet_lease_binding_failed');
     }
   }
@@ -181,7 +183,7 @@ export function createFleetLeases({ bucket, prefix, serviceId, token, recover, r
       const budget = storageBudget();
       const pending = binding.pending.then(() => update(binding, value => {
         if (entry.event === 'host.call.admitted') {
-          if (!UUID.test(entry.provider_call_id ?? '') || value.call_ids.length >= 3
+          if (typeof entry.provider_call_id !== 'string' || !isCallId(entry.provider_call_id) || value.call_ids.length >= 3
               || value.call_ids.includes(entry.provider_call_id)) throw new Error('fleet_call_binding_failed');
           return { ...value, call_ids: [...value.call_ids, entry.provider_call_id] };
         }
