@@ -40,11 +40,14 @@ REST origin: `https://api.pyai.com`. Read `PYAI_API_KEY` from the environment an
 send `Authorization: Bearer <key>`. Keys are opaque. Keep live keys server-side;
 never insert them into a browser bundle, source file, or prompt.
 
-If the PyAI MCP server is available, use `get_started` and `list_voices` to
-discover capabilities. For a requested sandbox test without an existing key,
-`create_sandbox_key` obtains a session key. A key-free server startup does not
-itself mean a key has been minted. Respect the user's scope for billable calls,
-external messages, and production changes.
+If the PyAI MCP server is available, start with `get_started`, `whoami` and
+`discover_tools`. Verify project ID, environment, scopes, credit and limits before
+usage; a test label or null budget is not a zero-cost guarantee.
+`create_sandbox_key` is local-only (stdio), unavailable on hosted HTTP, and
+requires an explicit request. It creates a separate sandbox and keeps its secret
+out of model-visible results. Do not silently replace an existing confirmed
+project. A key-free startup does not mean a key has been minted. Respect the
+user's scope for billable calls, external messages, and production changes.
 
 ## Streaming invariants
 
@@ -62,7 +65,12 @@ external messages, and production changes.
   configure/audio/finalize sequencing. Keep the reader alive for final events.
 - Use `wss://api.pyai.com/v1/omni?format=pcm16&rate=24000` for native Omni.
   WebSocket subprotocol authentication requires BOTH `pyai.v1` and
-  `pyai-key.<key>`. Follow the [Omni protocol](https://docs.pyai.com/realtime/omni-protocol)
+  `pyai-key.<credential>`. In browsers, the credential must be a short-lived
+  token minted by your authenticated backend through `POST /v1/omni/sessions`
+  with `allowed_origins` and `ttl_seconds` (default 60, maximum 600). Return only
+  the token, URL and expiry to the browser; never send the backend key. Token
+  expiry limits admission, not the duration or cost of an admitted session.
+  Follow the [Omni protocol](https://docs.pyai.com/realtime/omni-protocol)
   for binary envelopes and configure frames; do not assume OpenAI Realtime frames.
 - Measure first received audio separately from playback readiness and total
   synthesis time. Saved audio cannot demonstrate streaming latency.
