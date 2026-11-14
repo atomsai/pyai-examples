@@ -10,7 +10,7 @@
     "start": "node --env-file=.env --import tsx main.ts"
   },
   "dependencies": {
-    "@pyai/sdk": "0.18.0",
+    "@pyai/sdk": "0.18.1",
     "tsx": "^4.20.0"
   }
 }

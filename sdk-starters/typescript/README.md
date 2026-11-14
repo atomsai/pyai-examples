@@ -4,7 +4,7 @@ Use typed requests and native ReadableStream audio in your Node.js backend.
 
 ## Requirements
 
-Node.js 22+, SDK 0.18.0 (pinned in package.json), and a PyAI key. The starter writes speech.pcm; run npm start -- call.wav to also transcribe a recording.
+Node.js 22+, SDK 0.18.1 (pinned in package.json), and a PyAI key. The starter writes speech.pcm; run npm start -- call.wav to also transcribe a recording.
 
 ## Run
 
