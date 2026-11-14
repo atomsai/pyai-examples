@@ -1,1 +1,1 @@
-pyai-sdk==0.4.0
+pyai-sdk==0.5.1
