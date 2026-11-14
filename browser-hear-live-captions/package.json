@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Browser demo: stream mic audio to PyAI Hear and render live captions.",
   "scripts": {
-    "start": "node server.js",
+    "start": "node --env-file-if-exists=.env server.js",
     "test": "node --test"
   },
   "engines": {

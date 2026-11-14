@@ -138,3 +138,29 @@ for (const [label, payload, congested] of [
   assert.equal(demo.upstream.terminated, true);
   assert.equal(demo.connections(), 1);
 });
+
+test('scaffold npm start loads .env and rejects a live identity before listening', async () => {
+  const { mkdtemp, writeFile, symlink, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { pathToFileURL, fileURLToPath } = await import('node:url');
+  const { spawnSync } = await import('node:child_process');
+  const dir = await mkdtemp(join(tmpdir(), 'pyai-caption-env-'));
+  try {
+    await writeFile(join(dir, 'package.json'), await readFile(new URL('./package.json', import.meta.url)));
+    await writeFile(join(dir, 'server.js'), await readFile(new URL('./server.js', import.meta.url)));
+    await symlink(fileURLToPath(new URL('./node_modules', import.meta.url)), join(dir, 'node_modules'), 'junction');
+    await writeFile(join(dir, '.env'), 'PYAI_API_KEY=fixture-secret\nPYAI_PROJECT_ID=fixture-project\n', { mode: 0o600 });
+    await writeFile(join(dir, 'mock-fetch.mjs'), `globalThis.fetch = async (url, options) => {
+      if (url !== 'https://api.pyai.com/v1/me' || options.headers.Authorization !== 'Bearer fixture-secret') throw new Error('Unexpected identity request');
+      return Response.json({ project_id: 'fixture-project', env: 'live' });
+    };`);
+    const env = { ...process.env, NODE_OPTIONS: `--import=${pathToFileURL(join(dir, 'mock-fetch.mjs')).href}` };
+    delete env.PYAI_API_KEY; delete env.PYAI_PROJECT_ID;
+    const result = spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['start', '--silent'],
+      { cwd: dir, env, encoding: 'utf8', timeout: 10_000 });
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, /Expected test project does not match/);
+    assert.doesNotMatch(result.stdout + result.stderr, /fixture-secret|Live captions:/);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});

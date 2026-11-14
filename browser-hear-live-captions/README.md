@@ -9,13 +9,20 @@ No carrier connection or phone call is created.
 ## Run it
 
 Use Node 22 or newer. Supply your **confirmed test project's** credentials through
-the local environment; never paste a key into the page or commit it to a file.
+the local environment or a private local `.env`; never paste a key into the page
+or commit it to source control.
 
 ```bash
 npm install
-# Set PYAI_API_KEY and PYAI_PROJECT_ID privately in your local environment.
+# The scaffolder creates .env; when cloning, first copy .env.example to .env.
+chmod 600 .env
+# Set PYAI_API_KEY and PYAI_PROJECT_ID in .env using your local editor.
 npm start
 ```
+
+`npm start` loads `.env` when present; existing environment variables take
+precedence. The local `.gitignore` excludes `.env` and `node_modules`.
+Alternatively export both variables privately and run `npm start` without a file.
 
 Open <http://127.0.0.1:5173>. Before starting, review the displayed organization,
 project, environment, limits, credit and key budget. The server checks `GET /v1/me`
