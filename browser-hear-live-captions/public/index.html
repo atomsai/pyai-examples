@@ -47,66 +47,57 @@
       <h1>Live captions</h1>
       <p class="sub">Streams your microphone to <strong>PyAI Hear</strong> and renders partial &amp; final transcripts in real time.</p>
 
-      <div class="row">
-        <input id="key" type="password" placeholder="PyAI key (use a pyai_test_… sandbox key here)" autocomplete="off" />
-      </div>
-      <div class="row">
-        <input id="base" type="text" value="wss://api.pyai.com" />
-        <button id="toggle">Start listening</button>
-      </div>
-
-      <div id="status" class="status">Idle. Paste a sandbox key and click Start.</div>
+      <pre id="identity" style="white-space:pre-wrap;font-size:12px"></pre>
+      <div class="row"><button id="toggle" disabled>Start listening</button></div>
+      <div id="status" class="status">Checking the server's test project…</div>
       <div id="captions" class="captions"><span class="partial">…</span></div>
 
       <p class="hint">
-        The key travels as the WebSocket subprotocol <code>pyai-key.&lt;key&gt;</code>, the browser-safe
-        auth PyAI expects. <strong>Only use a <code>pyai_test_</code> sandbox key in the browser</strong>, never
-        ship a live key to a web page.
+        The API key stays on the local server. Review the project and limits above before
+        starting. One session, at most 60 seconds, with no automatic retries. Closing the
+        socket stops capture; a pending final may be lost. This is a local demo, not a public service.
       </p>
     </div>
 
     <script type="module">
+      import { captureContext, applyTranscript } from "./client.js";
       const $ = (id) => document.getElementById(id);
-      const keyEl = $("key"), baseEl = $("base"), toggle = $("toggle");
+      const toggle = $("toggle");
       const statusEl = $("status"), captionsEl = $("captions");
 
       let ws, audioCtx, source, processor, stream, running = false;
-      let finals = [];
+      let finals = new Map();
 
       function setStatus(text, kind = "") { statusEl.textContent = text; statusEl.className = "status " + kind; }
 
       function render(partial = "") {
         captionsEl.innerHTML =
-          finals.map((t) => `<span class="final">${escapeHtml(t)}</span>`).join(" ") +
+          [...finals.values()].map((t) => `<span class="final">${escapeHtml(t)}</span>`).join(" ") +
           (partial ? ` <span class="partial">${escapeHtml(partial)}</span>` : "");
         captionsEl.scrollTop = captionsEl.scrollHeight;
       }
       function escapeHtml(s) { return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
 
       async function start() {
-        const key = keyEl.value.trim();
-        if (!key) return setStatus("Enter a PyAI sandbox key first.", "err");
-
+        toggle.disabled = true;
         try {
+          audioCtx = captureContext(window.AudioContext || window.webkitAudioContext);
+          await audioCtx.resume();
           stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
-        } catch (e) {
-          return setStatus("Microphone permission denied.", "err");
+          ws = new WebSocket(`ws://${location.host}/stream`);
+        } catch (error) {
+          stop(error.message);
+          return;
         }
-
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const sampleRate = Math.round(audioCtx.sampleRate); // Hear accepts 8000-48000
-
-        const url = `${baseEl.value.replace(/\/$/, "")}/v1/audio/transcriptions/stream` +
-          `?protocol=pyai-hear-v1&model=pyai-hear&sample_rate=${sampleRate}&encoding=pcm16&interim_results=true`;
-        ws = new WebSocket(url, ["pyai.v1", `pyai-key.${key}`]);
         ws.binaryType = "arraybuffer";
 
-        ws.onopen = () => {
-          setStatus(`Listening at ${sampleRate} Hz… speak now.`, "live");
+        function beginCapture() {
+          setStatus("Listening at 16000 Hz… speak now.", "live");
           source = audioCtx.createMediaStreamSource(stream);
           processor = audioCtx.createScriptProcessor(4096, 1, 1);
           processor.onaudioprocess = (ev) => {
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            if (ws.bufferedAmount > 64 * 1024) return stop("Connection too slow; session stopped.");
             const input = ev.inputBuffer.getChannelData(0);
             const pcm = new Int16Array(input.length);
             for (let i = 0; i < input.length; i++) {
@@ -121,15 +112,16 @@
 
         ws.onmessage = (ev) => {
           let msg; try { msg = JSON.parse(ev.data); } catch { return; }
-          const text = (msg.text ?? "").trim();
-          if (msg.type === "final") { if (text) finals.push(text); render(); }
-          else if (msg.type === "partial" || msg.type === "speech_final") { render(text); }
-          else if (msg.type === "error") { setStatus(`Error: ${msg.message ?? msg.code ?? "unknown"}`, "err"); }
+          if (msg.type === "ready") return beginCapture();
+          const partial = applyTranscript(finals, msg);
+          if (partial !== null) render(partial);
+          if (msg.type === "error") stop(`Hear error: ${msg.code ?? "unknown"}`);
         };
-        ws.onerror = () => setStatus("WebSocket error (check the key, scope, and base URL).", "err");
+        ws.onerror = () => stop("Connection failed. Check the local server; no automatic retry.");
         ws.onclose = (e) => { if (running) stop(`Closed (code ${e.code}).`); };
 
         running = true;
+        toggle.disabled = false;
         toggle.textContent = "Stop";
         toggle.classList.add("stop");
       }
@@ -141,11 +133,19 @@
         try { stream && stream.getTracks().forEach((t) => t.stop()); } catch {}
         try { audioCtx && audioCtx.close(); } catch {}
         try { ws && ws.readyState <= 1 && ws.close(); } catch {}
-        toggle.textContent = "Start listening";
+        toggle.disabled = true;
+        toggle.textContent = "Session ended";
         toggle.classList.remove("stop");
         setStatus(reason);
       }
 
+      fetch("/identity").then(async (response) => {
+        if (!response.ok) throw new Error("Project check unavailable.");
+        $("identity").textContent = JSON.stringify(await response.json(), null, 2);
+        setStatus("Review this test project and its limits, then start one session.");
+        toggle.disabled = false;
+      }).catch((error) => setStatus(error.message, "err"));
+      window.addEventListener("pagehide", () => stop());
       toggle.onclick = () => (running ? stop() : start());
     </script>
   </body>

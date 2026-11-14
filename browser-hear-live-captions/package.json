@@ -5,9 +5,13 @@
   "type": "module",
   "description": "Browser demo: stream mic audio to PyAI Hear and render live captions.",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=22"
+  },
+  "dependencies": {
+    "ws": "^8.23.0"
   }
 }
