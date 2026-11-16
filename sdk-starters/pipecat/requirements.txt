@@ -1,2 +1,2 @@
-pipecat-pyai==0.1.4
+pipecat-pyai==0.1.5
 pipecat-ai==1.8.1
