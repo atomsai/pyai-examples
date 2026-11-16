@@ -2,6 +2,22 @@
 
 Plug PyAI speech services into the transport and LLM pipeline you already use.
 
+## Build a complete voice agent
+
+PyAI is listed in Pipecat's [STT](https://docs.pipecat.ai/api-reference/server/services/stt/pyai)
+and [TTS](https://docs.pipecat.ai/api-reference/server/services/tts/pyai) provider references.
+Use the [complete WebRTC example](https://github.com/atomsai/pyai-speech-integrations/tree/main/pipecat-pyai#run-the-standalone-webrtc-example)
+for a transport, VAD, LLM, Hear, Speak, and disconnect cleanup. Its README supplies
+the separately pinned dependencies and server-side credential setup.
+
+[Watch the existing interruption recording](https://docs.pipecat.ai/videos/pyai-speech-interruption.webm):
+34 seconds using prerecorded synthetic input, live STT/TTS, scripted replies,
+and VAD-driven interruption. This is not a human-microphone or latency benchmark.
+
+Check the project's identity and billing limits with `GET /v1/me` before running.
+PyAI, your LLM, and hosting have separate billing. The downloadable starter here
+only writes a WAV file; it does not include a microphone or conversational loop.
+
 ## Try it in your browser
 
 [Try Hear + Speak live](https://pyai-voice-demo-wfls74alya-uc.a.run.app/?source=pipecat)
