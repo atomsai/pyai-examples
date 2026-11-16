@@ -55,3 +55,21 @@ Select a voice from `GET https://api.pyai.com/v1/voices`. Use the current voice/
 Keep `.env` out of Git. These starters use server-side credentials.
 
 [Full guide](https://docs.pyai.com/guides/pipecat) · [Agent setup](https://pyai.com/build-with-ai) · [API contract](https://api.pyai.com/openapi.json)
+
+## Saved-file measurement
+
+After closing and validating a nonempty `speech.wav`, this starter sends the
+original speech request ID and the fixed source `pipecat-starter` to PyAI's
+existing product analytics using the same key. No audio, transcript, filename,
+local path or content hash is sent. Set `PYAI_REPORT_ARTIFACTS=0` to disable it.
+The optional receipt has a three-second timeout; telemetry failure never retries
+synthesis or prevents using the saved file. Missing response IDs and pipeline
+errors are not reported as successful artifacts.
+
+Analytics matches receipts to successful Speak usage from the same key, counts
+the first saved artifact and later UTC days of activity, and keeps internal/test
+organizations separate. This measures a validated local save, not audible
+playback or sound quality. Existing downloads and uninstrumented applications do
+not emit these receipts. Receipts are retained for 180 days; the growth report
+uses 7/30/90-day signup cohorts. It does not reassign existing customers to a new
+acquisition channel.
