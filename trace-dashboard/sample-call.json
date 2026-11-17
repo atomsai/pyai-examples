@@ -1,0 +1,33 @@
+{
+  "object": "trace.interaction",
+  "id": "sample-sales-call",
+  "verdict": "WARN",
+  "audit_hash": null,
+  "tier2_findings": [],
+  "scorecard": {
+    "schema_version": "trace-scorecard-v0",
+    "call_id": "sample-sales-call",
+    "tenant": "fictional-example",
+    "scored_at": "2026-11-17T00:00:00Z",
+    "packs_enforced": "fictional-sales-policy",
+    "n_events_scored": 1,
+    "findings": [{
+      "rule_id": "sample-opening-disclosure",
+      "title": "Fictional opening disclosure finding",
+      "severity": "high",
+      "citation": "Fictional sales policy, opening disclosure",
+      "disposition": "flag",
+      "action_taken": "pass",
+      "at_t": null,
+      "event_type": "call.end",
+      "reason": "Illustrative stored finding: the required opening phrase was not observed. This fixture did not analyze a recording."
+    }],
+    "satisfied_requirements": [],
+    "redactions": [],
+    "severity_counts": { "high": 1 },
+    "blocked_turns": 0,
+    "modified_turns": 0,
+    "gate_health": {},
+    "verdict": { "status": "WARN", "reasons": ["Fictional example only"] }
+  }
+}

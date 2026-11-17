@@ -5,5 +5,5 @@
   "type": "module",
   "description": "A customizable Trace dashboard and server adapter, with an offline sample mode.",
   "engines": { "node": ">=22" },
-  "scripts": { "start": "node server.mjs", "live": "node --env-file=.env server.mjs --live" }
+  "scripts": { "start": "node server.mjs", "live": "node --env-file=.env server.mjs --live", "test": "node --test review-call.test.mjs" }
 }

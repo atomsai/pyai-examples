@@ -3,6 +3,50 @@
 A dashboard you can customize and embed, plus server helpers for summaries and
 signed completed-call events. Node 22 or later; no dependency installation.
 
+## Review a completed call through the API
+
+The [Trace API walkthrough](https://docs.pyai.com/guides/trace-guardrails#walkthrough-review-an-existing-sales-call)
+uses this example to retrieve reported findings and evidence. Start offline:
+
+```sh
+node review-call.mjs --out sample-review.json
+```
+
+The file is explicitly fictional (`sample: true`); no network request is made,
+even with an existing key. It demonstrates reading an opening-disclosure finding,
+not detecting a missing disclosure in a real call.
+
+For existing records, provide `PYAI_API_KEY` privately in your server environment
+and the expected project. This first lists up to five scorecards:
+
+```sh
+node review-call.mjs --live --project proj_your_expected_project
+```
+
+Select an authorized ID from the list, then retrieve it:
+
+```sh
+node review-call.mjs --live --project proj_your_expected_project \
+  --call call_id_from_the_list --out call-review.json
+```
+
+Each live run makes two GET requests: identity, then list or detail. The key must
+belong to the expected active project and organization and grant `trace:read`.
+Trace data is **organization-scoped**, not project-isolated. The script does not
+enable monitoring, upload anything, create a call or run a new scan. It stops on
+errors without retries. Existing files are never overwritten; real output is
+private evidence and must not be published or committed.
+
+Reported findings, reasons, citations, null timestamps and check health are
+preserved. No finding or empty result does not mean the call is compliant.
+The audit hash is retained but its chain is not verified. Advisory findings stay
+separate. Uploaded-call review checks personal-data patterns; it is not a general
+disclosure detector. See the walkthrough for eligible processing paths and
+[current billing](https://pyai.com/pricing).
+
+Run the offline regression checks with `npm test`. These use fake API responses
+and establish no speech quality or live disclosure-detection result.
+
 The console has the same widget under **Trace → Build & embed**. Its editor adds
 card ordering, labels, layout import/export, browser-local saves, and CSV export.
 This starter is a small standalone app for bringing the widget into another product.
