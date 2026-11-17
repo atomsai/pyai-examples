@@ -38,6 +38,14 @@ def fake_server():
                 error = case in ('missing_credentials','identity_error')
                 if case == 'sandbox_wrong_project': payload['project_id'] = 'proj_other'
                 if case == 'incomplete_identity': payload.pop('billing_notice')
+                if case == 'empty_context': payload.update(limits={}, credit={})
+                if case == 'empty_limits': payload['limits'] = {}
+                if case == 'empty_credit': payload['credit'] = {}
+                if case == 'null_limits': payload['limits'] = None
+                if case == 'null_credit': payload['credit'] = None
+                if case == 'array_context': payload.update(limits=[10], credit=[100])
+                if case == 'string_context': payload.update(limits='unknown', credit='unknown')
+                if case == 'zero_context': payload.update(limits={'daily_unit_cap':0}, credit={'gated':False,'available_cents':0})
                 if case == 'no_scope': payload['scopes'] = []
                 if case == 'expired': payload['expires_at'] = 1
             elif name == 'synthesize_speech':
@@ -112,10 +120,13 @@ class QuickstartTests(unittest.TestCase):
                 ('live_approved',('--generate','--project','proj_fixture','--allow-live'),True,1,0,True),
                 ('unknown_flag',('--genrate',),False,0,0,False),
             ]
-            for case in ('identity_error','incomplete_identity','no_scope','expired','existing_output'):
+            for case in ('identity_error','incomplete_identity','empty_context','empty_limits','empty_credit','null_limits','null_credit','array_context','string_context','no_scope','expired','existing_output'):
                 cases.append((case,('--generate','--project','proj_fixture'),False,0,0,False))
             for case in ('tool_error','missing_audio','empty_audio','invalid_audio','truncated_audio','sentinel_header','empty_pcm','invalid_format','bad_alignment','wrong_output','wrong_bytes','disconnect','valid_audio','text_only'):
                 cases.append((case,('--generate','--project','proj_fixture'),case in ('valid_audio','text_only'),1,0,False))
+            cases.append(('zero_context',('--generate','--project','proj_fixture'),True,1,0,False))
+            for case in ('empty_context','empty_limits','empty_credit','array_context','string_context'):
+                cases.append((case,(),False,0,0,False))
             for case,args,ok,synthesis,sandbox,env_key in cases:
                 with self.subTest(client=client,case=case):
                     self.run_case(client,case,args,ok,synthesis,sandbox,env_key)

@@ -21,7 +21,9 @@ python3 client.py
 Both commands list available tools and call `whoami`, showing organization and
 project names and IDs, test/live environment, scopes, limits, credit, billing
 notice and any managed payer/budget. They **do not synthesize by default**.
-Missing credentials or failed identity inspection stop the run. No project is
+Missing credentials, empty or malformed limits/credit objects, or failed identity
+inspection stop the run. Zero and false fields inside populated objects are
+valid context; they do not by themselves authorize spending. No project is
 created automatically and there is no fallback to another credential.
 
 Use `--profile NAME` to select a saved CLI profile. `PYAI_API_KEY`, if set,
@@ -93,7 +95,10 @@ The tests run both real entrypoints against a fake stdio server, without network
 calls or speech generation. They cover live saved-profile/environment identities,
 missing credentials, explicit project/live consent, failed sandbox creation,
 identity mismatch, tool errors, disconnects, existing output and missing, empty,
-malformed, truncated or incorrectly reported audio files.
+malformed, truncated or incorrectly reported audio files. Empty and malformed
+identity context is rejected in both clients. These fixtures do not wait through
+the full 120-second timeout, enforce a real monetary cap, or establish audible
+quality; a real TTS-to-file-to-STT journey is a separate acceptance test.
 
 See https://pyai.com/mcp-agent-guide.md for hosted output contracts, discovery,
 polling and error recovery.

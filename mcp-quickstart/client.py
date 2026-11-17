@@ -136,7 +136,7 @@ def main():
         me = client.call_tool('whoami')
         fields = ['org_id','org_name','project_id','project_name','env','status','org_status','scopes','expires_at','plan','limits','credit','key_budget_cents','billing_notice','managed_billing']
         print('Project and billing context:\n' + json.dumps({k:me[k] for k in fields if k in me}, indent=2))
-        if not me.get('org_id') or not me.get('project_id') or me.get('env') not in ('test','live') or me.get('status') != 'active' or me.get('org_status') != 'active' or not me.get('limits') or not me.get('credit') or not me.get('billing_notice'):
+        if not me.get('org_id') or not me.get('project_id') or me.get('env') not in ('test','live') or me.get('status') != 'active' or me.get('org_status') != 'active' or not isinstance(me.get('limits'), dict) or not me['limits'] or not isinstance(me.get('credit'), dict) or not me['credit'] or not me.get('billing_notice'):
             raise RuntimeError('Identity or billing context is incomplete/inactive. Stop and inspect whoami.')
         if created and (me['project_id'] != created['project_id'] or me['org_id'] != created.get('org_id') or me['env'] != 'test'):
             raise RuntimeError('Sandbox identity does not match the newly created test project.')
