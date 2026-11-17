@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Drive the PyAI MCP server (@pyai/mcp) over stdio: mint a free sandbox key and synthesize speech, no key, no human steps.",
+  "description": "Inspect local PyAI MCP discovery, identity and billing; explicitly opt in to one verified speech artifact.",
   "scripts": {
-    "start": "node index.mjs"
+    "start": "node index.mjs",
+    "test": "python3 test_quickstart.py"
   },
   "engines": {
     "node": ">=22"

@@ -1,127 +1,122 @@
 #!/usr/bin/env node
-/**
- * MCP quickstart, drive the PyAI MCP server (@pyai/mcp) over stdio.
- *
- * Spawns `npx -y @pyai/mcp`, performs the MCP handshake, lists the tools, mints a
- * free sandbox key (no human steps) unless PYAI_API_KEY is already set, then
- * synthesizes speech to hello.mp3, proving "MCP -> working PyAI call" end to end.
- *
- * Transport: newline-delimited JSON-RPC 2.0 over stdio (the MCP stdio transport).
- * Zero dependencies, Node >= 22 only.
+/** Local MCP stdio: inspect discovery, project and billing by default.
+ * --sandbox explicitly creates a NEW session-only test project; never automatic.
+ * Speech requires --generate plus --project <inspected ID> (or --sandbox).
+ * Live usage additionally requires --allow-live and an independently approved budget.
+ * Node >=22, no dependencies. No automatic retries.
  */
-import { spawn } from "node:child_process";
-import { createInterface } from "node:readline";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { spawn } from 'node:child_process';
+import { createInterface } from 'node:readline';
+import { fileURLToPath } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
+import { lstatSync, readFileSync } from 'node:fs';
+import { parseArgs } from 'node:util';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const haveKey = Boolean(process.env.PYAI_API_KEY);
-
-// Start the PyAI MCP server. It speaks JSON-RPC on stdout; diagnostics on stderr
-// (inherited so you can see them, they never corrupt the protocol stream).
-const server = spawn("npx", ["-y", "@pyai/mcp"], {
-  stdio: ["pipe", "pipe", "inherit"],
-  env: process.env,
+const { values: opts } = parseArgs({ options: {
+  sandbox: { type: 'boolean' }, generate: { type: 'boolean' },
+  project: { type: 'string' }, profile: { type: 'string' }, 'allow-live': { type: 'boolean' },
+} });
+const server = spawn('npx', ['-y', '@pyai/mcp@0.5.18', ...(opts.profile ? ['--profile', opts.profile] : [])], {
+  cwd: here, stdio: ['pipe', 'pipe', 'inherit'], env: process.env,
 });
-server.on("error", (err) => {
-  console.error(`Could not start @pyai/mcp via npx: ${err.message}`);
-  process.exit(1);
-});
-
-const rl = createInterface({ input: server.stdout });
 const pending = new Map();
 let nextId = 1;
-
-rl.on("line", (line) => {
-  const trimmed = line.trim();
-  if (!trimmed) return;
+function failPending(message) {
+  for (const p of pending.values()) { clearTimeout(p.timer); p.reject(new Error(message)); }
+  pending.clear();
+}
+server.on('error', () => failPending('Could not start MCP. Install Node.js 22+ and check npx.'));
+server.on('exit', () => failPending('MCP exited before responding; do not retry speech automatically.'));
+const rl = createInterface({ input: server.stdout });
+rl.on('line', (line) => {
   let msg;
-  try {
-    msg = JSON.parse(trimmed);
-  } catch {
-    return; // not a JSON-RPC line
-  }
-  if (msg.id != null && pending.has(msg.id)) {
-    const { resolve, reject } = pending.get(msg.id);
-    pending.delete(msg.id);
-    if (msg.error) reject(new Error(msg.error.message));
-    else resolve(msg.result);
-  }
+  try { msg = JSON.parse(line); } catch { return; }
+  const p = pending.get(msg.id);
+  if (!p) return;
+  pending.delete(msg.id); clearTimeout(p.timer);
+  if (msg.error) p.reject(new Error('MCP request failed; no automatic retry.'));
+  else p.resolve(msg.result);
 });
-
-function request(method, params) {
+function send(method, params, id) {
+  server.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
+}
+function request(method, params = {}) {
   const id = nextId++;
   return new Promise((resolve, reject) => {
-    pending.set(id, { resolve, reject });
-    server.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
+    const timer = setTimeout(() => {
+      pending.delete(id);
+      reject(new Error('MCP timed out; speech may have completed. Do not retry automatically.'));
+    }, 120_000);
+    pending.set(id, { resolve, reject, timer });
+    send(method, params, id);
   });
 }
-
-function notify(method, params) {
-  server.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method, params })}\n`);
+async function tool(name, args = {}) {
+  const result = await request('tools/call', { name, arguments: args });
+  if (!result || result.isError) throw new Error(`${name} failed; stopped without retry. Speech may have completed; inspect artifacts before another request. For whoami, run pyai login or explicitly choose --sandbox.`);
+  if (result.structuredContent) return result.structuredContent;
+  const text = (result.content ?? []).filter(c => c.type === 'text').map(c => c.text).join('\n');
+  try { return JSON.parse(text); } catch { return { text }; }
 }
-
-// MCP tool results arrive as { content: [{ type: "text", text }] }. Parse JSON
-// payloads when the tool returned them as text.
-function toolResult(result) {
-  const text = (result?.content ?? []).map((c) => c.text).join("\n");
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
-}
-
-async function main() {
-  // 1. Handshake.
-  const init = await request("initialize", {
-    protocolVersion: "2024-11-05",
-    capabilities: {},
-    clientInfo: { name: "pyai-mcp-quickstart", version: "1.0.0" },
-  });
-  console.log(`Connected to ${init.serverInfo?.name ?? "server"} (protocol ${init.protocolVersion}).`);
-  notify("notifications/initialized");
-
-  // 2. Discover the tools the server exposes.
-  const { tools } = await request("tools/list");
-  console.log(`Tools: ${tools.map((t) => t.name).join(", ")}`);
-
-  // Local MCP shares the CLI profile. Sandbox creation is an explicit option.
-  if (!haveKey && process.argv.includes("--sandbox")) {
-    const result = toolResult(await request("tools/call", {
-      name: "create_sandbox_key", arguments: { label: "mcp-quickstart" },
-    }));
-    console.log(`Sandbox adopted privately (org ${result?.org_id ?? "?"}).`);
-  } else {
-    console.log("Using the environment key or saved PyAI CLI profile.");
-  }
-
-  // 4. Synthesize speech. The MCP server writes the audio to output_path on this
-  //    machine (the server runs locally via npx).
-  const outPath = join(here, "hello.mp3");
-  const tts = toolResult(await request("tools/call", {
-    name: "synthesize_speech",
-    arguments: {
-      input: "Hello from the PyAI MCP server.",
-      voice: "nova",
-      response_format: "mp3",
-      output_path: outPath,
-    },
-  }));
-  console.log("synthesize_speech:", tts);
-  console.log(`\nDone, play ${outPath}`);
-}
-
-main()
-  .catch((err) => {
-    console.error("Error:", err.message);
-    process.exitCode = 1;
-  })
-  .finally(() => {
-    try {
-      server.stdin.end();
-      server.kill();
-    } catch {
-      /* already gone */
+function validateWav(path) {
+  if (!lstatSync(path).isFile()) throw new Error('Output is not a regular WAV file.');
+  const b = readFileSync(path);
+  if (b.length < 44 || b.toString('ascii', 0, 4) !== 'RIFF' || b.toString('ascii', 8, 12) !== 'WAVE' || b.readUInt32LE(4) !== b.length - 8)
+    throw new Error('Output is not a complete RIFF WAV file.');
+  let fmt, data, p = 12;
+  while (p + 8 <= b.length) {
+    const tag = b.toString('ascii', p, p + 4), n = b.readUInt32LE(p + 4), start = p + 8;
+    if (start + n > b.length) throw new Error('Truncated WAV chunk.');
+    if (tag === 'fmt ') {
+      if (fmt || n < 16) throw new Error('Invalid WAV format chunk.');
+      fmt = { codec: b.readUInt16LE(start), channels: b.readUInt16LE(start+2), rate: b.readUInt32LE(start+4), bytesPerSecond: b.readUInt32LE(start+8), align: b.readUInt16LE(start+12), bits: b.readUInt16LE(start+14) };
     }
-  });
+    if (tag === 'data') { if (data !== undefined) throw new Error('Duplicate WAV data.'); data = n; }
+    p = start + n + (n % 2);
+  }
+  if (p !== b.length || !fmt || fmt.codec !== 1 || fmt.bits !== 16 || ![1,2].includes(fmt.channels) || fmt.rate < 8000 || fmt.rate > 192000 || fmt.align !== fmt.channels * 2 || fmt.bytesPerSecond !== fmt.rate * fmt.align || !data || data % fmt.align)
+    throw new Error('Output is not a nonempty, complete PCM16 WAV.');
+  return { bytes: b.length, seconds: data / fmt.bytesPerSecond };
+}
+async function main() {
+  if (opts.sandbox && opts.project) throw new Error('--sandbox creates a new project; do not combine it with --project.');
+  const init = await request('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'pyai-mcp-quickstart', version: '1.1.0' } });
+  console.log(`Connected to ${init.serverInfo?.name ?? 'MCP'} (local stdio).`);
+  send('notifications/initialized', {});
+  const { tools } = await request('tools/list');
+  console.log(`Tools: ${tools.map(t => t.name).join(', ')}`);
+  let created;
+  if (opts.sandbox) {
+    created = await tool('create_sandbox_key', { label: 'mcp-quickstart' });
+    if (!created.project_id) throw new Error('Sandbox creation did not return a project ID.');
+  }
+  const me = await tool('whoami');
+  // Print only identity/billing fields, never the entire tool result or credentials.
+  const fields = ['org_id','org_name','project_id','project_name','env','status','org_status','scopes','expires_at','plan','limits','credit','key_budget_cents','billing_notice','managed_billing'];
+  console.log('Project and billing context:\n' + JSON.stringify(Object.fromEntries(fields.filter(k => Object.hasOwn(me,k)).map(k => [k, me[k]])), null, 2));
+  if (!me.org_id || !me.project_id || !['test','live'].includes(me.env) || me.status !== 'active' || me.org_status !== 'active' || !me.limits || !me.credit || !me.billing_notice)
+    throw new Error('Identity or billing context is incomplete/inactive. Stop and inspect whoami.');
+  if (created && (me.project_id !== created.project_id || me.org_id !== created.org_id || me.env !== 'test'))
+    throw new Error('Sandbox identity does not match the newly created test project.');
+  if (!opts.generate) {
+    console.log('Inspection complete. No audio submitted. Review billing and limits before opting in with --generate --project <project_id>. --sandbox is session-only.');
+    return;
+  }
+  if (!created && opts.project !== me.project_id) throw new Error('Generation requires --project matching the inspected project ID.');
+  if (me.env === 'live' && !opts['allow-live']) throw new Error('Live usage can incur charges. Requires --allow-live and a separately approved budget; this script does not enforce a dollar cap.');
+  if (!me.scopes?.some(s => ['speak:synthesize','speak:*','*'].includes(s))) throw new Error('Project key lacks speech synthesis permission.');
+  if (me.expires_at != null && me.expires_at <= Date.now()) throw new Error('Project key has expired.');
+  const out = join(here, 'hello.wav');
+  try { lstatSync(out); throw new Error('Output already exists; preserve it and choose a fresh example directory.'); }
+  catch (err) { if (err.code !== 'ENOENT') throw err; }
+  console.log('Submitting one short clip. No automatic retries; inspect billing separately.');
+  const tts = await tool('synthesize_speech', { input: 'Hello from the PyAI MCP server.', voice: 'nova', response_format: 'wav', output_path: out });
+  if (tts.status !== 'ok' || typeof tts.output_path !== 'string' || resolve(tts.output_path) !== out) throw new Error('Speech result did not confirm the requested output file.');
+  const wav = validateWav(out);
+  if (tts.bytes !== wav.bytes) throw new Error('Speech result and saved file sizes disagree.');
+  console.log(`Saved and validated PCM WAV: ${out} (${wav.bytes} bytes, ${wav.seconds.toFixed(3)} seconds). Play it to confirm audible quality; playback has not been tested by this script.`);
+}
+main().catch(err => { console.error('Error:', err.message); process.exitCode = 1; }).finally(() => {
+  failPending('Client closed.'); rl.close(); server.stdin.end(); server.kill();
+});
