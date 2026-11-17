@@ -34,7 +34,7 @@ def fake_server():
                 payload = {'org_id':'org_fixture','project_id':'proj_fixture','credential_saved':'session'}
                 error = case == 'sandbox_error'
             elif name == 'whoami':
-                payload = {'org_id':'org_fixture','org_name':'Fixture org','project_id':'proj_fixture','project_name':'Fixture project','env':'live' if case.startswith('live') else 'test','status':'active','org_status':'active','scopes':['speak:synthesize'],'expires_at':None,'plan':'enterprise','limits':{'daily_unit_cap':10},'credit':{'gated':False,'available_cents':100},'key_budget_cents':None,'billing_notice':'Fixture billing context: caps do not establish free usage.','api_key':'DO-NOT-PRINT-SECRET'}
+                payload = {'org_id':'org_fixture','org_name':'Fixture org','project_id':'proj_fixture','project_name':'Fixture project','env':'live' if case.startswith('live') else 'test','status':'active','org_status':'active','scopes':['speak:synthesize'],'expires_at':None,'plan':'enterprise','limits':{'rps':20,'burst':40,'concurrency':2,'monthly_units':None,'daily_unit_cap':10},'credit':{'gated':False,'available_cents':100},'key_budget_cents':None,'billing_notice':'Fixture billing context: caps do not establish free usage.','api_key':'DO-NOT-PRINT-SECRET'}
                 error = case in ('missing_credentials','identity_error')
                 if case == 'sandbox_wrong_project': payload['project_id'] = 'proj_other'
                 if case == 'incomplete_identity': payload.pop('billing_notice')
@@ -45,7 +45,34 @@ def fake_server():
                 if case == 'null_credit': payload['credit'] = None
                 if case == 'array_context': payload.update(limits=[10], credit=[100])
                 if case == 'string_context': payload.update(limits='unknown', credit='unknown')
-                if case == 'zero_context': payload.update(limits={'daily_unit_cap':0}, credit={'gated':False,'available_cents':0})
+                if case == 'zero_context':
+                    payload['limits'] = dict.fromkeys(payload['limits'], 0)
+                    payload['credit'] = {'gated':False,'available_cents':0}
+                    payload['key_budget_cents'] = 0
+                if case == 'unknown_limits': payload['limits'] = {'unrelated':True}
+                if case == 'unknown_credit': payload['credit'] = {'unrelated':True}
+                if case.startswith('missing_limit_'): payload['limits'].pop(case[len('missing_limit_'):])
+                if case.startswith('missing_credit_'): payload['credit'].pop(case[len('missing_credit_'):])
+                if case.startswith('bad_limit_'): payload['limits'][case[len('bad_limit_'):]] = 'unknown'
+                if case == 'boolean_number': payload['credit']['available_cents'] = True
+                if case == 'numeric_gate': payload['credit']['gated'] = 0
+                if case == 'string_gate': payload['credit']['gated'] = 'false'
+                if case == 'null_balance': payload['credit']['available_cents'] = None
+                if case == 'string_balance': payload['credit']['available_cents'] = '0'
+                if case == 'fractional_balance': payload['credit']['available_cents'] = 0.5
+                if case == 'fractional_limit': payload['limits']['rps'] = 1.5
+                if case == 'boolean_limit': payload['limits']['monthly_units'] = False
+                if case == 'null_rate': payload['limits']['rps'] = None
+                if case == 'null_daily_cap': payload['limits']['daily_unit_cap'] = None
+                if case == 'absent_daily_cap': payload['limits'].pop('daily_unit_cap')
+                if case == 'finite_caps': payload['limits'].update(monthly_units=100, daily_unit_cap=10)
+                if case == 'negative_balance': payload['credit'].update(gated=True, available_cents=-1)
+                if case == 'extra_fields':
+                    payload['limits']['future_field'] = 'ignored'
+                    payload['credit']['future_field'] = 'ignored'
+                if case == 'integral_numbers':
+                    payload['limits']['rps'] = 20.0
+                    payload['credit']['available_cents'] = 100.0
                 if case == 'no_scope': payload['scopes'] = []
                 if case == 'expired': payload['expires_at'] = 1
             elif name == 'synthesize_speech':
@@ -97,7 +124,7 @@ class QuickstartTests(unittest.TestCase):
             if synthesis:
                 self.assertLess(names.index('whoami'),names.index('synthesize_speech'))
                 self.assertIn('Project and billing context:',out)
-                self.assertIn('daily_unit_cap',out)
+                self.assertIn('monthly_units',out)
                 self.assertEqual('Saved and validated PCM WAV:' in out,ok)
                 self.assertNotIn('Done',out)
             if case == 'existing_output': self.assertEqual((root/'hello.wav').read_bytes(),b'preserve me')
@@ -124,7 +151,16 @@ class QuickstartTests(unittest.TestCase):
                 cases.append((case,('--generate','--project','proj_fixture'),False,0,0,False))
             for case in ('tool_error','missing_audio','empty_audio','invalid_audio','truncated_audio','sentinel_header','empty_pcm','invalid_format','bad_alignment','wrong_output','wrong_bytes','disconnect','valid_audio','text_only'):
                 cases.append((case,('--generate','--project','proj_fixture'),case in ('valid_audio','text_only'),1,0,False))
-            cases.append(('zero_context',('--generate','--project','proj_fixture'),True,1,0,False))
+            for case in ('zero_context','null_daily_cap','absent_daily_cap','finite_caps','negative_balance','extra_fields','integral_numbers'):
+                cases.append((case,('--generate','--project','proj_fixture'),True,1,0,False))
+            malformed = ['unknown_limits','unknown_credit','boolean_number','numeric_gate','string_gate','null_balance','string_balance','fractional_balance','fractional_limit','boolean_limit','null_rate']
+            malformed += ['missing_limit_'+field for field in ('rps','burst','concurrency','monthly_units')]
+            malformed += ['missing_credit_'+field for field in ('gated','available_cents')]
+            malformed += ['bad_limit_'+field for field in ('rps','burst','concurrency','monthly_units','daily_unit_cap')]
+            for case in malformed:
+                cases.append((case,('--generate','--project','proj_fixture'),False,0,0,False))
+            for case in ('unknown_limits','unknown_credit'):
+                cases.append((case,(),False,0,0,False))
             for case in ('empty_context','empty_limits','empty_credit','array_context','string_context'):
                 cases.append((case,(),False,0,0,False))
             for case,args,ok,synthesis,sandbox,env_key in cases:

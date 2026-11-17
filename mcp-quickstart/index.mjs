@@ -59,8 +59,16 @@ async function tool(name, args = {}) {
   const text = (result.content ?? []).filter(c => c.type === 'text').map(c => c.text).join('\n');
   try { return JSON.parse(text); } catch { return { text }; }
 }
-function hasContext(value) {
-  return value !== null && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length > 0;
+function hasBillingContext(limits, credit) {
+  const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+  const nullableInteger = value => value === null || Number.isInteger(value);
+  // GET /v1/me field types plus the core fields its projection always returns.
+  // daily_unit_cap is optional; null caps are unlimited, not free usage.
+  return object(limits) && object(credit)
+    && ['rps', 'burst', 'concurrency'].every(k => Number.isInteger(limits[k]))
+    && Object.hasOwn(limits, 'monthly_units') && nullableInteger(limits.monthly_units)
+    && (!Object.hasOwn(limits, 'daily_unit_cap') || nullableInteger(limits.daily_unit_cap))
+    && typeof credit.gated === 'boolean' && Number.isInteger(credit.available_cents);
 }
 function validateWav(path) {
   if (!lstatSync(path).isFile()) throw new Error('Output is not a regular WAV file.');
@@ -98,7 +106,7 @@ async function main() {
   // Print only identity/billing fields, never the entire tool result or credentials.
   const fields = ['org_id','org_name','project_id','project_name','env','status','org_status','scopes','expires_at','plan','limits','credit','key_budget_cents','billing_notice','managed_billing'];
   console.log('Project and billing context:\n' + JSON.stringify(Object.fromEntries(fields.filter(k => Object.hasOwn(me,k)).map(k => [k, me[k]])), null, 2));
-  if (!me.org_id || !me.project_id || !['test','live'].includes(me.env) || me.status !== 'active' || me.org_status !== 'active' || !hasContext(me.limits) || !hasContext(me.credit) || !me.billing_notice)
+  if (!me.org_id || !me.project_id || !['test','live'].includes(me.env) || me.status !== 'active' || me.org_status !== 'active' || !hasBillingContext(me.limits, me.credit) || !me.billing_notice)
     throw new Error('Identity or billing context is incomplete/inactive. Stop and inspect whoami.');
   if (created && (me.project_id !== created.project_id || me.org_id !== created.org_id || me.env !== 'test'))
     throw new Error('Sandbox identity does not match the newly created test project.');

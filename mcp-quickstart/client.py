@@ -17,6 +17,20 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
+def has_billing_context(limits, credit):
+    # JSON Schema integers include integral JSON numbers, but never booleans.
+    def integer(value):
+        return type(value) is int or (type(value) is float and value.is_integer())
+    def nullable_integer(value):
+        return value is None or integer(value)
+    # GET /v1/me field types plus the core fields its projection always returns.
+    # daily_unit_cap is optional; null caps are unlimited, not free usage.
+    return (isinstance(limits, dict) and isinstance(credit, dict)
+            and all(integer(limits.get(k)) for k in ('rps', 'burst', 'concurrency'))
+            and 'monthly_units' in limits and nullable_integer(limits['monthly_units'])
+            and ('daily_unit_cap' not in limits or nullable_integer(limits['daily_unit_cap']))
+            and type(credit.get('gated')) is bool and integer(credit.get('available_cents')))
+
 class MCPStdioClient:
     def __init__(self, command):
         self.proc = subprocess.Popen(command, cwd=HERE, stdin=subprocess.PIPE,
@@ -136,7 +150,7 @@ def main():
         me = client.call_tool('whoami')
         fields = ['org_id','org_name','project_id','project_name','env','status','org_status','scopes','expires_at','plan','limits','credit','key_budget_cents','billing_notice','managed_billing']
         print('Project and billing context:\n' + json.dumps({k:me[k] for k in fields if k in me}, indent=2))
-        if not me.get('org_id') or not me.get('project_id') or me.get('env') not in ('test','live') or me.get('status') != 'active' or me.get('org_status') != 'active' or not isinstance(me.get('limits'), dict) or not me['limits'] or not isinstance(me.get('credit'), dict) or not me['credit'] or not me.get('billing_notice'):
+        if not me.get('org_id') or not me.get('project_id') or me.get('env') not in ('test','live') or me.get('status') != 'active' or me.get('org_status') != 'active' or not has_billing_context(me.get('limits'), me.get('credit')) or not me.get('billing_notice'):
             raise RuntimeError('Identity or billing context is incomplete/inactive. Stop and inspect whoami.')
         if created and (me['project_id'] != created['project_id'] or me['org_id'] != created.get('org_id') or me['env'] != 'test'):
             raise RuntimeError('Sandbox identity does not match the newly created test project.')

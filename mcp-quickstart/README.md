@@ -22,9 +22,17 @@ Both commands list available tools and call `whoami`, showing organization and
 project names and IDs, test/live environment, scopes, limits, credit, billing
 notice and any managed payer/budget. They **do not synthesize by default**.
 Missing credentials, empty or malformed limits/credit objects, or failed identity
-inspection stop the run. Zero and false fields inside populated objects are
-valid context; they do not by themselves authorize spending. No project is
-created automatically and there is no fallback to another credential.
+inspection stop the run. The minimum usable context is integer `rps`, `burst`
+and `concurrency`, integer-or-null `monthly_units`, boolean `credit.gated`, and
+integer `credit.available_cents`. These types follow the
+[identity contract](https://api.pyai.com/openapi.json); the core fields are
+always returned by the identity endpoint, although its schema currently omits
+formal required-field lists. `daily_unit_cap` may be absent, null or an integer.
+Zero values, `gated=false` and null caps remain valid; numeric strings,
+booleans in numeric fields and objects containing only unrelated fields do not.
+Unknown additional fields are tolerated. Valid context does not authorize
+spending or prove remaining allowance. No project is created automatically and
+there is no fallback to another credential.
 
 Use `--profile NAME` to select a saved CLI profile. `PYAI_API_KEY`, if set,
 **overrides the profile**. Verify the returned project ID. Never paste keys into
