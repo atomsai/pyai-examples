@@ -2,6 +2,7 @@ import { OmniBrowserAudioContract } from "./audio-contract.mjs";
 import { normalizeOmniTranscriptBody as normalizeTranscriptBody, normalizeOmniServerControl as normalizeServerControl } from "./omni-wire.mjs";
 import { createAssistantTranscriptState, advanceAssistantTranscriptState, readAssistantInterruption, reconcileAssistantTranscript } from "./transcript-correction.mjs";
 import { OmniPlaybackReceipts } from "./playback-receipts.mjs";
+import { executeDemoTool } from "./tool-client.mjs";
 
 // Browser side of the "Talk to PyAI" concierge.
 //
@@ -43,6 +44,7 @@ let processor;
 let captureMute;
 let outputGain;
 let running = false;
+let demoDeadline;
 let startupAudioPhase = "waiting";
 let connectedAt = 0;
 let responseAudioActive = false;
@@ -196,6 +198,10 @@ async function connectDirect() {
   const res = await fetch("/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
   if (!res.ok) throw new Error("Could not start a session.");
   const session = await res.json();
+  if (session.max_duration_ms === 180000) {
+    clearTimeout(demoDeadline);
+    demoDeadline = setTimeout(() => stop("Three-minute demonstration limit reached."), 180000);
+  }
   pendingConfigure = { ...(session.configure || {}), type: "configure", playback_ack: true };
 
   protocolCloseRequested = false;
@@ -387,6 +393,13 @@ function handleEvent(evt) {
   }
   const kind = typeof evt.event === "string" ? evt.event : "";
   switch (kind) {
+    case "tool_call": {
+      const socket = ws;
+      void executeDemoTool(evt).then(result => {
+        if (socket === ws && socket?.readyState === WebSocket.OPEN) socket.send(connectMode === "direct" ? frame03(result) : JSON.stringify(result));
+      });
+      break;
+    }
     case "configured":     // negotiated engine configure acknowledgement
     case "config_ack":     // older server acknowledgement
       setStatus("Listening, go ahead and ask.", "live");
@@ -530,6 +543,7 @@ function drawTranscript() {
 }
 
 function stop(reason = "Call ended.") {
+  clearTimeout(demoDeadline);
   running = false;
   transportEpoch++;
   playbackReceipts.reset();

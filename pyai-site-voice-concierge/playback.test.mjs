@@ -6,6 +6,7 @@ import { normalizeOmniTranscriptBody as normalizeTranscriptBody, normalizeOmniSe
 import * as correction from './public/transcript-correction.mjs';
 import { OmniPlaybackReceipts } from './public/playback-receipts.mjs';
 import { OmniBrowserAudioContract } from './public/audio-contract.mjs';
+import { executeDemoTool } from './public/tool-client.mjs';
 
 const source = readFileSync(new URL('./public/app.js', import.meta.url), 'utf8').replace(/^import .*;\n/gm, '');
 const reply = 'a'.repeat(32);
@@ -14,7 +15,7 @@ function player(mode, acknowledged = true) {
   const element = () => ({ classList: { add() {}, remove() {} }, textContent: '',
     replaceChildren() {}, appendChild() {}, querySelector() { return element(); } });
   const context = vm.createContext({
-    ...correction, normalizeTranscriptBody, normalizeServerControl, OmniPlaybackReceipts, OmniBrowserAudioContract, Uint8Array, Float32Array, DataView, ArrayBuffer, TextEncoder, TextDecoder, Blob,
+    ...correction, normalizeTranscriptBody, normalizeServerControl, OmniPlaybackReceipts, OmniBrowserAudioContract, executeDemoTool, Uint8Array, Float32Array, DataView, ArrayBuffer, TextEncoder, TextDecoder, Blob,
     console, URL, navigator: {}, location: { protocol: 'http:', host: 'localhost' },
     document: { createElement: element, getElementById(id) { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); } },
     window: {}, WebSocket: { OPEN: 1 }, fetch: async () => ({ json: async () => ({mode}) }),
@@ -36,6 +37,24 @@ function player(mode, acknowledged = true) {
 }
 
 for (const mode of ['direct','broker']) {
+  test(`${mode}: client tool returns the confirmed backend receipt on its original socket`, async () => {
+    const p = player(mode);
+    p.context.executeDemoTool = async evt => ({type:'tool_result',call_id:evt.call_id,result:{success:true,id:'synthetic-enquiry-1'}});
+    p.control({event:'tool_call',call_id:'call_demo',name:'save_demo_enquiry',arguments:{team_size:4,needs_reminders:true}});
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(p.receipts().at(-1).result.id, 'synthetic-enquiry-1');
+    assert.equal(p.receipts().at(-1).call_id, 'call_demo');
+  });
+  test(`${mode}: a delayed tool result cannot leak into a replacement session`, async () => {
+    const p = player(mode);
+    let finish;
+    p.context.executeDemoTool = () => new Promise(resolve => { finish = resolve; });
+    p.control({event:'tool_call',call_id:'call_old',name:'save_demo_enquiry'});
+    vm.runInContext('ws = {readyState:1,send(){throw new Error("wrong session")}}', p.context);
+    finish({type:'tool_result',call_id:'call_old',result:{success:true}});
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(p.receipts().some(r => r.type === 'tool_result'), false);
+  });
   test(`${mode}: actual ingress through scheduled sink to contiguous source-rate receipts`, () => {
     const p=player(mode); p.segment(); p.audio(); p.audio();
     p.control({event:'audio_segment_done',reply_id:reply,segment_id:'1'});

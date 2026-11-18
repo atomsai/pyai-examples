@@ -7,6 +7,12 @@ a knowledge base you control.
 
 ## Deploy in one click (zero-install)
 
+For a bounded synthetic conversation with a real backend action, use the
+[local demonstration](#synthetic-website-demonstration) below. The older server
+in this example is a reference integration: before exposing it publicly, add
+the authenticated project authorization and quota policy described in the
+[browser guide](https://docs.pyai.com/guides/browser-voice-agent).
+
 You don't need to clone anything or run `ngrok` to try this on a real URL:
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/atomsai/pyai-examples)
@@ -19,7 +25,7 @@ key is fine). Everything else is automatic: `KB_TOKEN` is generated and
 click **Talk to PyAI**.
 
 > The button targets the public [`pyai-examples`](https://github.com/atomsai/pyai-examples)
-> repo. Until that repo is published you can still deploy in ~2 minutes: in
+> repo. For a manual deployment, in
 > Render, **New → Web Service**, point it at this repo, set **Root Directory** to
 > `examples/pyai-site-voice-concierge`, build `npm install`, start
 > `npm run start:noenv`, and add `PYAI_API_KEY`. Railway/Fly/Cloud Run work the
@@ -28,6 +34,73 @@ click **Talk to PyAI**.
 > anything, open it in [StackBlitz](https://stackblitz.com/github/atomsai/pyai-examples/tree/main/pyai-site-voice-concierge).
 
 Prefer to run it locally? See [Run it](#run-it) below.
+
+## Synthetic website demonstration
+
+This optional `demo.mjs` server uses the same browser playback client and the
+public Omni endpoint. It provides fictional Lantern Desk facts inline, asks
+for team size and reminder needs, then saves one confirmed enquiry to a local
+file. It does not contact a person, book an appointment, or use a carrier.
+This exercises inline context; it does not qualify indexed knowledge retrieval
+or the separately hosted widget.
+
+The [18 November 2026 result](https://pyai.com/demos/website-enquiry/result.json)
+and [recorded conversation](https://pyai.com/demos/website-enquiry/website-audio.webm)
+retain the evidence and limitations. The initial live test failed because native
+tool arguments were JSON text; both that representation and object-valued
+arguments now pass strict backend validation. The successful run saved one
+enquiry and stopped scheduled playback on interruption. This uses the server's
+default voice and records its acknowledgement; it does not promise selection
+of a voice merely because it appears in the catalog.
+
+Use Node 22 or newer. No server dependencies are needed for this mode. In a
+private `.env`, set `PYAI_API_KEY`, the matching `PYAI_PROJECT_ID`, and a random
+`DEMO_PASSWORD` of at least 24 characters. Do not commit that file. Run:
+
+```sh
+node --env-file=.env demo.mjs
+```
+
+Open `http://127.0.0.1:8787`, sign in with username `demo` and your demo password,
+and start the microphone. The server binds only to loopback, rejects missing
+or wrong origins, checks the exact active test project and non-credit-gated
+identity, and allows one session attempt per process. The browser closes after
+three minutes. The short-lived token's expiry limits admission; it is not a
+server-enforced session-duration or monetary cap. This is a local test policy,
+not production authentication or account-wide cost enforcement.
+
+1. Ask: “What does Lantern Desk do? Can it help with appointment reminders?”
+2. Say: “There are four people on our team, and yes, we need appointment reminders.”
+3. Confirm: “Yes, please save that synthetic enquiry now.”
+4. During the reply, interrupt: “Wait, stop. Tell me only how many people are on our team.”
+
+Check `demo-results/enquiry.json` for exactly one receipt with `team_size: 4`
+and `needs_reminders: true`. A success response is sent only after that file
+is written. Repeated delivery of the same action returns the same receipt;
+a different action is rejected. Lost responses are reported as uncertain and
+never retried automatically. Keep the receipt while investigating a failure;
+the server refuses to overwrite it on a later run.
+
+The API key stays on the backend. The browser receives only the origin-locked
+Omni token. The action executor accepts only the fictional enquiry schema.
+This demo is not an authorization pattern for real customer writes: an
+authenticated visitor controls browser messages, so a production backend must
+independently authorize each business action.
+
+Run the non-audio regression tests with `node --test *.test.mjs`. These cover
+wrong origin, missing authentication, wrong project, gated/exhausted credit,
+duplicate actions, uncertain responses, and playback cancellation. Mock credit
+failures do not establish actual account billing behavior.
+
+`measure.mjs` exports an explicitly invoked measurement function: it validates
+the same test identity, issues at most 46 short requests with no retries, and
+preserves each result or failure. `benchmark()` makes 21 requests per language:
+one first observation and 20 subsequent observations using repeated text.
+It measures client request-start to first nonempty PCM payload, including
+network and admission. It does not measure server-only processing, a controlled
+cold start, speaker audibility, or production tail latency. English uses
+`stock_aria_en` (Natural); Hindi uses `stock_ananya_hi` (Standard), so the results
+are not a matched model comparison.
 
 It ships **two supported web patterns**, switchable with one env var
 (`CONNECT_MODE`):
